@@ -20,7 +20,7 @@ CREATE TABLE jobs (
     state           text        NOT NULL,
     priority        smallint    NOT NULL DEFAULT 100,
     attempts        int         NOT NULL DEFAULT 0,
-    max_attempts    int         NOT NULL DEFAULT 5,
+    max_attempts    int         NOT NULL DEFAULT 9,
     run_after       timestamptz NOT NULL DEFAULT now(),
     leased_until    timestamptz NULL,
     leased_by       text        NULL,
