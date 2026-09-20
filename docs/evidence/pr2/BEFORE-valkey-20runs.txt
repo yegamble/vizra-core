@@ -1,0 +1,44 @@
+run  1 rc=0 pass=38 fail=0
+run  2 rc=0 pass=38 fail=0
+run  3 rc=0 pass=38 fail=0
+run  4 rc=1 pass=37 fail=1
+    golden_test.go:412: no rows in result set
+--- FAIL: TestSweepReclaimsOnlyElapsedLeases (0.04s)
+    golden_test.go:564: cache identified as valkey 9.1.2
+    golden_test.go:700: FLUSHALL issued; the cache is now empty
+    golden_test.go:941: claim plan:
+    golden_test.go:960: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
+    golden_test.go:1421: stored 2014 bytes, valid UTF-8, redacted, message preserved
+run  5 rc=0 pass=38 fail=0
+run  6 rc=0 pass=38 fail=0
+run  7 rc=0 pass=38 fail=0
+run  8 rc=1 pass=36 fail=2
+    golden_test.go:369: no rows in result set
+--- FAIL: TestHeartbeatRequiresStillHoldingTheLease (0.03s)
+    golden_test.go:412: no rows in result set
+--- FAIL: TestSweepReclaimsOnlyElapsedLeases (0.03s)
+    golden_test.go:564: cache identified as valkey 9.1.2
+    golden_test.go:700: FLUSHALL issued; the cache is now empty
+    golden_test.go:941: claim plan:
+    golden_test.go:960: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
+    golden_test.go:1421: stored 2014 bytes, valid UTF-8, redacted, message preserved
+run  9 rc=0 pass=38 fail=0
+run 10 rc=0 pass=38 fail=0
+run 11 rc=0 pass=38 fail=0
+run 12 rc=0 pass=38 fail=0
+run 13 rc=0 pass=38 fail=0
+run 14 rc=0 pass=38 fail=0
+run 15 rc=0 pass=38 fail=0
+run 16 rc=1 pass=37 fail=1
+    golden_test.go:369: no rows in result set
+--- FAIL: TestHeartbeatRequiresStillHoldingTheLease (0.03s)
+    golden_test.go:564: cache identified as valkey 9.1.2
+    golden_test.go:700: FLUSHALL issued; the cache is now empty
+    golden_test.go:941: claim plan:
+    golden_test.go:960: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
+    golden_test.go:1421: stored 2014 bytes, valid UTF-8, redacted, message preserved
+run 17 rc=0 pass=38 fail=0
+run 18 rc=0 pass=38 fail=0
+run 19 rc=0 pass=38 fail=0
+run 20 rc=0 pass=38 fail=0
+TOTAL FAILED RUNS: 3 / 20
