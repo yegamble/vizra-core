@@ -1,0 +1,6 @@
+
+=== GREEN after restoring ===
+=== RUN   TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue
+--- PASS: TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue (0.05s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	0.444s

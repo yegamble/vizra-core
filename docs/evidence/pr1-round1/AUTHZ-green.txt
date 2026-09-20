@@ -1,0 +1,3 @@
+$ go test -count=1 -run TestFrozenMatrix|TestUnlistedSurfaceDenies ./internal/authz/
+ok  	github.com/yegamble/vizra-core/internal/authz	0.268s
+EXIT=0

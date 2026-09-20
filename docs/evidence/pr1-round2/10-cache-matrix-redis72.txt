@@ -1,0 +1,4 @@
+$ integration against Redis 7.2 (matrix leg 2)
+ok  	github.com/yegamble/vizra-core/internal/integration	8.218s
+ok  	github.com/yegamble/vizra-core/internal/cache	1.380s
+EXIT=0

@@ -1,0 +1,7 @@
+$ make migrate-lint
+==> migrate-lint
+migrate-lint: migrations
+  ok    4 migrations form a gapless 1..4 sequence
+  ok    append-only manifest matches (8 migrations)
+migrate-lint: passed
+EXIT=0

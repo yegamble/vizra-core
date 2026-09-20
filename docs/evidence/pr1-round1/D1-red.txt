@@ -1,0 +1,12 @@
+$ make openapi-verify
+==> openapi-verify
+--- FAIL: TestEveryRouteHasASpecOperation (0.00s)
+    openapi_contract_test.go:106: cmd/api serves 1 route(s) that api/openapi.yaml does not describe:
+          GET /stats
+        
+        api/openapi.yaml is the API source (ADR-002 § Contracts): write the operation first.
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.616s
+FAIL
+make: *** [openapi-verify] Error 1
+EXIT=2

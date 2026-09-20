@@ -1,0 +1,8 @@
+$ go test -tags=integration -run TestAMultibyteErrorIsStoredInLastError ./internal/integration/
+# truncate() slices on a byte index (the state at 4f8d0fc)
+        time=2026-09-20T16:10:17.794-04:00 level=WARN msg="jobs: recording dead-letter failed" site=default worker=utf8-worker job_id=01a0c070-df3c-7c15-9a5a-d047fe74afa9 kind=multibyte-fail correlation_id=utf8 rows=0 error="ERROR: invalid byte sequence for en
+--- FAIL: TestAMultibyteErrorIsStoredInLastError (20.12s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	20.506s
+FAIL
+EXIT=1

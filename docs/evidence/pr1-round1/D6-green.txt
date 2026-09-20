@@ -1,0 +1,12 @@
+$ go test -race -count=1 -tags=integration -v -run TestGoldenPathPassesAfterFlushAll|TestReadinessDegradesWhenTheCacheIsUnreachable ./internal/integration/
+=== RUN   TestGoldenPathPassesAfterFlushAll
+    golden_test.go:697: FLUSHALL issued; the cache is now empty
+--- PASS: TestGoldenPathPassesAfterFlushAll (2.28s)
+=== RUN   TestReadinessDegradesWhenTheCacheIsUnreachable
+redis: 2026/09/20 14:13:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/20 14:13:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/20 14:13:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+--- PASS: TestReadinessDegradesWhenTheCacheIsUnreachable (1.40s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	5.418s
+EXIT=0

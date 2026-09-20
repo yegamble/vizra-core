@@ -28,6 +28,36 @@ import (
 // schema-drift check reporting OK, the cache floor check deleted, and an
 // invalid configuration reporting OK.
 
+// probes are the I/O collect() performs. They exist as fields so a test can run
+// the REAL collect() — the same function `vizra doctor` runs — against fakes,
+// and assert that every check appears in its output.
+//
+// Without that, deleting a call site here left every lane green while the check
+// silently vanished from an operator's doctor run. A check that can disappear
+// without a test noticing is a check that is not there.
+type probes struct {
+	loadConfig      func() (*config.Config, error)
+	compose         func() doctor.Result
+	openPools       func(context.Context, *site.Resolver) (pooler, error)
+	serverVersion   func(context.Context, pooler) (string, error)
+	schema          func(context.Context, pooler) (migrate.Status, error)
+	openCache       func(*config.Config) (cacher, error)
+	searchReachable func(context.Context, *config.Config) bool
+}
+
+// pooler and cacher are the narrow views collect() needs, so a fake is three
+// methods rather than a database.
+type pooler interface {
+	Ping(context.Context) error
+	Close()
+}
+
+type cacher interface {
+	Ping(context.Context) error
+	Identify(context.Context) (cache.ServerInfo, error)
+	Close() error
+}
+
 func runDoctor(args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	envFile := fs.String("env", "", "validate this env file instead of the process environment")
@@ -38,32 +68,77 @@ func runDoctor(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	results := collect(ctx, *envFile)
+	results := collect(ctx, realProbes(*envFile))
 	return doctor.Report(os.Stdout, results)
 }
 
-func collect(ctx context.Context, envFile string) []doctor.Result {
+// realProbes is the production wiring.
+func realProbes(envFile string) probes {
+	return probes{
+		loadConfig: func() (*config.Config, error) {
+			if envFile == "" {
+				return config.Load()
+			}
+			env, err := readEnvFile(envFile)
+			if err != nil {
+				return nil, err
+			}
+			return config.LoadFrom(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
+		},
+		compose: composeCheck,
+		openPools: func(ctx context.Context, r *site.Resolver) (pooler, error) {
+			p, err := db.Open(ctx, r)
+			if err != nil {
+				return nil, err
+			}
+			return poolAdapter{p}, nil
+		},
+		serverVersion: func(ctx context.Context, p pooler) (string, error) {
+			var v string
+			err := p.(poolAdapter).pools.Default().QueryRow(ctx, "SHOW server_version").Scan(&v)
+			return v, err
+		},
+		schema: func(ctx context.Context, p pooler) (migrate.Status, error) {
+			embedded, err := migrate.EmbeddedVersion()
+			if err != nil {
+				return migrate.Status{}, err
+			}
+			return migrate.Probe(ctx, p.(poolAdapter).pools.Default(), embedded), nil
+		},
+		openCache: func(cfg *config.Config) (cacher, error) {
+			c, err := cache.Open(cfg.CacheURL, cfg.CacheNamespace)
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+		searchReachable: func(ctx context.Context, cfg *config.Config) bool {
+			if cfg.SearchMode == config.SearchOff {
+				return false
+			}
+			remote := search.NewRemote(cfg.SearchURL, []byte(cfg.SearchHMACKey), cfg.SearchTimeout)
+			return search.NewService(search.NewSQL(), remote, nil).Health(ctx) == search.HealthOK
+		},
+	}
+}
+
+type poolAdapter struct{ pools *db.Pools }
+
+func (a poolAdapter) Ping(ctx context.Context) error { return db.Ping(ctx, a.pools.Default()) }
+func (a poolAdapter) Close()                         { a.pools.Close() }
+
+func collect(ctx context.Context, p probes) []doctor.Result {
 	var results []doctor.Result
 
 	// --- configuration ------------------------------------------------------
 	// Validated with the SAME code boot runs (ADR-002 § Configuration
 	// ownership): config.LoadFrom. A doctor with its own rules is a doctor that
 	// disagrees with boot.
-	var cfg *config.Config
-	var cfgErr error
-	if envFile != "" {
-		env, err := readEnvFile(envFile)
-		if err != nil {
-			return append(results, doctor.Result{Name: "configuration", Status: doctor.StatusFail, Detail: err.Error()})
-		}
-		cfg, cfgErr = config.LoadFrom(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
-	} else {
-		cfg, cfgErr = config.Load()
-	}
+	cfg, cfgErr := p.loadConfig()
 	results = append(results, doctor.CheckConfig(cfg, cfgErr)...)
 
 	// --- compose ------------------------------------------------------------
-	results = append(results, composeCheck())
+	results = append(results, p.compose())
 
 	// Everything below needs a valid configuration.
 	if cfg == nil {
@@ -72,32 +147,31 @@ func collect(ctx context.Context, envFile string) []doctor.Result {
 	resolver := site.NewResolver(cfg)
 
 	// --- database and schema ------------------------------------------------
-	pools, err := db.Open(ctx, resolver)
+	pool, err := p.openPools(ctx, resolver)
 	if err != nil {
 		results = append(results, doctor.Result{
 			Name: "database", Status: doctor.StatusFail,
 			Detail: "could not open a connection pool: " + err.Error(),
 		})
 	} else {
-		defer pools.Close()
-		pingErr := db.Ping(ctx, pools.Default())
+		defer pool.Close()
+		pingErr := pool.Ping(ctx)
 		results = append(results, doctor.CheckDatabase(pingErr))
 		if pingErr == nil {
-			var version string
-			if err := pools.Default().QueryRow(ctx, "SHOW server_version").Scan(&version); err == nil {
-				results = append(results, doctor.Result{Name: "database version", Status: doctor.StatusOK, Detail: version})
+			if v, verr := p.serverVersion(ctx, pool); verr == nil {
+				results = append(results, doctor.Result{Name: "database version", Status: doctor.StatusOK, Detail: v})
 			}
-			embedded, verr := migrate.EmbeddedVersion()
-			if verr != nil {
-				results = append(results, doctor.Result{Name: "schema", Status: doctor.StatusFail, Detail: verr.Error()})
+			st, serr := p.schema(ctx, pool)
+			if serr != nil {
+				results = append(results, doctor.Result{Name: "schema", Status: doctor.StatusFail, Detail: serr.Error()})
 			} else {
-				results = append(results, doctor.CheckSchema(migrate.Probe(ctx, pools.Default(), embedded)))
+				results = append(results, doctor.CheckSchema(st))
 			}
 		}
 	}
 
 	// --- cache --------------------------------------------------------------
-	cc, cerr := cache.Open(cfg.CacheURL, cfg.CacheNamespace)
+	cc, cerr := p.openCache(cfg)
 	if cerr != nil {
 		results = append(results, doctor.Result{Name: "cache", Status: doctor.StatusFail, Detail: cerr.Error()})
 	} else {
@@ -112,13 +186,7 @@ func collect(ctx context.Context, envFile string) []doctor.Result {
 	}
 
 	// --- search -------------------------------------------------------------
-	reachable := false
-	if cfg.SearchMode != config.SearchOff {
-		remote := search.NewRemote(cfg.SearchURL, []byte(cfg.SearchHMACKey), cfg.SearchTimeout)
-		svc := search.NewService(search.NewSQL(), remote, nil)
-		reachable = svc.Health(ctx) == search.HealthOK
-	}
-	results = append(results, doctor.CheckSearch(cfg.SearchMode, reachable))
+	results = append(results, doctor.CheckSearch(cfg.SearchMode, p.searchReachable(ctx, cfg)))
 
 	return results
 }

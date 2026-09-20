@@ -1,0 +1,9 @@
+$ go test -count=1 -tags=integration -v -run TestGoldenPathPassesAfterFlushAll ./internal/integration/
+=== RUN   TestGoldenPathPassesAfterFlushAll
+    golden_test.go:700: FLUSHALL issued; the cache is now empty
+    golden_test.go:715: 1 golden-path jobs survived FLUSHALL, want 2: durable work must not live in the cache
+--- FAIL: TestGoldenPathPassesAfterFlushAll (2.20s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	3.320s
+FAIL
+EXIT=1

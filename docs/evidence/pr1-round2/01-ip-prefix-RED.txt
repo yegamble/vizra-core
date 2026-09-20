@@ -1,0 +1,12 @@
+$ go test -tags=integration -run TestAuditEventsRefusesAFullIPAddress ./internal/integration/   # against the CURRENT regex
+--- FAIL: TestAuditEventsRefusesAFullIPAddress (0.06s)
+    --- FAIL: TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused (0.00s)
+        golden_test.go:1284: ip_prefix accepted "2001:db8:1234:5678:9abc:def0::", which is more specific than /64 (or is not an address). The column must refuse it: the header promises /24 and /48-or-/64 only.
+        golden_test.go:1284: ip_prefix accepted "2001:db8:1234:5678:9abc:def0:1234::", which is more specific than /64 (or is not an address). The column must refuse it: the header promises /24 and /48-or-/64 only.
+        golden_test.go:1284: ip_prefix accepted "a:b:c:d:e:f:1::", which is more specific than /64 (or is not an address). The column must refuse it: the header promises /24 and /48-or-/64 only.
+        golden_test.go:1284: ip_prefix accepted "2001:db8:1234:5678:9abc:def0::/48", which is more specific than /64 (or is not an address). The column must refuse it: the header promises /24 and /48-or-/64 only.
+        golden_test.go:1284: ip_prefix accepted "999.999.999.0", which is more specific than /64 (or is not an address). The column must refuse it: the header promises /24 and /48-or-/64 only.
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	0.574s
+FAIL
+EXIT=1

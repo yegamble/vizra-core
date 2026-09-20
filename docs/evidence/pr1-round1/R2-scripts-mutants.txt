@@ -1,0 +1,111 @@
+=== M6 (verifier): remove COLUMN from migrate-lint's destructive alternation ===
+--- FAIL: TestMigrateLintFixtures (0.57s)
+    --- FAIL: TestMigrateLintFixtures/drop-column (0.03s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: scripts/testdata/migratelint/drop-column
+              ok    2 migrations form a gapless 1..2 sequence
+            migrate-lint: passed
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	0.774s
+EXIT=0
+
+=== Verifier Finding 4: narrow the Makefile test selection ===
+  FAIL  PKGS is './internal/buildinfo/', not './...'
+        The test-race lane would run a subset of the module while every gate stayed green.
+ci-required-guard: FAILED
+ci-required-guard:
+  ok    all 4 floor lane(s) are present and non-optional
+--
+  ok    the test-race target uses $(PKGS)
+  ok    all 2 -run selections are non-empty
+guard exit=
+
+=== Verifier Finding 4: empty a -run pattern ===
+  FAIL  1 -run pattern(s) are empty
+ci-required-guard: FAILED
+
+=== restored: guard and meta-tests green ===
+guard exit=0
+--- FAIL: TestMigrateLintFixtures (2.05s)
+    --- FAIL: TestMigrateLintFixtures/drop-column (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/drop-table (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/drop-index (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/drop-constraint (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/rename (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/alter-type (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/truncate (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/bad-filename (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/sequence-gap (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/missing-down (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+    --- FAIL: TestMigrateLintFixtures/empty-down (0.09s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: migrations
+              ok    4 migrations form a gapless 1..4 sequence
+              ok    append-only manifest matches (8 migrations)
+            migrate-lint: passed
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	3.425s
+FAIL
+EXIT=1
+=== M6 re-run against the committed tree, so the revert is clean ===
+--- FAIL: TestMigrateLintFixtures (0.54s)
+    --- FAIL: TestMigrateLintFixtures/drop-column (0.03s)
+        scripts_test.go:78: exit 0 (failed=false), want failed=true.
+            migrate-lint: scripts/testdata/migratelint/drop-column
+              ok    2 migrations form a gapless 1..2 sequence
+            migrate-lint: passed
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	0.719s
+--- restored ---
+ok  	github.com/yegamble/vizra-core/scripts	1.833s
+EXIT=0

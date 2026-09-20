@@ -1,0 +1,404 @@
+$ go test -count=1 ./internal/authz/   # constant added, normalisations still in place
+--- FAIL: TestUnknownVisibilityDenies (0.00s)
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"" (0.00s)
+        authz_test.go:431: item_page with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"" (0.00s)
+        authz_test.go:431: original_download with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"" (0.00s)
+        authz_test.go:431: derivative_url with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"" (0.00s)
+        authz_test.go:431: album_page with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"" (0.00s)
+        authz_test.go:431: count_contribution with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"" (0.00s)
+        authz_test.go:431: profile_grid with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/explore/"" (0.00s)
+        authz_test.go:431: explore with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/search/"" (0.00s)
+        authz_test.go:431: search with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"" (0.00s)
+        authz_test.go:431: tag_category_listing with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"" (0.00s)
+        authz_test.go:431: feeds with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"" (0.00s)
+        authz_test.go:431: notifications with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"" (0.00s)
+        authz_test.go:431: favorite_rating with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/embed/"" (0.00s)
+        authz_test.go:431: embed with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"" (0.00s)
+        authz_test.go:431: sitemap with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"" (0.00s)
+        authz_test.go:431: bulk_download with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"" (0.00s)
+        authz_test.go:431: federation_outbound with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"" (0.00s)
+        authz_test.go:431: ipfs_publication with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/export/"" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"" (0.00s)
+        authz_test.go:431: shared_cache with visibility "" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"PUBLIC" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"PUBLIC" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"PUBLIC" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"PUBLIC" (0.00s)
+        authz_test.go:431: album_page with visibility "PUBLIC" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"PUBLIC" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"PUBLIC" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"PUBLIC" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"PUBLIC" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"PUBLIC" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"PUBLIC" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"PUBLIC" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"PUBLIC" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"PUBLIC" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"PUBLIC" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"PUBLIC" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"PUBLIC" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"PUBLIC" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"PUBLIC" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"PUBLIC" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"PUBLIC" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"PUBLIC" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"Public" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"Public" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"Public" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"Public" (0.00s)
+        authz_test.go:431: album_page with visibility "Public" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"Public" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"Public" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"Public" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"Public" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"Public" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"Public" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"Public" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"Public" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"Public" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"Public" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"Public" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"Public" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"Public" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"Public" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"Public" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"Public" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"Public" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"scheduled" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"scheduled" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"scheduled" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"scheduled" (0.00s)
+        authz_test.go:431: album_page with visibility "scheduled" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"scheduled" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"scheduled" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"scheduled" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"scheduled" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"scheduled" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"scheduled" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"scheduled" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"scheduled" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"scheduled" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"scheduled" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"scheduled" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"scheduled" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"scheduled" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"scheduled" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"scheduled" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"scheduled" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"scheduled" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"moderated" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"moderated" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"moderated" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"moderated" (0.00s)
+        authz_test.go:431: album_page with visibility "moderated" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"moderated" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"moderated" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"moderated" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"moderated" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"moderated" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"moderated" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"moderated" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"moderated" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"moderated" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"moderated" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"moderated" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"moderated" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"moderated" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"moderated" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"moderated" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"moderated" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"moderated" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"deleted" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"deleted" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"deleted" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"deleted" (0.00s)
+        authz_test.go:431: album_page with visibility "deleted" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"deleted" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"deleted" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"deleted" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"deleted" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"deleted" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"deleted" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"deleted" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"deleted" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"deleted" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"deleted" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"deleted" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"deleted" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"deleted" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"deleted" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"deleted" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"deleted" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"deleted" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"_public" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"_public" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"_public" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"_public" (0.00s)
+        authz_test.go:431: album_page with visibility " public" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"_public" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"_public" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"_public" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"_public" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"_public" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"_public" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"_public" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"_public" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"_public" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"_public" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"_public" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"_public" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"_public" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"_public" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"_public" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"_public" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"_public" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/item_page/"public\n" (0.00s)
+        authz_test.go:437: item_page/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/original_download/"public\n" (0.00s)
+        authz_test.go:437: original_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/derivative_url/"public\n" (0.00s)
+        authz_test.go:437: derivative_url/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/album_page/"public\n" (0.00s)
+        authz_test.go:431: album_page with visibility "public\n" ALLOWED for viewer class A (reason "public"). An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in staging, a caller bug that allows is a private photo on the fediverse.
+    --- FAIL: TestUnknownVisibilityDenies/count_contribution/"public\n" (0.00s)
+        authz_test.go:437: count_contribution/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/owner_library/"public\n" (0.00s)
+        authz_test.go:437: owner_library/A: reason = "surface_is_owner_scoped", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/profile_grid/"public\n" (0.00s)
+        authz_test.go:437: profile_grid/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/explore/"public\n" (0.00s)
+        authz_test.go:437: explore/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/search/"public\n" (0.00s)
+        authz_test.go:437: search/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/tag_category_listing/"public\n" (0.00s)
+        authz_test.go:437: tag_category_listing/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/feeds/"public\n" (0.00s)
+        authz_test.go:437: feeds/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/notifications/"public\n" (0.00s)
+        authz_test.go:437: notifications/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/favorite_rating/"public\n" (0.00s)
+        authz_test.go:437: favorite_rating/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/embed/"public\n" (0.00s)
+        authz_test.go:437: embed/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/sitemap/"public\n" (0.00s)
+        authz_test.go:437: sitemap/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/bulk_download/"public\n" (0.00s)
+        authz_test.go:437: bulk_download/A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/federation_outbound/"public\n" (0.00s)
+        authz_test.go:437: federation_outbound/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/ipfs_publication/"public\n" (0.00s)
+        authz_test.go:437: ipfs_publication/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/export/"public\n" (0.00s)
+        authz_test.go:437: export/A: reason = "site_export_requires_owner_role", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/admin_console/"public\n" (0.00s)
+        authz_test.go:437: admin_console/A: reason = "surface_is_staff_only", want "visibility_unknown"
+    --- FAIL: TestUnknownVisibilityDenies/shared_cache/"public\n" (0.00s)
+        authz_test.go:437: shared_cache/A: reason = "surface_lists_public_items_only", want "visibility_unknown"
+--- FAIL: TestZeroResourceDeniesEverySurface (0.00s)
+    authz_test.go:451: a zero-valued Resource ALLOWED item_page for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED original_download for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED derivative_url for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED album_page for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED count_contribution for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED profile_grid for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED explore for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED search for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED tag_category_listing for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED feeds for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED notifications for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED favorite_rating for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED embed for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED sitemap for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED bulk_download for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED federation_outbound for an anonymous subject (reason "public")
+    authz_test.go:451: a zero-valued Resource ALLOWED shared_cache for an anonymous subject (reason "public")
+--- FAIL: TestUnknownAlbumPrivacyDenies (0.00s)
+    authz_test.go:464: album page with privacy "" ALLOWED for viewer class A (reason "public")
+    authz_test.go:467: album privacy "", class A: reason = "public", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "" ALLOWED for viewer class M (reason "public")
+    authz_test.go:467: album privacy "", class M: reason = "public", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "" ALLOWED for viewer class G (reason "public")
+    authz_test.go:467: album privacy "", class G: reason = "public", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "" ALLOWED for viewer class O (reason "owner")
+    authz_test.go:467: album privacy "", class O: reason = "owner", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "" ALLOWED for viewer class S (reason "staff_audited_context")
+    authz_test.go:467: album privacy "", class S: reason = "staff_audited_context", want "visibility_unknown"
+    authz_test.go:467: album privacy "PUBLIC", class A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "PUBLIC", class M: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "PUBLIC", class G: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "PUBLIC" ALLOWED for viewer class O (reason "owner")
+    authz_test.go:467: album privacy "PUBLIC", class O: reason = "owner", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "PUBLIC" ALLOWED for viewer class S (reason "staff_audited_context")
+    authz_test.go:467: album privacy "PUBLIC", class S: reason = "staff_audited_context", want "visibility_unknown"
+    authz_test.go:467: album privacy "Public", class A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "Public", class M: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "Public", class G: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "Public" ALLOWED for viewer class O (reason "owner")
+    authz_test.go:467: album privacy "Public", class O: reason = "owner", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "Public" ALLOWED for viewer class S (reason "staff_audited_context")
+    authz_test.go:467: album privacy "Public", class S: reason = "staff_audited_context", want "visibility_unknown"
+    authz_test.go:467: album privacy "hidden", class A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "hidden", class M: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "hidden", class G: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "hidden" ALLOWED for viewer class O (reason "owner")
+    authz_test.go:467: album privacy "hidden", class O: reason = "owner", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "hidden" ALLOWED for viewer class S (reason "staff_audited_context")
+    authz_test.go:467: album privacy "hidden", class S: reason = "staff_audited_context", want "visibility_unknown"
+    authz_test.go:467: album privacy "unlisted", class A: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "unlisted", class M: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:467: album privacy "unlisted", class G: reason = "private_requires_owner_grant_or_staff", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "unlisted" ALLOWED for viewer class O (reason "owner")
+    authz_test.go:467: album privacy "unlisted", class O: reason = "owner", want "visibility_unknown"
+    authz_test.go:464: album page with privacy "unlisted" ALLOWED for viewer class S (reason "staff_audited_context")
+    authz_test.go:467: album privacy "unlisted", class S: reason = "staff_audited_context", want "visibility_unknown"
+--- FAIL: TestHideExistenceForAnythingNotPublicOrUnlisted (0.00s)
+    authz_test.go:478: visibility "" does not hide existence; a 403 on it would confirm the row exists
+    authz_test.go:478: visibility "scheduled" does not hide existence; a 403 on it would confirm the row exists
+    authz_test.go:478: visibility "PUBLIC" does not hide existence; a 403 on it would confirm the row exists
+    authz_test.go:478: visibility "moderated" does not hide existence; a 403 on it would confirm the row exists
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/authz	0.331s
+FAIL
+EXIT=1

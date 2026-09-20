@@ -12,10 +12,12 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,6 +25,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -1268,9 +1271,46 @@ func TestAuditEventsRefusesAFullIPAddress(t *testing.T) {
 		}
 	})
 
+	// Two seats found the same hole independently: the IPv6 branch's group
+	// repetition was unbounded, so a /96 or /112 was accepted while the header
+	// promised /48 or /64. The whole point of the column is that it CANNOT hold
+	// something more specific than a prefix, and this CHECK freezes on merge.
+	t.Run("a prefix more specific than /64 is refused", func(t *testing.T) {
+		for _, addr := range []string{
+			"2001:db8:1234:5678:9abc:def0::",      // /96
+			"2001:db8:1234:5678:9abc:def0:1234::", // /112
+			"a:b:c:d:e:f:1::",                     // seven groups, short labels
+			"2001:db8:1234:5678:9abc:def0::/48",   // a /48 suffix does not make the value a /48
+			"999.999.999.0",                       // not an address at all
+		} {
+			if err := insert(addr); err == nil {
+				t.Errorf("ip_prefix accepted %q, which is more specific than /64 (or is not an address). "+
+					"The column must refuse it: the header promises /24 and /48-or-/64 only.", addr)
+			} else if !strings.Contains(err.Error(), "audit_events_ip_prefix_shape") {
+				t.Errorf("%q rejected for the wrong reason: %v", addr, err)
+			}
+		}
+	})
+
+	// Lowercase is the frozen rule: Go's netip emits lowercase, and a canonical
+	// column is what keeps prefix EQUALITY honest — "2001:DB8::" and
+	// "2001:db8::" are the same network but different text.
+	t.Run("uppercase hex is refused", func(t *testing.T) {
+		for _, addr := range []string{"2001:DB8::", "FE80::", "2001:Db8:85A3::"} {
+			if err := insert(addr); err == nil {
+				t.Errorf("ip_prefix accepted %q; the column is canonical lowercase", addr)
+			}
+		}
+	})
+
 	t.Run("a truncated prefix is accepted", func(t *testing.T) {
 		for _, prefix := range []string{
-			"203.0.113.0", "203.0.113.0/24", "2001:db8::", "2001:db8::/48", "2001:db8::/64",
+			"203.0.113.0", "203.0.113.0/24", "10.0.0.0",
+			"2001:db8::", "2001:db8::/48", "2001:db8::/64",
+			"2001:db8:85a3:1::",       // four groups, the /64 shape
+			"2001:db8:1234:5678::/64", //
+			"2001:0db8:0000::",        // zero-padded labels are still lowercase hex
+			"fe80::",                  // link-local, one group
 		} {
 			if err := insert(prefix); err != nil {
 				t.Errorf("ip_prefix refused the truncated prefix %q: %v", prefix, err)
@@ -1283,4 +1323,137 @@ func TestAuditEventsRefusesAFullIPAddress(t *testing.T) {
 			t.Errorf(`"no IP available" must be representable: %v`, err)
 		}
 	})
+}
+
+// ---------------------------------------------------------------------------
+// last_error must actually reach the column, multibyte and all
+// ---------------------------------------------------------------------------
+
+// The unit test proves truncate produces valid UTF-8. This proves the whole
+// path: a handler returns a >2 KiB error containing multibyte runes and a
+// credential, and the row ends up terminal with last_error STORED.
+//
+// Before truncate was rune-safe, PostgreSQL rejected the write with
+// "invalid byte sequence for encoding UTF8", the worker logged "recording
+// terminal failure failed", and the row stayed `leased` with its cause lost.
+func TestAMultibyteErrorIsStoredInLastError(t *testing.T) {
+	_, resolver, pool := freshDatabase(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+
+	// The misalignment is DELIBERATE, not left to luck. truncate cuts at byte
+	// 2000, so the head is padded to exactly 1999 bytes and a 3-byte rune
+	// starts at 2000 — byte 2000 is then its second byte, and a byte-index
+	// slice is guaranteed to split it. Without this the test would pass or fail
+	// depending on where the repeats happened to land.
+	const head = "処理に失敗しました — fetching https://b.example/o?"
+	pad := strings.Repeat("a", 1999-len(head))
+	const secret = "X-Amz-Signature=SuperSecretSignatureMaterial0123456789"
+	msg := head + pad + strings.Repeat("日", 700) + "&" + secret
+	if len(head)+len(pad) != 1999 {
+		t.Fatalf("the fixture is misbuilt: head+pad is %d bytes, want 1999", len(head)+len(pad))
+	}
+
+	var workerLog safeBuffer
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("worker log:\n%s", workerLog.String())
+		}
+	})
+
+	w := jobs.NewWorker(resolver, map[string]*pgxpool.Pool{"default": pool}, nil, jobs.Options{
+		Lease: 10 * time.Second, Timeout: 10 * time.Second, Concurrency: 1,
+		PollInterval: 50 * time.Millisecond, SweepInterval: time.Hour,
+		WorkerID: "utf8-worker",
+		// Captured rather than discarded: when this test fails, the reason is in
+		// the worker's log ("invalid byte sequence for encoding UTF8"), and a
+		// test that hides its own diagnosis wastes the next reader's hour.
+		//
+		// Captured rather than printed, because the raw handler error carries
+		// the fixture credential and the worker's logger in a test is not the
+		// redacting one cmd/api and cmd/worker install with slog.SetDefault.
+		Logger: slog.New(slog.NewTextHandler(&workerLog, &slog.HandlerOptions{Level: slog.LevelDebug})),
+	})
+	// A PLAIN error, not a Terminal one: Terminal's Error() prefixes
+	// "terminal: ", which would shift the byte offsets the fixture depends on.
+	// With MaxAttempts 1 the first failure exhausts the ladder and the worker
+	// dead-letters it, which writes last_error by the same path.
+	w.Register("multibyte-fail", func(context.Context, jobs.Claimed) error {
+		return errors.New(msg)
+	})
+	go func() { _ = w.Run(ctx) }()
+
+	j := enqueue(t, pool, jobs.NewJob{Kind: "multibyte-fail", MaxAttempts: 1, CorrelationID: "utf8"})
+	q := sqlcgen.New(pool)
+	waitFor(t, ctx, func() bool {
+		row, err := q.GetJob(ctx, j.ID)
+		return err == nil && (row.State == "dead" || row.State == "failed")
+	}, "the job to reach a terminal state")
+
+	row, err := q.GetJob(ctx, j.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.LastError == nil || *row.LastError == "" {
+		t.Fatal("last_error is empty. The write was rejected, so the job's real cause was never " +
+			"recorded and an operator has nothing to read.")
+	}
+	stored := *row.LastError
+	if !utf8.ValidString(stored) {
+		t.Fatalf("the stored value is not valid UTF-8; PostgreSQL rejects such a write outright, "+
+			"so in production the row would stay leased with its cause lost.\nlast 16 bytes: % x",
+			stored[max(0, len(stored)-16):])
+	}
+	// Terminal{} prefixes "terminal: ", so match on the message itself.
+	if !strings.Contains(stored, "処理に失敗しました") {
+		t.Fatalf("the beginning of the message was lost: %q", firstRunes(stored, 30))
+	}
+	if strings.Contains(stored, "SuperSecretSignatureMaterial") {
+		t.Fatalf("the credential was stored: %s", stored)
+	}
+	if !strings.Contains(stored, "truncated") {
+		t.Fatalf("a truncated message must say so: %q", lastRunes(stored, 30))
+	}
+	// And the database's own bound still holds.
+	if len(stored) > 4096 {
+		t.Fatalf("last_error is %d bytes; jobs_last_error_bounded caps it at 4096", len(stored))
+	}
+	t.Logf("stored %d bytes, valid UTF-8, redacted, message preserved", len(stored))
+}
+
+// safeBuffer is a bytes.Buffer the worker's goroutines may write to while the
+// test reads it.
+type safeBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *safeBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *safeBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// firstRunes and lastRunes slice on RUNE boundaries, so a failure message about
+// a mid-rune cut is not itself mid-rune.
+func firstRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		r = r[:n]
+	}
+	return string(r)
+}
+
+func lastRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		r = r[len(r)-n:]
+	}
+	return string(r)
 }

@@ -1,0 +1,10 @@
+$ make migrate-lint
+==> migrate-lint
+migrate-lint: migrations
+  ok    4 migrations form a gapless 1..4 sequence
+  FAIL  0004_storage_locations.up.sql:38 destructive statement in an up migration: ALTER TABLE jobs DROP COLUMN last_error;
+        If this is deliberate, put '-- allow-destructive: <reason>' on the line before.
+  ok    append-only manifest matches (8 migrations)
+migrate-lint: FAILED
+make: *** [migrate-lint] Error 1
+EXIT=2

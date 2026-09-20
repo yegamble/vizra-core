@@ -1,0 +1,4 @@
+$ make openapi-verify
+==> openapi-verify
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.504s
+EXIT=0

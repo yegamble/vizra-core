@@ -38,6 +38,32 @@ func main() {
 	}
 }
 
+// newAPIServer builds the public listener.
+//
+// It is a function rather than a struct literal inline in run() because the
+// timeouts are a security property with no test otherwise: the verifier removed
+// ReadTimeout and WriteTimeout and every lane stayed green. cmd/api has no
+// other seam, so this is the seam.
+func newAPIServer(cfg *config.Config, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:    cfg.ListenAddr,
+		Handler: h,
+		// ReadHeaderTimeout alone is not enough: once the headers are in, a
+		// slow-body client holds the connection indefinitely. ReadTimeout and
+		// WriteTimeout bound the whole exchange, and IdleTimeout bounds a
+		// keep-alive connection that is doing nothing at all.
+		//
+		// 30 s is generous for the M0 probe surface. M1's upload routes need a
+		// longer, per-route budget — they will set it on their own handler
+		// rather than widening this default, because a global timeout sized for
+		// the slowest route protects nothing.
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+}
+
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -110,22 +136,7 @@ func run() error {
 		}
 	}()
 
-	apiSrv := &http.Server{
-		Addr:    cfg.ListenAddr,
-		Handler: srv.Handler(),
-		// ReadHeaderTimeout alone is not enough: once the headers are in, a
-		// slow-body client holds the connection indefinitely. ReadTimeout and
-		// WriteTimeout bound the whole exchange.
-		//
-		// 30 s is generous for the M0 probe surface. M1's upload routes need a
-		// longer, per-route budget — they will set it on their own handler
-		// rather than widening this default, because a global timeout sized for
-		// the slowest route protects nothing.
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
+	apiSrv := newAPIServer(cfg, srv.Handler())
 
 	errCh := make(chan error, 1)
 	go func() {

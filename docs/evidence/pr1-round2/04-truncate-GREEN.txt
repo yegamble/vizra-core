@@ -1,0 +1,4 @@
+
+$ go test ./internal/jobs/
+ok  	github.com/yegamble/vizra-core/internal/jobs	1.699s
+EXIT=0

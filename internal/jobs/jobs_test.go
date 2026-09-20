@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yegamble/vizra-core/internal/jobs"
 )
@@ -210,5 +211,72 @@ func TestPriorityOrdering(t *testing.T) {
 	// therefore means unset. PriorityUrgent is how a caller reaches the top.
 	if jobs.PriorityUrgent == 0 {
 		t.Fatal("PriorityUrgent is 0, which is indistinguishable from unset")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// truncate must not cut a UTF-8 rune in half
+// ---------------------------------------------------------------------------
+
+// last_error is a `text` column. PostgreSQL rejects an invalid UTF-8 byte
+// sequence outright, so a truncation that slices mid-rune does not merely store
+// a mangled string — the whole write FAILS, the row stays `leased`, and the
+// real cause of the failure is never recorded. The job is then swept and
+// re-run, losing the one piece of evidence an operator needed.
+//
+// A multibyte error message is not exotic: a filename, a photo title, a remote
+// server's error body, or an em dash in our own text all reach 2 KiB.
+func TestSafeErrorNeverCutsARuneInHalf(t *testing.T) {
+	// Drive the cut across every byte offset a multibyte rune can straddle, so
+	// the test does not depend on guessing the exact boundary.
+	multibyte := []string{
+		"é",    // 2 bytes
+		"日",    // 3 bytes
+		"🙂",    // 4 bytes
+		"—",    // 3 bytes, the em dash our own messages use
+		"ñé日🙂", // mixed
+	}
+	for _, r := range multibyte {
+		for pad := 1990; pad <= 2010; pad++ {
+			in := strings.Repeat("a", pad) + strings.Repeat(r, 40) + " tail"
+			got := jobs.SafeErrorForTest(in)
+			if !utf8.ValidString(got) {
+				t.Fatalf("pad=%d rune=%q produced invalid UTF-8; PostgreSQL would reject the "+
+					"last_error write and the job would stay leased with its cause unrecorded.\n"+
+					"last 16 bytes: % x", pad, r, got[max(0, len(got)-16):])
+			}
+		}
+	}
+}
+
+// The bound must still hold, and the message must still be useful.
+func TestSafeErrorStillBoundsAndStillReads(t *testing.T) {
+	in := "connecting: " + strings.Repeat("日", 5000)
+	got := jobs.SafeErrorForTest(in)
+	if !utf8.ValidString(got) {
+		t.Fatal("invalid UTF-8")
+	}
+	if len(got) > 2100 {
+		t.Fatalf("the bound was lost: %d bytes", len(got))
+	}
+	if !strings.HasPrefix(got, "connecting: ") {
+		t.Fatalf("the beginning of the message was lost: %q", got[:40])
+	}
+	if !strings.Contains(got, "truncated") {
+		t.Fatalf("a truncated message must say so: %q", got[len(got)-40:])
+	}
+}
+
+// Redaction happens BEFORE truncation, and the rune-safety must not reopen the
+// straddling hole the previous round closed.
+func TestSafeErrorRedactsThenTruncatesEvenWithMultibyteText(t *testing.T) {
+	const secret = "X-Amz-Signature=SuperSecretSignatureMaterial0123456789"
+	in := "失敗 fetching https://b.example/o?" + strings.Repeat("日", 660) + "&" + secret + " after 3 tries"
+	got := jobs.SafeErrorForTest(in)
+	if strings.Contains(got, "SuperSecretSignatureMaterial") {
+		t.Fatalf("a secret straddling the truncation boundary was stored:\n%s", got)
+	}
+	if !utf8.ValidString(got) {
+		t.Fatal("redaction plus truncation produced invalid UTF-8")
 	}
 }

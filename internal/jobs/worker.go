@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -303,7 +305,7 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 			ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(safeError(err.Error())),
 		})
 		if derr != nil || n == 0 {
-			log.Warn("jobs: recording dead-letter failed", "rows", n)
+			log.Warn("jobs: recording dead-letter failed", "rows", n, "error", errText(derr))
 		}
 		log.Error("jobs: exhausted attempts", "attempts", j.Attempts, "error", err.Error())
 	default:
@@ -313,7 +315,7 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 			Backoff: toInterval(backoff), LastError: strPtr(safeError(err.Error())),
 		})
 		if rerr != nil || n == 0 {
-			log.Warn("jobs: scheduling retry failed", "rows", n)
+			log.Warn("jobs: scheduling retry failed", "rows", n, "error", errText(rerr))
 		}
 		log.Warn("jobs: retrying", "attempt", j.Attempts, "backoff", backoff.String(), "error", err.Error())
 	}
@@ -461,14 +463,49 @@ func safeError(s string) string { return truncate(obs.Redact(s)) }
 // truncate bounds what a handler's error text can write into a row. The
 // database also enforces this (jobs_last_error_bounded, 4096), so this is the
 // friendly half of a bound that is real either way.
+//
+// IT MUST NOT CUT A RUNE IN HALF. last_error is a `text` column and PostgreSQL
+// rejects an invalid UTF-8 byte sequence outright —
+//
+//	ERROR: invalid byte sequence for encoding "UTF8": 0xe6 0xe2 0x80
+//
+// — so a mid-rune slice does not merely mangle the message: the whole write
+// FAILS, the row stays `leased` with its cause unrecorded, and the sweep
+// re-runs the job having lost the one piece of evidence an operator needed.
+//
+// A multibyte error message is ordinary, not exotic: a filename, a photo
+// title, a remote server's error body, or the em dash in our own text below.
 func truncate(s string) string {
 	const max = 2000
 	if len(s) <= max {
 		return s
 	}
-	return s[:max] + "… (truncated)"
+	// Back off to a rune START. Continuation bytes are 0b10xxxxxx, so this
+	// takes at most three steps, and s[:cut] then ends exactly on a boundary.
+	cut := max
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	out := s[:cut]
+	// Belt and braces. If the INPUT was already invalid UTF-8 — a subprocess
+	// dumping raw bytes into stderr, say — the arithmetic above cannot fix it,
+	// and the column would still reject the write.
+	if !utf8.ValidString(out) {
+		out = strings.ToValidUTF8(out, "")
+	}
+	return out + "… (truncated)"
 }
 
 // isNoRows distinguishes "the claim found nothing" from a real database error.
 // pgx returns ErrNoRows from QueryRow.Scan; sqlc propagates it unwrapped.
 func isNoRows(err error) bool { return errors.Is(err, pgx.ErrNoRows) }
+
+// errText renders an error for a log field, including the "no error" case.
+// Logging only a row count when the write failed says "rows=0" and nothing
+// about why, which is how an outcome-write failure stays invisible.
+func errText(err error) string {
+	if err == nil {
+		return "none (the statement matched no row)"
+	}
+	return err.Error()
+}

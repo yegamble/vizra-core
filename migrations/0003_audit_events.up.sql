@@ -11,8 +11,9 @@
 -- ENFORCED by the database:
 --   * actor_kind is one of four values, and a `user` actor must carry a user id
 --     while a non-user actor must not (audit_events_actor_identified);
---   * ip_prefix cannot hold a full address (audit_events_ip_prefix_shape below)
---     — the column refuses one rather than relying on a caller to truncate.
+--   * ip_prefix cannot hold anything more specific than an IPv4 /24 or an IPv6
+--     /64, in canonical lowercase (audit_events_ip_prefix_shape below) — the
+--     column refuses one rather than relying on a caller to truncate.
 --
 -- NOT enforced here, by decision:
 --   * IMMUTABILITY. The application role can still UPDATE or DELETE a row, so
@@ -48,20 +49,53 @@ CREATE TABLE audit_events (
     CONSTRAINT audit_events_actor_identified
         CHECK ((actor_kind = 'user') = (actor_user_id IS NOT NULL)),
 
-    -- The column REFUSES a full address rather than trusting a caller to
-    -- truncate. Without this, the first M1 caller that passes c.RealIP() stores
-    -- a whole address and the privacy claim above becomes false in a queryable
-    -- table — and by then the rows exist, which is what makes an append-only
-    -- CHECK expensive to add later.
+    -- The column REFUSES anything more specific than a prefix, rather than
+    -- trusting a caller to truncate. Without this, the first M1 caller that
+    -- passes c.RealIP() stores a whole address and the privacy claim above
+    -- becomes false in a queryable table — and by then the rows exist, which is
+    -- what makes an append-only CHECK expensive to add later.
     --
-    -- Accepted: an IPv4 /24 whose last octet is literally 0 ('203.0.113.0' or
-    -- '203.0.113.0/24'), and an IPv6 /48 or /64 ending in '::' ('2001:db8::'
-    -- or '2001:db8::/48'). Anything else, including '203.0.113.47', is refused.
-    -- The truncation helper itself ships with the first writer in M1.
+    -- ACCEPTED, and nothing else:
+    --   IPv4  a /24 whose last octet is literally 0, each of the first three
+    --         octets a real 0-255 value: '203.0.113.0', '203.0.113.0/24',
+    --         '10.0.0.0'. '999.999.999.0' is not an address and is refused.
+    --   IPv6  at most FOUR groups then '::', optionally '/48' or '/64':
+    --         'fe80::', '2001:db8::', '2001:db8:85a3:1::',
+    --         '2001:db8:1234:5678::/64'.
+    --
+    -- The group count is bounded at four on purpose. An unbounded repetition
+    -- accepted '2001:db8:1234:5678:9abc:def0::' (a /96) and
+    -- '2001:db8:1234:5678:9abc:def0:1234::' (a /112) while this header promised
+    -- /48 or /64 — the exact failure the column exists to prevent, found by two
+    -- reviewers independently.
+    --
+    -- LOWERCASE ONLY. Go's netip emits lowercase, and a canonical column is what
+    -- keeps prefix EQUALITY honest: '2001:DB8::' and '2001:db8::' are the same
+    -- network but different text, and a queryable column that holds both cannot
+    -- be grouped or joined on. '::', IPv4-mapped forms and uppercase hex are all
+    -- refused; loosening a CHECK later is easy, tightening one after rows exist
+    -- is not.
+    --
+    -- The /len suffix is deliberately NOT cross-checked against the group count.
+    -- Expressing that in a CHECK costs far more than it buys, and the writer
+    -- below is the thing that gets it right; this constraint is the floor that
+    -- catches a writer which does not.
+    --
+    -- THE M1 WRITER'S CONTRACT. There is exactly ONE function that produces a
+    -- value for this column, and it:
+    --   1. parses with netip.ParseAddr and calls Unmap() FIRST, so an
+    --      IPv4-mapped IPv6 address is treated as the IPv4 address it is;
+    --   2. masks to /24 for IPv4 and /64 for IPv6 — never finer;
+    --   3. formats lowercase, which netip already does;
+    --   4. returns NULL when there is no usable address — behind a proxy with no
+    --      trusted forwarded header, for a system actor, or on a parse failure.
+    --      NULL is the honest answer; a zero address would be a lie that groups.
+    -- It ships with the first writer in M1, tested for the IPv4 /24, IPv6 /64,
+    -- IPv4-mapped and no-address cases.
     CONSTRAINT audit_events_ip_prefix_shape CHECK (
         ip_prefix IS NULL
-        OR ip_prefix ~ '^([0-9]{1,3}\.){3}0(/24)?$'
-        OR ip_prefix ~ '^[0-9a-f]{1,4}(:[0-9a-f]{1,4})*::(/(48|64))?$'
+        OR ip_prefix ~ '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}0(/24)?$'
+        OR ip_prefix ~ '^[0-9a-f]{1,4}(:[0-9a-f]{1,4}){0,3}::(/(48|64))?$'
     )
 );
 

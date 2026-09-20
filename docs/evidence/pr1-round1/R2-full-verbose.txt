@@ -1,0 +1,1882 @@
+?   	github.com/yegamble/vizra-core/cmd/api	[no test files]
+?   	github.com/yegamble/vizra-core/cmd/vizra	[no test files]
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+=== RUN   TestFrozenMatrix
+=== RUN   TestFrozenMatrix/item_page/public/A
+=== RUN   TestFrozenMatrix/item_page/public/M
+=== RUN   TestFrozenMatrix/item_page/public/G
+=== RUN   TestFrozenMatrix/item_page/public/O
+=== RUN   TestFrozenMatrix/item_page/public/S
+=== RUN   TestFrozenMatrix/item_page/unlisted/A
+=== RUN   TestFrozenMatrix/item_page/unlisted/M
+=== RUN   TestFrozenMatrix/item_page/unlisted/G
+=== RUN   TestFrozenMatrix/item_page/unlisted/O
+=== RUN   TestFrozenMatrix/item_page/unlisted/S
+=== RUN   TestFrozenMatrix/item_page/private/A
+=== RUN   TestFrozenMatrix/item_page/private/M
+=== RUN   TestFrozenMatrix/item_page/private/G
+=== RUN   TestFrozenMatrix/item_page/private/O
+=== RUN   TestFrozenMatrix/item_page/private/S
+=== RUN   TestFrozenMatrix/original_download/public/A
+=== RUN   TestFrozenMatrix/original_download/public/M
+=== RUN   TestFrozenMatrix/original_download/public/G
+=== RUN   TestFrozenMatrix/original_download/public/O
+=== RUN   TestFrozenMatrix/original_download/public/S
+=== RUN   TestFrozenMatrix/original_download/unlisted/A
+=== RUN   TestFrozenMatrix/original_download/unlisted/M
+=== RUN   TestFrozenMatrix/original_download/unlisted/G
+=== RUN   TestFrozenMatrix/original_download/unlisted/O
+=== RUN   TestFrozenMatrix/original_download/unlisted/S
+=== RUN   TestFrozenMatrix/original_download/private/A
+=== RUN   TestFrozenMatrix/original_download/private/M
+=== RUN   TestFrozenMatrix/original_download/private/G
+=== RUN   TestFrozenMatrix/original_download/private/O
+=== RUN   TestFrozenMatrix/original_download/private/S
+=== RUN   TestFrozenMatrix/derivative_url/public/A
+=== RUN   TestFrozenMatrix/derivative_url/public/M
+=== RUN   TestFrozenMatrix/derivative_url/public/G
+=== RUN   TestFrozenMatrix/derivative_url/public/O
+=== RUN   TestFrozenMatrix/derivative_url/public/S
+=== RUN   TestFrozenMatrix/derivative_url/unlisted/A
+=== RUN   TestFrozenMatrix/derivative_url/unlisted/M
+=== RUN   TestFrozenMatrix/derivative_url/unlisted/G
+=== RUN   TestFrozenMatrix/derivative_url/unlisted/O
+=== RUN   TestFrozenMatrix/derivative_url/unlisted/S
+=== RUN   TestFrozenMatrix/derivative_url/private/A
+=== RUN   TestFrozenMatrix/derivative_url/private/M
+=== RUN   TestFrozenMatrix/derivative_url/private/G
+=== RUN   TestFrozenMatrix/derivative_url/private/O
+=== RUN   TestFrozenMatrix/derivative_url/private/S
+=== RUN   TestFrozenMatrix/album_page/public/A
+=== RUN   TestFrozenMatrix/album_page/public/M
+=== RUN   TestFrozenMatrix/album_page/public/G
+=== RUN   TestFrozenMatrix/album_page/public/O
+=== RUN   TestFrozenMatrix/album_page/public/S
+=== RUN   TestFrozenMatrix/album_page/unlisted/A
+=== RUN   TestFrozenMatrix/album_page/unlisted/M
+=== RUN   TestFrozenMatrix/album_page/unlisted/G
+=== RUN   TestFrozenMatrix/album_page/unlisted/O
+=== RUN   TestFrozenMatrix/album_page/unlisted/S
+=== RUN   TestFrozenMatrix/album_page/private/A
+=== RUN   TestFrozenMatrix/album_page/private/M
+=== RUN   TestFrozenMatrix/album_page/private/G
+=== RUN   TestFrozenMatrix/album_page/private/O
+=== RUN   TestFrozenMatrix/album_page/private/S
+=== RUN   TestFrozenMatrix/count_contribution/public/A
+=== RUN   TestFrozenMatrix/count_contribution/public/M
+=== RUN   TestFrozenMatrix/count_contribution/public/G
+=== RUN   TestFrozenMatrix/count_contribution/public/O
+=== RUN   TestFrozenMatrix/count_contribution/public/S
+=== RUN   TestFrozenMatrix/count_contribution/unlisted/A
+=== RUN   TestFrozenMatrix/count_contribution/unlisted/M
+=== RUN   TestFrozenMatrix/count_contribution/unlisted/G
+=== RUN   TestFrozenMatrix/count_contribution/unlisted/O
+=== RUN   TestFrozenMatrix/count_contribution/unlisted/S
+=== RUN   TestFrozenMatrix/count_contribution/private/A
+=== RUN   TestFrozenMatrix/count_contribution/private/M
+=== RUN   TestFrozenMatrix/count_contribution/private/G
+=== RUN   TestFrozenMatrix/count_contribution/private/O
+=== RUN   TestFrozenMatrix/count_contribution/private/S
+=== RUN   TestFrozenMatrix/owner_library/public/A
+=== RUN   TestFrozenMatrix/owner_library/public/M
+=== RUN   TestFrozenMatrix/owner_library/public/G
+=== RUN   TestFrozenMatrix/owner_library/public/O
+=== RUN   TestFrozenMatrix/owner_library/public/S
+=== RUN   TestFrozenMatrix/owner_library/unlisted/A
+=== RUN   TestFrozenMatrix/owner_library/unlisted/M
+=== RUN   TestFrozenMatrix/owner_library/unlisted/G
+=== RUN   TestFrozenMatrix/owner_library/unlisted/O
+=== RUN   TestFrozenMatrix/owner_library/unlisted/S
+=== RUN   TestFrozenMatrix/owner_library/private/A
+=== RUN   TestFrozenMatrix/owner_library/private/M
+=== RUN   TestFrozenMatrix/owner_library/private/G
+=== RUN   TestFrozenMatrix/owner_library/private/O
+=== RUN   TestFrozenMatrix/owner_library/private/S
+=== RUN   TestFrozenMatrix/profile_grid/public/A
+=== RUN   TestFrozenMatrix/profile_grid/public/M
+=== RUN   TestFrozenMatrix/profile_grid/public/G
+=== RUN   TestFrozenMatrix/profile_grid/public/O
+=== RUN   TestFrozenMatrix/profile_grid/public/S
+=== RUN   TestFrozenMatrix/profile_grid/unlisted/A
+=== RUN   TestFrozenMatrix/profile_grid/unlisted/M
+=== RUN   TestFrozenMatrix/profile_grid/unlisted/G
+=== RUN   TestFrozenMatrix/profile_grid/unlisted/O
+=== RUN   TestFrozenMatrix/profile_grid/unlisted/S
+=== RUN   TestFrozenMatrix/profile_grid/private/A
+=== RUN   TestFrozenMatrix/profile_grid/private/M
+=== RUN   TestFrozenMatrix/profile_grid/private/G
+=== RUN   TestFrozenMatrix/profile_grid/private/O
+=== RUN   TestFrozenMatrix/profile_grid/private/S
+=== RUN   TestFrozenMatrix/explore/public/A
+=== RUN   TestFrozenMatrix/explore/public/M
+=== RUN   TestFrozenMatrix/explore/public/G
+=== RUN   TestFrozenMatrix/explore/public/O
+=== RUN   TestFrozenMatrix/explore/public/S
+=== RUN   TestFrozenMatrix/explore/unlisted/A
+=== RUN   TestFrozenMatrix/explore/unlisted/M
+=== RUN   TestFrozenMatrix/explore/unlisted/G
+=== RUN   TestFrozenMatrix/explore/unlisted/O
+=== RUN   TestFrozenMatrix/explore/unlisted/S
+=== RUN   TestFrozenMatrix/explore/private/A
+=== RUN   TestFrozenMatrix/explore/private/M
+=== RUN   TestFrozenMatrix/explore/private/G
+=== RUN   TestFrozenMatrix/explore/private/O
+=== RUN   TestFrozenMatrix/explore/private/S
+=== RUN   TestFrozenMatrix/search/public/A
+=== RUN   TestFrozenMatrix/search/public/M
+=== RUN   TestFrozenMatrix/search/public/G
+=== RUN   TestFrozenMatrix/search/public/O
+=== RUN   TestFrozenMatrix/search/public/S
+=== RUN   TestFrozenMatrix/search/unlisted/A
+=== RUN   TestFrozenMatrix/search/unlisted/M
+=== RUN   TestFrozenMatrix/search/unlisted/G
+=== RUN   TestFrozenMatrix/search/unlisted/O
+=== RUN   TestFrozenMatrix/search/unlisted/S
+=== RUN   TestFrozenMatrix/search/private/A
+=== RUN   TestFrozenMatrix/search/private/M
+=== RUN   TestFrozenMatrix/search/private/G
+=== RUN   TestFrozenMatrix/search/private/O
+=== RUN   TestFrozenMatrix/search/private/S
+=== RUN   TestFrozenMatrix/tag_category_listing/public/A
+=== RUN   TestFrozenMatrix/tag_category_listing/public/M
+=== RUN   TestFrozenMatrix/tag_category_listing/public/G
+=== RUN   TestFrozenMatrix/tag_category_listing/public/O
+=== RUN   TestFrozenMatrix/tag_category_listing/public/S
+=== RUN   TestFrozenMatrix/tag_category_listing/unlisted/A
+=== RUN   TestFrozenMatrix/tag_category_listing/unlisted/M
+=== RUN   TestFrozenMatrix/tag_category_listing/unlisted/G
+=== RUN   TestFrozenMatrix/tag_category_listing/unlisted/O
+=== RUN   TestFrozenMatrix/tag_category_listing/unlisted/S
+=== RUN   TestFrozenMatrix/tag_category_listing/private/A
+=== RUN   TestFrozenMatrix/tag_category_listing/private/M
+=== RUN   TestFrozenMatrix/tag_category_listing/private/G
+=== RUN   TestFrozenMatrix/tag_category_listing/private/O
+=== RUN   TestFrozenMatrix/tag_category_listing/private/S
+=== RUN   TestFrozenMatrix/feeds/public/A
+=== RUN   TestFrozenMatrix/feeds/public/M
+=== RUN   TestFrozenMatrix/feeds/public/G
+=== RUN   TestFrozenMatrix/feeds/public/O
+=== RUN   TestFrozenMatrix/feeds/public/S
+=== RUN   TestFrozenMatrix/feeds/unlisted/A
+=== RUN   TestFrozenMatrix/feeds/unlisted/M
+=== RUN   TestFrozenMatrix/feeds/unlisted/G
+=== RUN   TestFrozenMatrix/feeds/unlisted/O
+=== RUN   TestFrozenMatrix/feeds/unlisted/S
+=== RUN   TestFrozenMatrix/feeds/private/A
+=== RUN   TestFrozenMatrix/feeds/private/M
+=== RUN   TestFrozenMatrix/feeds/private/G
+=== RUN   TestFrozenMatrix/feeds/private/O
+=== RUN   TestFrozenMatrix/feeds/private/S
+=== RUN   TestFrozenMatrix/notifications/public/A
+=== RUN   TestFrozenMatrix/notifications/public/M
+=== RUN   TestFrozenMatrix/notifications/public/G
+=== RUN   TestFrozenMatrix/notifications/public/O
+=== RUN   TestFrozenMatrix/notifications/public/S
+=== RUN   TestFrozenMatrix/notifications/unlisted/A
+=== RUN   TestFrozenMatrix/notifications/unlisted/M
+=== RUN   TestFrozenMatrix/notifications/unlisted/G
+=== RUN   TestFrozenMatrix/notifications/unlisted/O
+=== RUN   TestFrozenMatrix/notifications/unlisted/S
+=== RUN   TestFrozenMatrix/notifications/private/A
+=== RUN   TestFrozenMatrix/notifications/private/M
+=== RUN   TestFrozenMatrix/notifications/private/G
+=== RUN   TestFrozenMatrix/notifications/private/O
+=== RUN   TestFrozenMatrix/notifications/private/S
+=== RUN   TestFrozenMatrix/favorite_rating/public/A
+=== RUN   TestFrozenMatrix/favorite_rating/public/M
+=== RUN   TestFrozenMatrix/favorite_rating/public/G
+=== RUN   TestFrozenMatrix/favorite_rating/public/O
+=== RUN   TestFrozenMatrix/favorite_rating/public/S
+=== RUN   TestFrozenMatrix/favorite_rating/unlisted/A
+=== RUN   TestFrozenMatrix/favorite_rating/unlisted/M
+=== RUN   TestFrozenMatrix/favorite_rating/unlisted/G
+=== RUN   TestFrozenMatrix/favorite_rating/unlisted/O
+=== RUN   TestFrozenMatrix/favorite_rating/unlisted/S
+=== RUN   TestFrozenMatrix/favorite_rating/private/A
+=== RUN   TestFrozenMatrix/favorite_rating/private/M
+=== RUN   TestFrozenMatrix/favorite_rating/private/G
+=== RUN   TestFrozenMatrix/favorite_rating/private/O
+=== RUN   TestFrozenMatrix/favorite_rating/private/S
+=== RUN   TestFrozenMatrix/embed/public/A
+=== RUN   TestFrozenMatrix/embed/public/M
+=== RUN   TestFrozenMatrix/embed/public/G
+=== RUN   TestFrozenMatrix/embed/public/O
+=== RUN   TestFrozenMatrix/embed/public/S
+=== RUN   TestFrozenMatrix/embed/unlisted/A
+=== RUN   TestFrozenMatrix/embed/unlisted/M
+=== RUN   TestFrozenMatrix/embed/unlisted/G
+=== RUN   TestFrozenMatrix/embed/unlisted/O
+=== RUN   TestFrozenMatrix/embed/unlisted/S
+=== RUN   TestFrozenMatrix/embed/private/A
+=== RUN   TestFrozenMatrix/embed/private/M
+=== RUN   TestFrozenMatrix/embed/private/G
+=== RUN   TestFrozenMatrix/embed/private/O
+=== RUN   TestFrozenMatrix/embed/private/S
+=== RUN   TestFrozenMatrix/sitemap/public/A
+=== RUN   TestFrozenMatrix/sitemap/public/M
+=== RUN   TestFrozenMatrix/sitemap/public/G
+=== RUN   TestFrozenMatrix/sitemap/public/O
+=== RUN   TestFrozenMatrix/sitemap/public/S
+=== RUN   TestFrozenMatrix/sitemap/unlisted/A
+=== RUN   TestFrozenMatrix/sitemap/unlisted/M
+=== RUN   TestFrozenMatrix/sitemap/unlisted/G
+=== RUN   TestFrozenMatrix/sitemap/unlisted/O
+=== RUN   TestFrozenMatrix/sitemap/unlisted/S
+=== RUN   TestFrozenMatrix/sitemap/private/A
+=== RUN   TestFrozenMatrix/sitemap/private/M
+=== RUN   TestFrozenMatrix/sitemap/private/G
+=== RUN   TestFrozenMatrix/sitemap/private/O
+=== RUN   TestFrozenMatrix/sitemap/private/S
+=== RUN   TestFrozenMatrix/bulk_download/public/A
+=== RUN   TestFrozenMatrix/bulk_download/public/M
+=== RUN   TestFrozenMatrix/bulk_download/public/G
+=== RUN   TestFrozenMatrix/bulk_download/public/O
+=== RUN   TestFrozenMatrix/bulk_download/public/S
+=== RUN   TestFrozenMatrix/bulk_download/unlisted/A
+=== RUN   TestFrozenMatrix/bulk_download/unlisted/M
+=== RUN   TestFrozenMatrix/bulk_download/unlisted/G
+=== RUN   TestFrozenMatrix/bulk_download/unlisted/O
+=== RUN   TestFrozenMatrix/bulk_download/unlisted/S
+=== RUN   TestFrozenMatrix/bulk_download/private/A
+=== RUN   TestFrozenMatrix/bulk_download/private/M
+=== RUN   TestFrozenMatrix/bulk_download/private/G
+=== RUN   TestFrozenMatrix/bulk_download/private/O
+=== RUN   TestFrozenMatrix/bulk_download/private/S
+=== RUN   TestFrozenMatrix/federation_outbound/public/A
+=== RUN   TestFrozenMatrix/federation_outbound/public/M
+=== RUN   TestFrozenMatrix/federation_outbound/public/G
+=== RUN   TestFrozenMatrix/federation_outbound/public/O
+=== RUN   TestFrozenMatrix/federation_outbound/public/S
+=== RUN   TestFrozenMatrix/federation_outbound/unlisted/A
+=== RUN   TestFrozenMatrix/federation_outbound/unlisted/M
+=== RUN   TestFrozenMatrix/federation_outbound/unlisted/G
+=== RUN   TestFrozenMatrix/federation_outbound/unlisted/O
+=== RUN   TestFrozenMatrix/federation_outbound/unlisted/S
+=== RUN   TestFrozenMatrix/federation_outbound/private/A
+=== RUN   TestFrozenMatrix/federation_outbound/private/M
+=== RUN   TestFrozenMatrix/federation_outbound/private/G
+=== RUN   TestFrozenMatrix/federation_outbound/private/O
+=== RUN   TestFrozenMatrix/federation_outbound/private/S
+=== RUN   TestFrozenMatrix/ipfs_publication/public/A
+=== RUN   TestFrozenMatrix/ipfs_publication/public/M
+=== RUN   TestFrozenMatrix/ipfs_publication/public/G
+=== RUN   TestFrozenMatrix/ipfs_publication/public/O
+=== RUN   TestFrozenMatrix/ipfs_publication/public/S
+=== RUN   TestFrozenMatrix/ipfs_publication/unlisted/A
+=== RUN   TestFrozenMatrix/ipfs_publication/unlisted/M
+=== RUN   TestFrozenMatrix/ipfs_publication/unlisted/G
+=== RUN   TestFrozenMatrix/ipfs_publication/unlisted/O
+=== RUN   TestFrozenMatrix/ipfs_publication/unlisted/S
+=== RUN   TestFrozenMatrix/ipfs_publication/private/A
+=== RUN   TestFrozenMatrix/ipfs_publication/private/M
+=== RUN   TestFrozenMatrix/ipfs_publication/private/G
+=== RUN   TestFrozenMatrix/ipfs_publication/private/O
+=== RUN   TestFrozenMatrix/ipfs_publication/private/S
+=== RUN   TestFrozenMatrix/export/public/A
+=== RUN   TestFrozenMatrix/export/public/M
+=== RUN   TestFrozenMatrix/export/public/G
+=== RUN   TestFrozenMatrix/export/public/O
+=== RUN   TestFrozenMatrix/export/public/S
+=== RUN   TestFrozenMatrix/export/unlisted/A
+=== RUN   TestFrozenMatrix/export/unlisted/M
+=== RUN   TestFrozenMatrix/export/unlisted/G
+=== RUN   TestFrozenMatrix/export/unlisted/O
+=== RUN   TestFrozenMatrix/export/unlisted/S
+=== RUN   TestFrozenMatrix/export/private/A
+=== RUN   TestFrozenMatrix/export/private/M
+=== RUN   TestFrozenMatrix/export/private/G
+=== RUN   TestFrozenMatrix/export/private/O
+=== RUN   TestFrozenMatrix/export/private/S
+=== RUN   TestFrozenMatrix/admin_console/public/A
+=== RUN   TestFrozenMatrix/admin_console/public/M
+=== RUN   TestFrozenMatrix/admin_console/public/G
+=== RUN   TestFrozenMatrix/admin_console/public/O
+=== RUN   TestFrozenMatrix/admin_console/public/S
+=== RUN   TestFrozenMatrix/admin_console/unlisted/A
+=== RUN   TestFrozenMatrix/admin_console/unlisted/M
+=== RUN   TestFrozenMatrix/admin_console/unlisted/G
+=== RUN   TestFrozenMatrix/admin_console/unlisted/O
+=== RUN   TestFrozenMatrix/admin_console/unlisted/S
+=== RUN   TestFrozenMatrix/admin_console/private/A
+=== RUN   TestFrozenMatrix/admin_console/private/M
+=== RUN   TestFrozenMatrix/admin_console/private/G
+=== RUN   TestFrozenMatrix/admin_console/private/O
+=== RUN   TestFrozenMatrix/admin_console/private/S
+=== RUN   TestFrozenMatrix/shared_cache/public/A
+=== RUN   TestFrozenMatrix/shared_cache/public/M
+=== RUN   TestFrozenMatrix/shared_cache/public/G
+=== RUN   TestFrozenMatrix/shared_cache/public/O
+=== RUN   TestFrozenMatrix/shared_cache/public/S
+=== RUN   TestFrozenMatrix/shared_cache/unlisted/A
+=== RUN   TestFrozenMatrix/shared_cache/unlisted/M
+=== RUN   TestFrozenMatrix/shared_cache/unlisted/G
+=== RUN   TestFrozenMatrix/shared_cache/unlisted/O
+=== RUN   TestFrozenMatrix/shared_cache/unlisted/S
+=== RUN   TestFrozenMatrix/shared_cache/private/A
+=== RUN   TestFrozenMatrix/shared_cache/private/M
+=== RUN   TestFrozenMatrix/shared_cache/private/G
+=== RUN   TestFrozenMatrix/shared_cache/private/O
+=== RUN   TestFrozenMatrix/shared_cache/private/S
+--- PASS: TestFrozenMatrix (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/item_page/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/original_download/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/derivative_url/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/album_page/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/count_contribution/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/owner_library/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/profile_grid/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/explore/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/explore/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/explore/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/explore/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/explore/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/explore/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/explore/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/explore/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/explore/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/explore/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/explore/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/explore/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/explore/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/explore/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/explore/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/search/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/search/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/search/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/search/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/search/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/search/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/search/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/search/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/search/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/search/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/search/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/search/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/search/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/search/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/search/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/tag_category_listing/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/feeds/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/notifications/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/favorite_rating/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/embed/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/embed/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/embed/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/embed/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/embed/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/embed/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/embed/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/embed/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/embed/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/embed/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/embed/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/embed/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/embed/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/embed/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/embed/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/sitemap/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/bulk_download/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/federation_outbound/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/ipfs_publication/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/export/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/export/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/export/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/export/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/export/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/export/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/export/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/export/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/export/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/export/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/export/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/export/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/export/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/export/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/export/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/admin_console/private/S (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/public/A (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/public/M (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/public/G (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/public/O (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/public/S (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/unlisted/A (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/unlisted/M (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/unlisted/G (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/unlisted/O (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/unlisted/S (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/private/A (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/private/M (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/private/G (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/private/O (0.00s)
+    --- PASS: TestFrozenMatrix/shared_cache/private/S (0.00s)
+=== RUN   TestFixtureCoversEveryFrozenSurfaceExactlyOnce
+--- PASS: TestFixtureCoversEveryFrozenSurfaceExactlyOnce (0.00s)
+=== RUN   TestUnlistedSurfaceDenies
+--- PASS: TestUnlistedSurfaceDenies (0.00s)
+=== RUN   TestSitePrivateDeniesAnonymousEverySurface
+--- PASS: TestSitePrivateDeniesAnonymousEverySurface (0.00s)
+=== RUN   TestSearchOwnLibraryScope
+--- PASS: TestSearchOwnLibraryScope (0.00s)
+=== RUN   TestOriginalDownloadSetting
+--- PASS: TestOriginalDownloadSetting (0.00s)
+=== RUN   TestPrivateOriginalRequiresDownloadInGrant
+--- PASS: TestPrivateOriginalRequiresDownloadInGrant (0.00s)
+=== RUN   TestIPFSRequiresListedOwner
+--- PASS: TestIPFSRequiresListedOwner (0.00s)
+=== RUN   TestSiteExportRequiresOwnerRole
+--- PASS: TestSiteExportRequiresOwnerRole (0.00s)
+=== RUN   TestAlbumPrivacy
+--- PASS: TestAlbumPrivacy (0.00s)
+=== RUN   TestHideExistenceOnlyForPrivate
+--- PASS: TestHideExistenceOnlyForPrivate (0.00s)
+=== RUN   TestZeroDecisionIsDeny
+--- PASS: TestZeroDecisionIsDeny (0.00s)
+=== RUN   TestRoleOrdering
+--- PASS: TestRoleOrdering (0.00s)
+=== RUN   TestStaffRoleWithoutAuditedContextIsNotStaff
+--- PASS: TestStaffRoleWithoutAuditedContextIsNotStaff (0.00s)
+=== RUN   TestUnknownVisibilityDenies
+=== RUN   TestUnknownVisibilityDenies/item_page/""
+=== RUN   TestUnknownVisibilityDenies/original_download/""
+=== RUN   TestUnknownVisibilityDenies/derivative_url/""
+=== RUN   TestUnknownVisibilityDenies/album_page/""
+=== RUN   TestUnknownVisibilityDenies/count_contribution/""
+=== RUN   TestUnknownVisibilityDenies/owner_library/""
+=== RUN   TestUnknownVisibilityDenies/profile_grid/""
+=== RUN   TestUnknownVisibilityDenies/explore/""
+=== RUN   TestUnknownVisibilityDenies/search/""
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/""
+=== RUN   TestUnknownVisibilityDenies/feeds/""
+=== RUN   TestUnknownVisibilityDenies/notifications/""
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/""
+=== RUN   TestUnknownVisibilityDenies/embed/""
+=== RUN   TestUnknownVisibilityDenies/sitemap/""
+=== RUN   TestUnknownVisibilityDenies/bulk_download/""
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/""
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/""
+=== RUN   TestUnknownVisibilityDenies/export/""
+=== RUN   TestUnknownVisibilityDenies/admin_console/""
+=== RUN   TestUnknownVisibilityDenies/shared_cache/""
+=== RUN   TestUnknownVisibilityDenies/item_page/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/original_download/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/album_page/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/explore/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/search/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/feeds/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/notifications/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/embed/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/export/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"PUBLIC"
+=== RUN   TestUnknownVisibilityDenies/item_page/"Public"
+=== RUN   TestUnknownVisibilityDenies/original_download/"Public"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"Public"
+=== RUN   TestUnknownVisibilityDenies/album_page/"Public"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"Public"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"Public"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"Public"
+=== RUN   TestUnknownVisibilityDenies/explore/"Public"
+=== RUN   TestUnknownVisibilityDenies/search/"Public"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"Public"
+=== RUN   TestUnknownVisibilityDenies/feeds/"Public"
+=== RUN   TestUnknownVisibilityDenies/notifications/"Public"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"Public"
+=== RUN   TestUnknownVisibilityDenies/embed/"Public"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"Public"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"Public"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"Public"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"Public"
+=== RUN   TestUnknownVisibilityDenies/export/"Public"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"Public"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"Public"
+=== RUN   TestUnknownVisibilityDenies/item_page/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/original_download/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/album_page/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/explore/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/search/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/feeds/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/notifications/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/embed/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/export/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"scheduled"
+=== RUN   TestUnknownVisibilityDenies/item_page/"moderated"
+=== RUN   TestUnknownVisibilityDenies/original_download/"moderated"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"moderated"
+=== RUN   TestUnknownVisibilityDenies/album_page/"moderated"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"moderated"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"moderated"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"moderated"
+=== RUN   TestUnknownVisibilityDenies/explore/"moderated"
+=== RUN   TestUnknownVisibilityDenies/search/"moderated"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"moderated"
+=== RUN   TestUnknownVisibilityDenies/feeds/"moderated"
+=== RUN   TestUnknownVisibilityDenies/notifications/"moderated"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"moderated"
+=== RUN   TestUnknownVisibilityDenies/embed/"moderated"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"moderated"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"moderated"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"moderated"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"moderated"
+=== RUN   TestUnknownVisibilityDenies/export/"moderated"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"moderated"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"moderated"
+=== RUN   TestUnknownVisibilityDenies/item_page/"deleted"
+=== RUN   TestUnknownVisibilityDenies/original_download/"deleted"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"deleted"
+=== RUN   TestUnknownVisibilityDenies/album_page/"deleted"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"deleted"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"deleted"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"deleted"
+=== RUN   TestUnknownVisibilityDenies/explore/"deleted"
+=== RUN   TestUnknownVisibilityDenies/search/"deleted"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"deleted"
+=== RUN   TestUnknownVisibilityDenies/feeds/"deleted"
+=== RUN   TestUnknownVisibilityDenies/notifications/"deleted"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"deleted"
+=== RUN   TestUnknownVisibilityDenies/embed/"deleted"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"deleted"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"deleted"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"deleted"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"deleted"
+=== RUN   TestUnknownVisibilityDenies/export/"deleted"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"deleted"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"deleted"
+=== RUN   TestUnknownVisibilityDenies/item_page/"_public"
+=== RUN   TestUnknownVisibilityDenies/original_download/"_public"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"_public"
+=== RUN   TestUnknownVisibilityDenies/album_page/"_public"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"_public"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"_public"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"_public"
+=== RUN   TestUnknownVisibilityDenies/explore/"_public"
+=== RUN   TestUnknownVisibilityDenies/search/"_public"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"_public"
+=== RUN   TestUnknownVisibilityDenies/feeds/"_public"
+=== RUN   TestUnknownVisibilityDenies/notifications/"_public"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"_public"
+=== RUN   TestUnknownVisibilityDenies/embed/"_public"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"_public"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"_public"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"_public"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"_public"
+=== RUN   TestUnknownVisibilityDenies/export/"_public"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"_public"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"_public"
+=== RUN   TestUnknownVisibilityDenies/item_page/"public\n"
+=== RUN   TestUnknownVisibilityDenies/original_download/"public\n"
+=== RUN   TestUnknownVisibilityDenies/derivative_url/"public\n"
+=== RUN   TestUnknownVisibilityDenies/album_page/"public\n"
+=== RUN   TestUnknownVisibilityDenies/count_contribution/"public\n"
+=== RUN   TestUnknownVisibilityDenies/owner_library/"public\n"
+=== RUN   TestUnknownVisibilityDenies/profile_grid/"public\n"
+=== RUN   TestUnknownVisibilityDenies/explore/"public\n"
+=== RUN   TestUnknownVisibilityDenies/search/"public\n"
+=== RUN   TestUnknownVisibilityDenies/tag_category_listing/"public\n"
+=== RUN   TestUnknownVisibilityDenies/feeds/"public\n"
+=== RUN   TestUnknownVisibilityDenies/notifications/"public\n"
+=== RUN   TestUnknownVisibilityDenies/favorite_rating/"public\n"
+=== RUN   TestUnknownVisibilityDenies/embed/"public\n"
+=== RUN   TestUnknownVisibilityDenies/sitemap/"public\n"
+=== RUN   TestUnknownVisibilityDenies/bulk_download/"public\n"
+=== RUN   TestUnknownVisibilityDenies/federation_outbound/"public\n"
+=== RUN   TestUnknownVisibilityDenies/ipfs_publication/"public\n"
+=== RUN   TestUnknownVisibilityDenies/export/"public\n"
+=== RUN   TestUnknownVisibilityDenies/admin_console/"public\n"
+=== RUN   TestUnknownVisibilityDenies/shared_cache/"public\n"
+--- PASS: TestUnknownVisibilityDenies (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"PUBLIC" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"Public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"scheduled" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"moderated" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"deleted" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"_public" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/item_page/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/original_download/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/derivative_url/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/album_page/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/count_contribution/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/owner_library/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/profile_grid/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/explore/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/search/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/tag_category_listing/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/feeds/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/notifications/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/favorite_rating/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/embed/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/sitemap/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/bulk_download/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/federation_outbound/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/ipfs_publication/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/export/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/admin_console/"public\n" (0.00s)
+    --- PASS: TestUnknownVisibilityDenies/shared_cache/"public\n" (0.00s)
+=== RUN   TestZeroResourceDeniesEverySurface
+--- PASS: TestZeroResourceDeniesEverySurface (0.00s)
+=== RUN   TestUnknownAlbumPrivacyDenies
+--- PASS: TestUnknownAlbumPrivacyDenies (0.00s)
+=== RUN   TestHideExistenceForAnythingNotPublicOrUnlisted
+--- PASS: TestHideExistenceForAnythingNotPublicOrUnlisted (0.00s)
+=== RUN   TestDownloadSettingStillDefaultsToAll
+--- PASS: TestDownloadSettingStillDefaultsToAll (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/authz	0.333s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+=== RUN   TestMemoryLimiterEnforcesTheWindow
+--- PASS: TestMemoryLimiterEnforcesTheWindow (0.00s)
+=== RUN   TestMemoryLimiterWindowExpires
+--- PASS: TestMemoryLimiterWindowExpires (0.03s)
+=== RUN   TestMemoryLimiterBoundsItsMemory
+--- PASS: TestMemoryLimiterBoundsItsMemory (0.00s)
+=== RUN   TestMemoryLimiterIsRaceFree
+--- PASS: TestMemoryLimiterIsRaceFree (0.00s)
+=== RUN   TestMemoryLimiterAlwaysReportsDegraded
+--- PASS: TestMemoryLimiterAlwaysReportsDegraded (0.00s)
+=== RUN   TestFallbackWithNoCacheStillLimitsAndReportsDegraded
+--- PASS: TestFallbackWithNoCacheStillLimitsAndReportsDegraded (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/cache	0.458s
+=== RUN   TestValidProductionEnvironmentLoads
+--- PASS: TestValidProductionEnvironmentLoads (0.00s)
+=== RUN   TestProductionRefusesDevSecrets
+=== RUN   TestProductionRefusesDevSecrets/dev
+=== RUN   TestProductionRefusesDevSecrets/devsecret
+=== RUN   TestProductionRefusesDevSecrets/changeme
+=== RUN   TestProductionRefusesDevSecrets/change-me-change-me-change-me-ch
+=== RUN   TestProductionRefusesDevSecrets/insecure-development-session-secret-0123456789
+=== RUN   TestProductionRefusesDevSecrets/vizra-dev-secret-vizra-dev-secret
+=== RUN   TestProductionRefusesDevSecrets/test-test-test-test-test-test-te
+--- PASS: TestProductionRefusesDevSecrets (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/dev (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/devsecret (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/changeme (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/change-me-change-me-change-me-ch (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/insecure-development-session-secret-0123456789 (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/vizra-dev-secret-vizra-dev-secret (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/test-test-test-test-test-test-te (0.00s)
+=== RUN   TestProductionRefusesShortSecrets
+--- PASS: TestProductionRefusesShortSecrets (0.00s)
+=== RUN   TestProductionRefusesMissingSecrets
+--- PASS: TestProductionRefusesMissingSecrets (0.00s)
+=== RUN   TestProductionRefusesWildcardCORS
+--- PASS: TestProductionRefusesWildcardCORS (0.00s)
+=== RUN   TestProductionRefusesPlainHTTPOriginUnlessExplicitlyAllowed
+--- PASS: TestProductionRefusesPlainHTTPOriginUnlessExplicitlyAllowed (0.00s)
+=== RUN   TestProductionRefusesPlainHTTPCORSOrigin
+--- PASS: TestProductionRefusesPlainHTTPCORSOrigin (0.00s)
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_DISABLE_AUTH
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_ALLOW_ANY_ORIGIN
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_SKIP_MIGRATIONS
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_AUTOLOGIN_USER
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_FAKE_SEARCH
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_INSECURE_COOKIES
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_TRUST_ANY_HMAC
+--- PASS: TestEveryEscapeHatchIsRefusedInProduction (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_DISABLE_AUTH (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_ALLOW_ANY_ORIGIN (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_SKIP_MIGRATIONS (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_AUTOLOGIN_USER (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_FAKE_SEARCH (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_INSECURE_COOKIES (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_TRUST_ANY_HMAC (0.00s)
+=== RUN   TestEscapeHatchesAreAllowedInDevelopment
+--- PASS: TestEscapeHatchesAreAllowedInDevelopment (0.00s)
+=== RUN   TestValidateCollectsEveryProblem
+--- PASS: TestValidateCollectsEveryProblem (0.00s)
+=== RUN   TestSearchModeRequiresURLAndKey
+--- PASS: TestSearchModeRequiresURLAndKey (0.00s)
+=== RUN   TestJobTimeoutMustExceedLease
+--- PASS: TestJobTimeoutMustExceedLease (0.00s)
+=== RUN   TestCheckEnvIsTheSameValidatorAsBoot
+--- PASS: TestCheckEnvIsTheSameValidatorAsBoot (0.00s)
+=== RUN   TestRegistryHasNoDuplicateKeys
+--- PASS: TestRegistryHasNoDuplicateKeys (0.00s)
+=== RUN   TestProductionRefusesPublishedTestKeys
+=== RUN   TestProductionRefusesPublishedTestKeys/as_the_search_HMAC_key
+=== RUN   TestProductionRefusesPublishedTestKeys/as_VIZRA_SESSION_SECRET
+=== RUN   TestProductionRefusesPublishedTestKeys/as_VIZRA_MFA_KEY_KEK
+=== RUN   TestProductionRefusesPublishedTestKeys/the_search_package_test_key_as_VIZRA_SESSION_SECRET
+=== RUN   TestProductionRefusesPublishedTestKeys/the_search_package_test_key_as_VIZRA_MFA_KEY_KEK
+=== RUN   TestProductionRefusesPublishedTestKeys/development_still_accepts_them
+--- PASS: TestProductionRefusesPublishedTestKeys (0.00s)
+    --- PASS: TestProductionRefusesPublishedTestKeys/as_the_search_HMAC_key (0.00s)
+    --- PASS: TestProductionRefusesPublishedTestKeys/as_VIZRA_SESSION_SECRET (0.00s)
+    --- PASS: TestProductionRefusesPublishedTestKeys/as_VIZRA_MFA_KEY_KEK (0.00s)
+    --- PASS: TestProductionRefusesPublishedTestKeys/the_search_package_test_key_as_VIZRA_SESSION_SECRET (0.00s)
+    --- PASS: TestProductionRefusesPublishedTestKeys/the_search_package_test_key_as_VIZRA_MFA_KEY_KEK (0.00s)
+    --- PASS: TestProductionRefusesPublishedTestKeys/development_still_accepts_them (0.00s)
+=== RUN   TestTheTestBaselineIsNotAPublishedSecret
+--- PASS: TestTheTestBaselineIsNotAPublishedSecret (0.00s)
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"alice"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"owner"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"0"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"false"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"off"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"no"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"1"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"true"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"_"
+=== RUN   TestValueBearingEscapeHatchIsRefusedWhenPresent/"-"
+--- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"alice" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"owner" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"0" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"false" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"off" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"no" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"1" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"true" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"_" (0.00s)
+    --- PASS: TestValueBearingEscapeHatchIsRefusedWhenPresent/"-" (0.00s)
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="true"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="1"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="yes"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="on"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH=false_tolerated
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="true"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="1"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="yes"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="on"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN=false_tolerated
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="true"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="1"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="yes"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="on"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS=false_tolerated
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="alice"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="owner"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="0"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="false"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="true"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="1"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="yes"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="on"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH=false_tolerated
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="true"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="1"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="yes"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="on"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES=false_tolerated
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="true"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="1"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="yes"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="on"
+=== RUN   TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC=false_tolerated
+--- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="true" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="1" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="yes" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="on" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH=false_tolerated (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="true" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="1" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="yes" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="on" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN=false_tolerated (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="true" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="1" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="yes" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="on" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS=false_tolerated (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="alice" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="owner" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="0" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="false" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="true" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="1" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="yes" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH="on" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_FAKE_SEARCH=false_tolerated (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="true" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="1" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="yes" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES="on" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_INSECURE_COOKIES=false_tolerated (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="true" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="1" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="yes" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC="on" (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_TRUST_ANY_HMAC=false_tolerated (0.00s)
+=== RUN   TestEveryKeyHasATemplateEntry
+--- PASS: TestEveryKeyHasATemplateEntry (0.00s)
+=== RUN   TestTemplateHasNoKeyNothingReads
+--- PASS: TestTemplateHasNoKeyNothingReads (0.00s)
+=== RUN   TestTemplateSecretsAreRefusedInProduction
+--- PASS: TestTemplateSecretsAreRefusedInProduction (0.00s)
+=== RUN   TestTemplateBootsInDevelopment
+--- PASS: TestTemplateBootsInDevelopment (0.00s)
+=== RUN   TestEscapeHatchesAreCommentedOutInTheTemplate
+--- PASS: TestEscapeHatchesAreCommentedOutInTheTemplate (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/config	0.846s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+=== RUN   TestCheckSchema
+=== RUN   TestCheckSchema/current
+=== RUN   TestCheckSchema/behind:_the_code_may_be_reading_columns_that_do_not_exist
+=== RUN   TestCheckSchema/ahead:_this_binary_must_not_be_rolled_out
+=== RUN   TestCheckSchema/dirty:_a_migration_failed_part-way
+=== RUN   TestCheckSchema/unknown:_the_ledger_could_not_be_read
+--- PASS: TestCheckSchema (0.00s)
+    --- PASS: TestCheckSchema/current (0.00s)
+    --- PASS: TestCheckSchema/behind:_the_code_may_be_reading_columns_that_do_not_exist (0.00s)
+    --- PASS: TestCheckSchema/ahead:_this_binary_must_not_be_rolled_out (0.00s)
+    --- PASS: TestCheckSchema/dirty:_a_migration_failed_part-way (0.00s)
+    --- PASS: TestCheckSchema/unknown:_the_ledger_could_not_be_read (0.00s)
+=== RUN   TestCheckCacheFloor
+=== RUN   TestCheckCacheFloor/9.1.2
+=== RUN   TestCheckCacheFloor/7.2.16
+=== RUN   TestCheckCacheFloor/7.2.0
+=== RUN   TestCheckCacheFloor/8.0.11
+=== RUN   TestCheckCacheFloor/10.0.0
+=== RUN   TestCheckCacheFloor/7.1.9
+=== RUN   TestCheckCacheFloor/6.2.14
+=== RUN   TestCheckCacheFloor/5.0.0
+=== RUN   TestCheckCacheFloor/#00
+=== RUN   TestCheckCacheFloor/unknown
+=== RUN   TestCheckCacheFloor/v-not-a-version
+=== RUN   TestCheckCacheFloor/seven_point_two
+--- PASS: TestCheckCacheFloor (0.00s)
+    --- PASS: TestCheckCacheFloor/9.1.2 (0.00s)
+    --- PASS: TestCheckCacheFloor/7.2.16 (0.00s)
+    --- PASS: TestCheckCacheFloor/7.2.0 (0.00s)
+    --- PASS: TestCheckCacheFloor/8.0.11 (0.00s)
+    --- PASS: TestCheckCacheFloor/10.0.0 (0.00s)
+    --- PASS: TestCheckCacheFloor/7.1.9 (0.00s)
+    --- PASS: TestCheckCacheFloor/6.2.14 (0.00s)
+    --- PASS: TestCheckCacheFloor/5.0.0 (0.00s)
+    --- PASS: TestCheckCacheFloor/#00 (0.00s)
+    --- PASS: TestCheckCacheFloor/unknown (0.00s)
+    --- PASS: TestCheckCacheFloor/v-not-a-version (0.00s)
+    --- PASS: TestCheckCacheFloor/seven_point_two (0.00s)
+=== RUN   TestCheckCacheReportsFlavourAndVersion
+--- PASS: TestCheckCacheReportsFlavourAndVersion (0.00s)
+=== RUN   TestCheckCacheBelowTheFloorFails
+--- PASS: TestCheckCacheBelowTheFloorFails (0.00s)
+=== RUN   TestCheckCacheUnreachableFails
+--- PASS: TestCheckCacheUnreachableFails (0.00s)
+=== RUN   TestCheckDatabase
+--- PASS: TestCheckDatabase (0.00s)
+=== RUN   TestCheckConfigReportsEveryProblemAndFails
+--- PASS: TestCheckConfigReportsEveryProblemAndFails (0.00s)
+=== RUN   TestCheckConfigValidReportsOK
+--- PASS: TestCheckConfigValidReportsOK (0.00s)
+=== RUN   TestCheckCompose
+=== RUN   TestCheckCompose/at_the_floor
+=== RUN   TestCheckCompose/above_the_floor
+=== RUN   TestCheckCompose/a_major_above_2
+=== RUN   TestCheckCompose/below_the_floor
+=== RUN   TestCheckCompose/well_below
+=== RUN   TestCheckCompose/unparseable
+=== RUN   TestCheckCompose/empty
+=== RUN   TestCheckCompose/command_failed
+=== RUN   TestCheckCompose/docker_absent
+--- PASS: TestCheckCompose (0.00s)
+    --- PASS: TestCheckCompose/at_the_floor (0.00s)
+    --- PASS: TestCheckCompose/above_the_floor (0.00s)
+    --- PASS: TestCheckCompose/a_major_above_2 (0.00s)
+    --- PASS: TestCheckCompose/below_the_floor (0.00s)
+    --- PASS: TestCheckCompose/well_below (0.00s)
+    --- PASS: TestCheckCompose/unparseable (0.00s)
+    --- PASS: TestCheckCompose/empty (0.00s)
+    --- PASS: TestCheckCompose/command_failed (0.00s)
+    --- PASS: TestCheckCompose/docker_absent (0.00s)
+=== RUN   TestCheckSearch
+--- PASS: TestCheckSearch (0.00s)
+=== RUN   TestSkipIsNeverAPassButDoesNotFailTheRun
+--- PASS: TestSkipIsNeverAPassButDoesNotFailTheRun (0.00s)
+=== RUN   TestReportReturnsAnErrorWhenAnyCheckFails
+--- PASS: TestReportReturnsAnErrorWhenAnyCheckFails (0.00s)
+=== RUN   TestParseVersionIsAnchored
+--- PASS: TestParseVersionIsAnchored (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/doctor	1.074s
+=== RUN   TestEveryRouteHasASpecOperation
+--- PASS: TestEveryRouteHasASpecOperation (0.00s)
+=== RUN   TestEverySpecOperationHasARoute
+--- PASS: TestEverySpecOperationHasARoute (0.00s)
+=== RUN   TestSpecOperationIDsAreUniqueAndPresent
+--- PASS: TestSpecOperationIDsAreUniqueAndPresent (0.00s)
+=== RUN   TestM0ContractIsTheFourProbes
+--- PASS: TestM0ContractIsTheFourProbes (0.00s)
+=== RUN   TestInternalSearchContractIsValid
+--- PASS: TestInternalSearchContractIsValid (0.00s)
+=== RUN   TestInternalOperationsAreNotInThePublicContract
+--- PASS: TestInternalOperationsAreNotInThePublicContract (0.00s)
+=== RUN   TestHMACTestVectorsArePublished
+--- PASS: TestHMACTestVectorsArePublished (0.00s)
+=== RUN   TestHealthzIsLivenessOnly
+--- PASS: TestHealthzIsLivenessOnly (0.00s)
+=== RUN   TestHealthzReportsDraining
+--- PASS: TestHealthzReportsDraining (0.00s)
+=== RUN   TestReadyzHealthy
+--- PASS: TestReadyzHealthy (0.00s)
+=== RUN   TestReadyzDatabaseDownIs503
+--- PASS: TestReadyzDatabaseDownIs503 (0.00s)
+=== RUN   TestReadyzCacheDownIs200Degraded
+--- PASS: TestReadyzCacheDownIs200Degraded (0.00s)
+=== RUN   TestReadyzQueueAgeAboveThresholdIsDegraded
+--- PASS: TestReadyzQueueAgeAboveThresholdIsDegraded (0.00s)
+=== RUN   TestReadyzQueueAgeBelowThresholdIsOK
+--- PASS: TestReadyzQueueAgeBelowThresholdIsOK (0.00s)
+=== RUN   TestReadyzUnavailableBeatsDegraded
+--- PASS: TestReadyzUnavailableBeatsDegraded (0.00s)
+=== RUN   TestReadyzDrainingIs503
+--- PASS: TestReadyzDrainingIs503 (0.00s)
+=== RUN   TestReadinessIsSingleFlightAndCached
+--- PASS: TestReadinessIsSingleFlightAndCached (0.01s)
+=== RUN   TestSchemazIsAlways200
+--- PASS: TestSchemazIsAlways200 (0.00s)
+=== RUN   TestVersionReportsBuildIdentity
+--- PASS: TestVersionReportsBuildIdentity (0.00s)
+=== RUN   TestRequestIDIsAlwaysSetAndUntrustedInputIsReplaced
+--- PASS: TestRequestIDIsAlwaysSetAndUntrustedInputIsReplaced (0.00s)
+=== RUN   TestUnknownRouteIsAJSONError
+--- PASS: TestUnknownRouteIsAJSONError (0.00s)
+=== RUN   TestEveryRouteCarriesHardeningHeaders
+=== RUN   TestEveryRouteCarriesHardeningHeaders/GET_/healthz
+=== RUN   TestEveryRouteCarriesHardeningHeaders/GET_/readyz
+=== RUN   TestEveryRouteCarriesHardeningHeaders/GET_/version
+=== RUN   TestEveryRouteCarriesHardeningHeaders/GET_/schemaz
+--- PASS: TestEveryRouteCarriesHardeningHeaders (0.00s)
+    --- PASS: TestEveryRouteCarriesHardeningHeaders/GET_/healthz (0.00s)
+    --- PASS: TestEveryRouteCarriesHardeningHeaders/GET_/readyz (0.00s)
+    --- PASS: TestEveryRouteCarriesHardeningHeaders/GET_/version (0.00s)
+    --- PASS: TestEveryRouteCarriesHardeningHeaders/GET_/schemaz (0.00s)
+=== RUN   TestErrorResponsesCarryHardeningHeaders
+=== RUN   TestErrorResponsesCarryHardeningHeaders/unknown_route_404
+=== RUN   TestErrorResponsesCarryHardeningHeaders/unknown_nested_route_404
+--- PASS: TestErrorResponsesCarryHardeningHeaders (0.00s)
+    --- PASS: TestErrorResponsesCarryHardeningHeaders/unknown_route_404 (0.00s)
+    --- PASS: TestErrorResponsesCarryHardeningHeaders/unknown_nested_route_404 (0.00s)
+=== RUN   TestMetricsAreNotOnThePublicServer
+--- PASS: TestMetricsAreNotOnThePublicServer (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.570s
+=== RUN   TestMigrateUpOnEmptyDatabase
+--- PASS: TestMigrateUpOnEmptyDatabase (0.05s)
+=== RUN   TestMigrateIsIdempotent
+--- PASS: TestMigrateIsIdempotent (0.03s)
+=== RUN   TestSchemaConstraintsAreEnforced
+=== RUN   TestSchemaConstraintsAreEnforced/only_one_default_storage_location
+=== RUN   TestSchemaConstraintsAreEnforced/a_read-only_location_cannot_be_the_default
+=== RUN   TestSchemaConstraintsAreEnforced/a_job_state_outside_the_enum_is_rejected
+=== RUN   TestSchemaConstraintsAreEnforced/a_leased_job_must_name_its_holder
+=== RUN   TestSchemaConstraintsAreEnforced/a_system_audit_event_cannot_claim_a_user
+--- PASS: TestSchemaConstraintsAreEnforced (0.03s)
+    --- PASS: TestSchemaConstraintsAreEnforced/only_one_default_storage_location (0.00s)
+    --- PASS: TestSchemaConstraintsAreEnforced/a_read-only_location_cannot_be_the_default (0.00s)
+    --- PASS: TestSchemaConstraintsAreEnforced/a_job_state_outside_the_enum_is_rejected (0.00s)
+    --- PASS: TestSchemaConstraintsAreEnforced/a_leased_job_must_name_its_holder (0.00s)
+    --- PASS: TestSchemaConstraintsAreEnforced/a_system_audit_event_cannot_claim_a_user (0.00s)
+=== RUN   TestEnqueueIsRolledBackWithItsTransaction
+--- PASS: TestEnqueueIsRolledBackWithItsTransaction (0.03s)
+=== RUN   TestEnqueueIdempotency
+--- PASS: TestEnqueueIdempotency (0.03s)
+=== RUN   TestConcurrentClaimsNeverTakeTheSameJob
+--- PASS: TestConcurrentClaimsNeverTakeTheSameJob (0.04s)
+=== RUN   TestHeartbeatRequiresStillHoldingTheLease
+--- PASS: TestHeartbeatRequiresStillHoldingTheLease (0.03s)
+=== RUN   TestSweepReclaimsOnlyElapsedLeases
+--- PASS: TestSweepReclaimsOnlyElapsedLeases (0.03s)
+=== RUN   TestWorkerRunsAndCompletesAJob
+--- PASS: TestWorkerRunsAndCompletesAJob (0.04s)
+=== RUN   TestRetryLadderAndTerminalFailure
+2026/09/20 15:24:32 ERROR jobs: exhausted attempts site=default worker=test-worker job_id=01a0c046-fcde-7bf6-b924-b5d096f962a0 kind=always-retryable correlation_id=c1 attempts=1 error=transient
+2026/09/20 15:24:32 ERROR jobs: terminal failure site=default worker=test-worker job_id=01a0c046-fce0-702a-9bc1-2565e35c4c65 kind=always-terminal correlation_id=c2 error="terminal: malformed payload"
+2026/09/20 15:24:32 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+2026/09/20 15:24:32 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+2026/09/20 15:24:32 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+2026/09/20 15:24:32 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+--- PASS: TestRetryLadderAndTerminalFailure (0.13s)
+=== RUN   TestCacheFlavourAndVersionAreIdentified
+    golden_test.go:561: cache identified as valkey 9.1.2
+--- PASS: TestCacheFlavourAndVersionAreIdentified (0.00s)
+=== RUN   TestRateLimiterOnTheConnectedServer
+--- PASS: TestRateLimiterOnTheConnectedServer (0.00s)
+=== RUN   TestGoldenPathPassesAfterFlushAll
+    golden_test.go:697: FLUSHALL issued; the cache is now empty
+--- PASS: TestGoldenPathPassesAfterFlushAll (2.18s)
+=== RUN   TestReadinessDegradesWhenTheCacheIsUnreachable
+redis: 2026/09/20 15:24:35 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/20 15:24:36 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/20 15:24:36 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+--- PASS: TestReadinessDegradesWhenTheCacheIsUnreachable (1.33s)
+=== RUN   TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue
+--- PASS: TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue (0.06s)
+=== RUN   TestClaimPlanDoesNotSortTheBacklog
+    golden_test.go:938: claim plan:
+        [
+          {
+            "Plan": {
+              "Node Type": "Limit",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 0.29,
+              "Total Cost": 0.59,
+              "Plan Rows": 1,
+              "Plan Width": 26,
+              "Disabled": false,
+              "Plans": [
+                {
+                  "Node Type": "Index Scan",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Scan Direction": "Forward",
+                  "Index Name": "jobs_claim",
+                  "Relation Name": "jobs",
+                  "Alias": "jobs",
+                  "Startup Cost": 0.29,
+                  "Total Cost": 1011.84,
+                  "Plan Rows": 3333,
+                  "Plan Width": 26,
+                  "Disabled": false,
+                  "Index Cond": "(run_after <= now())",
+                  "Filter": "((kind = ANY ('{noop}'::text[])) AND (attempts < max_attempts))"
+                }
+              ]
+            }
+          }
+        ]
+--- PASS: TestClaimPlanDoesNotSortTheBacklog (0.09s)
+=== RUN   TestClaimIndexExcludesTerminalRows
+    golden_test.go:957: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
+--- PASS: TestClaimIndexExcludesTerminalRows (0.03s)
+=== RUN   TestEnqueueRefusesAnUnboundedPayload
+=== RUN   TestEnqueueRefusesAnUnboundedPayload/the_Go_error
+=== RUN   TestEnqueueRefusesAnUnboundedPayload/a_raw_INSERT_is_rejected_by_the_database
+=== RUN   TestEnqueueRefusesAnUnboundedPayload/an_oversized_kind_and_correlation_id_are_rejected
+=== RUN   TestEnqueueRefusesAnUnboundedPayload/a_normal_payload_is_accepted
+--- PASS: TestEnqueueRefusesAnUnboundedPayload (0.03s)
+    --- PASS: TestEnqueueRefusesAnUnboundedPayload/the_Go_error (0.00s)
+    --- PASS: TestEnqueueRefusesAnUnboundedPayload/a_raw_INSERT_is_rejected_by_the_database (0.00s)
+    --- PASS: TestEnqueueRefusesAnUnboundedPayload/an_oversized_kind_and_correlation_id_are_rejected (0.00s)
+    --- PASS: TestEnqueueRefusesAnUnboundedPayload/a_normal_payload_is_accepted (0.00s)
+=== RUN   TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob
+--- PASS: TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob (0.24s)
+=== RUN   TestRetryLadderActuallyWalksTheLadder
+2026/09/20 15:24:36 WARN jobs: retrying site=default worker=ladder-worker job_id=01a0c047-0cfe-7985-8b63-fbc1a93f8f6e kind=flaky correlation_id=ladder attempt=1 backoff=28.777191194s error=transient
+2026/09/20 15:24:37 WARN jobs: retrying site=default worker=ladder-worker job_id=01a0c047-0cfe-7985-8b63-fbc1a93f8f6e kind=flaky correlation_id=ladder attempt=2 backoff=2m7.651799653s error=transient
+2026/09/20 15:24:37 ERROR jobs: exhausted attempts site=default worker=ladder-worker job_id=01a0c047-0cfe-7985-8b63-fbc1a93f8f6e kind=flaky correlation_id=ladder attempts=3 error=transient
+--- PASS: TestRetryLadderActuallyWalksTheLadder (0.97s)
+=== RUN   TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
+2026/09/20 15:24:38 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
+2026/09/20 15:24:38 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+2026/09/20 15:24:38 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+--- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.47s)
+=== RUN   TestSitesIsASingleton
+--- PASS: TestSitesIsASingleton (0.06s)
+=== RUN   TestAuditEventsRefusesAFullIPAddress
+=== RUN   TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused
+=== RUN   TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted
+=== RUN   TestAuditEventsRefusesAFullIPAddress/null_is_accepted
+--- PASS: TestAuditEventsRefusesAFullIPAddress (0.04s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused (0.00s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted (0.00s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/null_is_accepted (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	6.997s
+=== RUN   TestEnqueueRequiresATransaction
+=== RUN   TestEnqueueRequiresATransaction/a_transaction_compiles
+=== RUN   TestEnqueueRequiresATransaction/a_pool_does_not_compile
+--- PASS: TestEnqueueRequiresATransaction (1.61s)
+    --- PASS: TestEnqueueRequiresATransaction/a_transaction_compiles (1.49s)
+    --- PASS: TestEnqueueRequiresATransaction/a_pool_does_not_compile (0.13s)
+=== RUN   TestBackoffLadderIsCapped
+--- PASS: TestBackoffLadderIsCapped (0.00s)
+=== RUN   TestTerminalBypassesTheLadder
+--- PASS: TestTerminalBypassesTheLadder (0.00s)
+=== RUN   TestEnqueueRefusesAnUntraceableJob
+--- PASS: TestEnqueueRefusesAnUntraceableJob (0.00s)
+=== RUN   TestLastErrorIsRedactedBeforeItIsStored
+=== RUN   TestLastErrorIsRedactedBeforeItIsStored/DSN_password
+=== RUN   TestLastErrorIsRedactedBeforeItIsStored/presigned_S3_URL
+=== RUN   TestLastErrorIsRedactedBeforeItIsStored/bearer_token
+=== RUN   TestLastErrorIsRedactedBeforeItIsStored/vizra_API_key
+=== RUN   TestLastErrorIsRedactedBeforeItIsStored/cache_URL_password
+--- PASS: TestLastErrorIsRedactedBeforeItIsStored (0.00s)
+    --- PASS: TestLastErrorIsRedactedBeforeItIsStored/DSN_password (0.00s)
+    --- PASS: TestLastErrorIsRedactedBeforeItIsStored/presigned_S3_URL (0.00s)
+    --- PASS: TestLastErrorIsRedactedBeforeItIsStored/bearer_token (0.00s)
+    --- PASS: TestLastErrorIsRedactedBeforeItIsStored/vizra_API_key (0.00s)
+    --- PASS: TestLastErrorIsRedactedBeforeItIsStored/cache_URL_password (0.00s)
+=== RUN   TestASecretStraddlingTheTruncationBoundaryIsRedacted
+--- PASS: TestASecretStraddlingTheTruncationBoundaryIsRedacted (0.00s)
+=== RUN   TestEnqueueRefusesAnOversizedPayload
+--- PASS: TestEnqueueRefusesAnOversizedPayload (0.00s)
+=== RUN   TestEnqueueRefusesAnOversizedKindOrCorrelationID
+--- PASS: TestEnqueueRefusesAnOversizedKindOrCorrelationID (0.00s)
+=== RUN   TestPriorityOrdering
+--- PASS: TestPriorityOrdering (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/jobs	3.054s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+=== RUN   TestRedactionOfEveryValueClass
+=== RUN   TestRedactionOfEveryValueClass/DSN_password_in_a_message
+=== RUN   TestRedactionOfEveryValueClass/DSN_password_in_a_message_(production_JSON)
+=== RUN   TestRedactionOfEveryValueClass/cache_URL_password_in_an_attribute
+=== RUN   TestRedactionOfEveryValueClass/cache_URL_password_in_an_attribute_(production_JSON)
+=== RUN   TestRedactionOfEveryValueClass/presigned_URL_in_a_message
+=== RUN   TestRedactionOfEveryValueClass/presigned_URL_in_a_message_(production_JSON)
+=== RUN   TestRedactionOfEveryValueClass/bearer_token_in_an_attribute
+=== RUN   TestRedactionOfEveryValueClass/bearer_token_in_an_attribute_(production_JSON)
+=== RUN   TestRedactionOfEveryValueClass/Vizra_API_key
+=== RUN   TestRedactionOfEveryValueClass/Vizra_API_key_(production_JSON)
+=== RUN   TestRedactionOfEveryValueClass/a_secret-named_attribute,_whatever_its_value
+=== RUN   TestRedactionOfEveryValueClass/a_secret-named_attribute,_whatever_its_value_(production_JSON)
+=== RUN   TestRedactionOfEveryValueClass/a_secret_attribute_attached_with_With
+=== RUN   TestRedactionOfEveryValueClass/a_secret_attribute_attached_with_With_(production_JSON)
+--- PASS: TestRedactionOfEveryValueClass (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/DSN_password_in_a_message (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/DSN_password_in_a_message_(production_JSON) (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/cache_URL_password_in_an_attribute (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/cache_URL_password_in_an_attribute_(production_JSON) (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/presigned_URL_in_a_message (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/presigned_URL_in_a_message_(production_JSON) (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/bearer_token_in_an_attribute (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/bearer_token_in_an_attribute_(production_JSON) (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/Vizra_API_key (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/Vizra_API_key_(production_JSON) (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/a_secret-named_attribute,_whatever_its_value (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/a_secret-named_attribute,_whatever_its_value_(production_JSON) (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/a_secret_attribute_attached_with_With (0.00s)
+    --- PASS: TestRedactionOfEveryValueClass/a_secret_attribute_attached_with_With_(production_JSON) (0.00s)
+=== RUN   TestRedactIsUsableOnSubprocessOutput
+--- PASS: TestRedactIsUsableOnSubprocessOutput (0.00s)
+=== RUN   TestRedactionKeepsTheUsefulParts
+--- PASS: TestRedactionKeepsTheUsefulParts (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/obs	0.500s
+=== RUN   TestHMACTestVectors
+=== RUN   TestHMACTestVectors/search-empty-body
+=== RUN   TestHMACTestVectors/search-simple
+=== RUN   TestHMACTestVectors/suggestions
+=== RUN   TestHMACTestVectors/events-batch
+=== RUN   TestHMACTestVectors/unicode-body
+--- PASS: TestHMACTestVectors (0.00s)
+    --- PASS: TestHMACTestVectors/search-empty-body (0.00s)
+    --- PASS: TestHMACTestVectors/search-simple (0.00s)
+    --- PASS: TestHMACTestVectors/suggestions (0.00s)
+    --- PASS: TestHMACTestVectors/events-batch (0.00s)
+    --- PASS: TestHMACTestVectors/unicode-body (0.00s)
+=== RUN   TestEmptyBodyHashesToSHA256OfEmptyString
+--- PASS: TestEmptyBodyHashesToSHA256OfEmptyString (0.00s)
+=== RUN   TestVerifyRoundTrip
+--- PASS: TestVerifyRoundTrip (0.00s)
+=== RUN   TestVerifyRejects
+=== RUN   TestVerifyRejects/tampered_body
+=== RUN   TestVerifyRejects/different_path
+=== RUN   TestVerifyRejects/different_method
+=== RUN   TestVerifyRejects/wrong_key
+=== RUN   TestVerifyRejects/stale_timestamp
+=== RUN   TestVerifyRejects/future_timestamp
+=== RUN   TestVerifyRejects/missing_headers
+=== RUN   TestVerifyRejects/short_nonce
+=== RUN   TestVerifyRejects/short_key
+--- PASS: TestVerifyRejects (0.00s)
+    --- PASS: TestVerifyRejects/tampered_body (0.00s)
+    --- PASS: TestVerifyRejects/different_path (0.00s)
+    --- PASS: TestVerifyRejects/different_method (0.00s)
+    --- PASS: TestVerifyRejects/wrong_key (0.00s)
+    --- PASS: TestVerifyRejects/stale_timestamp (0.00s)
+    --- PASS: TestVerifyRejects/future_timestamp (0.00s)
+    --- PASS: TestVerifyRejects/missing_headers (0.00s)
+    --- PASS: TestVerifyRejects/short_nonce (0.00s)
+    --- PASS: TestVerifyRejects/short_key (0.00s)
+=== RUN   TestSearchOffUsesSQLAndReportsOff
+--- PASS: TestSearchOffUsesSQLAndReportsOff (0.00s)
+=== RUN   TestNotIndexedFallsBackToSQLAndStaysHealthy
+--- PASS: TestNotIndexedFallsBackToSQLAndStaysHealthy (0.00s)
+=== RUN   TestRemoteFaultFallsBackToSQLAndDegradesHealth
+=== RUN   TestRemoteFaultFallsBackToSQLAndDegradesHealth/500
+=== RUN   TestRemoteFaultFallsBackToSQLAndDegradesHealth/503
+=== RUN   TestRemoteFaultFallsBackToSQLAndDegradesHealth/unparseable_200
+--- PASS: TestRemoteFaultFallsBackToSQLAndDegradesHealth (0.00s)
+    --- PASS: TestRemoteFaultFallsBackToSQLAndDegradesHealth/500 (0.00s)
+    --- PASS: TestRemoteFaultFallsBackToSQLAndDegradesHealth/503 (0.00s)
+    --- PASS: TestRemoteFaultFallsBackToSQLAndDegradesHealth/unparseable_200 (0.00s)
+=== RUN   TestUnreachableSearchDegradesHealth
+--- PASS: TestUnreachableSearchDegradesHealth (0.00s)
+=== RUN   TestHealthRecoversAfterAFault
+--- PASS: TestHealthRecoversAfterAFault (0.00s)
+=== RUN   TestPublishFaultIsAnErrorSoTheJobRetries
+--- PASS: TestPublishFaultIsAnErrorSoTheJobRetries (0.00s)
+=== RUN   TestPublishNotIndexedSucceedsSoTheJobDoesNotRetryForever
+--- PASS: TestPublishNotIndexedSucceedsSoTheJobDoesNotRetryForever (0.00s)
+=== RUN   TestRemoteRequestsAreSignedAcceptably
+--- PASS: TestRemoteRequestsAreSignedAcceptably (0.00s)
+=== RUN   TestWrongKeyIsAFaultNotAFallback
+--- PASS: TestWrongKeyIsAFaultNotAFallback (0.00s)
+=== RUN   TestTransportErrorDoesNotLeakCredentials
+--- PASS: TestTransportErrorDoesNotLeakCredentials (0.00s)
+=== RUN   TestViewerFromSubjectMarksAnonymous
+--- PASS: TestViewerFromSubjectMarksAnonymous (0.00s)
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/exactly_now
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/one_second_stale
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/one_second_ahead
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/at_the_stale_edge
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/at_the_future_edge
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/one_second_past_the_stale_edge
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/one_second_past_the_future_edge
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/an_hour_stale
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/an_hour_ahead
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/a_year_stale
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/a_year_ahead
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/zero_(the_epoch)
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/one
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/negative_one_(before_the_epoch)
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/math.MinInt64
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/math.MaxInt64
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/math.MaxInt64_-_1
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/math.MinInt64_+_1
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/just_past_the_Duration_overflow,_ahead
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/just_past_the_Duration_overflow,_stale
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/far_beyond_the_Duration_overflow
+=== RUN   TestTimestampWindowAcrossTheMagnitudeRange/year_10000
+--- PASS: TestTimestampWindowAcrossTheMagnitudeRange (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/exactly_now (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/one_second_stale (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/one_second_ahead (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/at_the_stale_edge (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/at_the_future_edge (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/one_second_past_the_stale_edge (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/one_second_past_the_future_edge (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/an_hour_stale (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/an_hour_ahead (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/a_year_stale (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/a_year_ahead (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/zero_(the_epoch) (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/one (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/negative_one_(before_the_epoch) (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/math.MinInt64 (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/math.MaxInt64 (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/math.MaxInt64_-_1 (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/math.MinInt64_+_1 (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/just_past_the_Duration_overflow,_ahead (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/just_past_the_Duration_overflow,_stale (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/far_beyond_the_Duration_overflow (0.00s)
+    --- PASS: TestTimestampWindowAcrossTheMagnitudeRange/year_10000 (0.00s)
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"_1789000000"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"1789000000_"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"_1789000000_"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"+1789000000"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"01789000000"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"0001789000000"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"1_789_000_000"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"0x6A9B9A80"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"1789000000.0"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"1789000000\n"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"1789000000,"
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/""
+=== RUN   TestTimestampHeaderMustBeBareDecimalDigits/"not-a-timestamp"
+--- PASS: TestTimestampHeaderMustBeBareDecimalDigits (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"_1789000000" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"1789000000_" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"_1789000000_" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"+1789000000" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"01789000000" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"0001789000000" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"1_789_000_000" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"0x6A9B9A80" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"1789000000.0" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"1789000000\n" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"1789000000," (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"" (0.00s)
+    --- PASS: TestTimestampHeaderMustBeBareDecimalDigits/"not-a-timestamp" (0.00s)
+=== RUN   TestMethodMustAlreadyBeUppercase
+=== RUN   TestMethodMustAlreadyBeUppercase/post
+=== RUN   TestMethodMustAlreadyBeUppercase/Post
+=== RUN   TestMethodMustAlreadyBeUppercase/pOsT
+--- PASS: TestMethodMustAlreadyBeUppercase (0.00s)
+    --- PASS: TestMethodMustAlreadyBeUppercase/post (0.00s)
+    --- PASS: TestMethodMustAlreadyBeUppercase/Post (0.00s)
+    --- PASS: TestMethodMustAlreadyBeUppercase/pOsT (0.00s)
+=== RUN   TestNonceMustBeLowercaseHex
+=== RUN   TestNonceMustBeLowercaseHex/00112233445566778899AABBCCDDEEFF
+=== RUN   TestNonceMustBeLowercaseHex/00112233445566778899aabbccddeegg
+=== RUN   TestNonceMustBeLowercaseHex/00112233445566778899aabbccddee
+--- PASS: TestNonceMustBeLowercaseHex (0.00s)
+    --- PASS: TestNonceMustBeLowercaseHex/00112233445566778899AABBCCDDEEFF (0.00s)
+    --- PASS: TestNonceMustBeLowercaseHex/00112233445566778899aabbccddeegg (0.00s)
+    --- PASS: TestNonceMustBeLowercaseHex/00112233445566778899aabbccddee (0.00s)
+=== RUN   TestHMACNegativeTestVectors
+=== RUN   TestHMACNegativeTestVectors/method-lowercase
+=== RUN   TestHMACNegativeTestVectors/method-mixed-case
+=== RUN   TestHMACNegativeTestVectors/timestamp-leading-plus
+=== RUN   TestHMACNegativeTestVectors/timestamp-leading-zero
+=== RUN   TestHMACNegativeTestVectors/timestamp-leading-zeros
+=== RUN   TestHMACNegativeTestVectors/timestamp-leading-space
+=== RUN   TestHMACNegativeTestVectors/timestamp-trailing-space
+=== RUN   TestHMACNegativeTestVectors/timestamp-underscores
+=== RUN   TestHMACNegativeTestVectors/timestamp-hex
+=== RUN   TestHMACNegativeTestVectors/timestamp-empty
+=== RUN   TestHMACNegativeTestVectors/timestamp-stale-past-window
+=== RUN   TestHMACNegativeTestVectors/timestamp-future-past-window
+=== RUN   TestHMACNegativeTestVectors/timestamp-zero
+=== RUN   TestHMACNegativeTestVectors/timestamp-one
+=== RUN   TestHMACNegativeTestVectors/timestamp-year-10000
+=== RUN   TestHMACNegativeTestVectors/timestamp-duration-overflow-ahead
+=== RUN   TestHMACNegativeTestVectors/timestamp-duration-overflow-far
+=== RUN   TestHMACNegativeTestVectors/timestamp-max-int64
+=== RUN   TestHMACNegativeTestVectors/timestamp-max-int64-overflow
+=== RUN   TestHMACNegativeTestVectors/nonce-uppercase-hex
+=== RUN   TestHMACNegativeTestVectors/nonce-not-hex
+=== RUN   TestHMACNegativeTestVectors/nonce-too-short
+=== RUN   TestHMACNegativeTestVectors/nonce-empty
+=== RUN   TestHMACNegativeTestVectors/timestamp-duplicated-header
+--- PASS: TestHMACNegativeTestVectors (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/method-lowercase (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/method-mixed-case (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-leading-plus (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-leading-zero (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-leading-zeros (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-leading-space (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-trailing-space (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-underscores (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-hex (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-empty (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-stale-past-window (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-future-past-window (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-zero (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-one (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-year-10000 (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-duration-overflow-ahead (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-duration-overflow-far (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-max-int64 (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-max-int64-overflow (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/nonce-uppercase-hex (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/nonce-not-hex (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/nonce-too-short (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/nonce-empty (0.00s)
+    --- PASS: TestHMACNegativeTestVectors/timestamp-duplicated-header (0.00s)
+=== RUN   TestNegativeVectorSignaturesAreGenuine
+=== RUN   TestNegativeVectorSignaturesAreGenuine/method-lowercase
+=== RUN   TestNegativeVectorSignaturesAreGenuine/method-mixed-case
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-leading-plus
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-leading-zero
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-leading-zeros
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-leading-space
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-trailing-space
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-underscores
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-hex
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-empty
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-stale-past-window
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-future-past-window
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-zero
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-one
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-year-10000
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-duration-overflow-ahead
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-duration-overflow-far
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-max-int64
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-max-int64-overflow
+=== RUN   TestNegativeVectorSignaturesAreGenuine/nonce-uppercase-hex
+=== RUN   TestNegativeVectorSignaturesAreGenuine/nonce-not-hex
+=== RUN   TestNegativeVectorSignaturesAreGenuine/nonce-too-short
+=== RUN   TestNegativeVectorSignaturesAreGenuine/nonce-empty
+=== RUN   TestNegativeVectorSignaturesAreGenuine/timestamp-duplicated-header
+--- PASS: TestNegativeVectorSignaturesAreGenuine (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/method-lowercase (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/method-mixed-case (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-leading-plus (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-leading-zero (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-leading-zeros (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-leading-space (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-trailing-space (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-underscores (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-hex (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-empty (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-stale-past-window (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-future-past-window (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-zero (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-one (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-year-10000 (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-duration-overflow-ahead (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-duration-overflow-far (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-max-int64 (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-max-int64-overflow (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/nonce-uppercase-hex (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/nonce-not-hex (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/nonce-too-short (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/nonce-empty (0.00s)
+    --- PASS: TestNegativeVectorSignaturesAreGenuine/timestamp-duplicated-header (0.00s)
+=== RUN   TestARedirectIsNeverFollowedAndNoSignatureLeaks
+--- PASS: TestARedirectIsNeverFollowedAndNoSignatureLeaks (0.00s)
+=== RUN   TestPingDoesNotFollowRedirects
+--- PASS: TestPingDoesNotFollowRedirects (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/search	0.725s
+=== RUN   TestCoreHasExactlyOneSite
+--- PASS: TestCoreHasExactlyOneSite (0.00s)
+=== RUN   TestSitesReturnsACopy
+--- PASS: TestSitesReturnsACopy (0.00s)
+=== RUN   TestByHostIgnoresPortAndCase
+--- PASS: TestByHostIgnoresPortAndCase (0.00s)
+=== RUN   TestUnknownHostFallsBackToTheSingleSiteInCore
+--- PASS: TestUnknownHostFallsBackToTheSingleSiteInCore (0.00s)
+=== RUN   TestContextRoundTrip
+--- PASS: TestContextRoundTrip (0.00s)
+=== RUN   TestKeysCarryTheResolverPrefixAndNamespace
+--- PASS: TestKeysCarryTheResolverPrefixAndNamespace (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/site	1.198s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+=== RUN   TestMigrateLintFixtures
+=== RUN   TestMigrateLintFixtures/good
+=== RUN   TestMigrateLintFixtures/commented-out
+=== RUN   TestMigrateLintFixtures/allow-destructive
+=== RUN   TestMigrateLintFixtures/no-down-declared
+=== RUN   TestMigrateLintFixtures/drop-column
+=== RUN   TestMigrateLintFixtures/drop-table
+=== RUN   TestMigrateLintFixtures/drop-index
+=== RUN   TestMigrateLintFixtures/drop-constraint
+=== RUN   TestMigrateLintFixtures/rename
+=== RUN   TestMigrateLintFixtures/alter-type
+=== RUN   TestMigrateLintFixtures/truncate
+=== RUN   TestMigrateLintFixtures/bad-filename
+=== RUN   TestMigrateLintFixtures/sequence-gap
+=== RUN   TestMigrateLintFixtures/missing-down
+=== RUN   TestMigrateLintFixtures/empty-down
+--- PASS: TestMigrateLintFixtures (0.57s)
+    --- PASS: TestMigrateLintFixtures/good (0.03s)
+    --- PASS: TestMigrateLintFixtures/commented-out (0.03s)
+    --- PASS: TestMigrateLintFixtures/allow-destructive (0.04s)
+    --- PASS: TestMigrateLintFixtures/no-down-declared (0.03s)
+    --- PASS: TestMigrateLintFixtures/drop-column (0.06s)
+    --- PASS: TestMigrateLintFixtures/drop-table (0.05s)
+    --- PASS: TestMigrateLintFixtures/drop-index (0.05s)
+    --- PASS: TestMigrateLintFixtures/drop-constraint (0.05s)
+    --- PASS: TestMigrateLintFixtures/rename (0.05s)
+    --- PASS: TestMigrateLintFixtures/alter-type (0.05s)
+    --- PASS: TestMigrateLintFixtures/truncate (0.05s)
+    --- PASS: TestMigrateLintFixtures/bad-filename (0.02s)
+    --- PASS: TestMigrateLintFixtures/sequence-gap (0.04s)
+    --- PASS: TestMigrateLintFixtures/missing-down (0.02s)
+    --- PASS: TestMigrateLintFixtures/empty-down (0.02s)
+=== RUN   TestMigrateLintPassesOnTheRealMigrations
+--- PASS: TestMigrateLintPassesOnTheRealMigrations (0.21s)
+=== RUN   TestCIRequiredGuardFixtures
+=== RUN   TestCIRequiredGuardFixtures/good
+=== RUN   TestCIRequiredGuardFixtures/floor-deleted
+=== RUN   TestCIRequiredGuardFixtures/floor-commented
+=== RUN   TestCIRequiredGuardFixtures/coe-bare
+=== RUN   TestCIRequiredGuardFixtures/coe-quoted
+=== RUN   TestCIRequiredGuardFixtures/coe-capitalised
+=== RUN   TestCIRequiredGuardFixtures/coe-expression
+=== RUN   TestCIRequiredGuardFixtures/coe-underscore
+=== RUN   TestCIRequiredGuardFixtures/coe-step
+=== RUN   TestCIRequiredGuardFixtures/not-on-pull-request
+=== RUN   TestCIRequiredGuardFixtures/bad-runner
+=== RUN   TestCIRequiredGuardFixtures/unpinned-action
+=== RUN   TestCIRequiredGuardFixtures/missing-job
+--- PASS: TestCIRequiredGuardFixtures (1.06s)
+    --- PASS: TestCIRequiredGuardFixtures/good (0.13s)
+    --- PASS: TestCIRequiredGuardFixtures/floor-deleted (0.11s)
+    --- PASS: TestCIRequiredGuardFixtures/floor-commented (0.09s)
+    --- PASS: TestCIRequiredGuardFixtures/coe-bare (0.08s)
+    --- PASS: TestCIRequiredGuardFixtures/coe-quoted (0.11s)
+    --- PASS: TestCIRequiredGuardFixtures/coe-capitalised (0.08s)
+    --- PASS: TestCIRequiredGuardFixtures/coe-expression (0.09s)
+    --- PASS: TestCIRequiredGuardFixtures/coe-underscore (0.06s)
+    --- PASS: TestCIRequiredGuardFixtures/coe-step (0.06s)
+    --- PASS: TestCIRequiredGuardFixtures/not-on-pull-request (0.07s)
+    --- PASS: TestCIRequiredGuardFixtures/bad-runner (0.07s)
+    --- PASS: TestCIRequiredGuardFixtures/unpinned-action (0.06s)
+    --- PASS: TestCIRequiredGuardFixtures/missing-job (0.06s)
+=== RUN   TestCIRequiredGuardPassesOnTheRealWorkflows
+--- PASS: TestCIRequiredGuardPassesOnTheRealWorkflows (0.08s)
+=== RUN   TestLintImportsPassesOnTheRealTree
+--- PASS: TestLintImportsPassesOnTheRealTree (0.06s)
+PASS
+ok  	github.com/yegamble/vizra-core/scripts	3.589s

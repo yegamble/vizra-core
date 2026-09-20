@@ -1,0 +1,69 @@
+$ make ci
+==> fmt-check
+  ok    all Go files are gofmt-clean
+==> vet
+  ok    go vet is clean
+==> lint-imports
+lint-imports:
+  ok    Echo is imported only by internal/httpapi
+  ok    no package-global database, cache, storage or search handle
+  ok    no hardcoded storage root
+  ok    the image decoder is not linked into the api
+lint-imports: passed
+==> migrate-lint
+migrate-lint: migrations
+  ok    4 migrations form a gapless 1..4 sequence
+  ok    append-only manifest matches (8 migrations)
+migrate-lint: passed
+==> config-template-check
+ok  	github.com/yegamble/vizra-core/internal/config	0.345s
+==> openapi-verify
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.405s
+==> sqlc-verify
+  ok    internal/store/sqlcgen matches store/queries + migrations
+==> ci-guard
+ci-required-guard:
+  ok    all 5 floor lane(s) are present and non-optional
+  ok    required check 'append-only' resolves to a job
+  ok    required check 'build-test' resolves to a job
+  ok    required check 'cache-matrix' resolves to a job
+  ok    required check 'govulncheck' resolves to a job
+  ok    required check 'docker-build' resolves to a job
+  ok    floor lane 'append-only' runs on pull_request
+  ok    floor lane 'append-only' carries no continue-on-error
+  ok    floor lane 'build-test' runs on pull_request
+  ok    floor lane 'build-test' carries no continue-on-error
+  ok    floor lane 'cache-matrix' runs on pull_request
+  ok    floor lane 'cache-matrix' carries no continue-on-error
+  ok    floor lane 'govulncheck' runs on pull_request
+  ok    floor lane 'govulncheck' carries no continue-on-error
+  ok    floor lane 'docker-build' runs on pull_request
+  ok    floor lane 'docker-build' carries no continue-on-error
+  ok    the test-race lane selects the whole module (PKGS = ./...)
+  ok    the test-race target uses $(PKGS)
+  ok    all 2 -run selections are non-empty
+  ok    every job runs on GitHub-hosted ubuntu-24.04
+  ok    every third-party action is pinned to a commit SHA
+ci-required-guard: passed (5 required check(s))
+==> test-race
+ok  	github.com/yegamble/vizra-core/cmd/api	1.371s
+ok  	github.com/yegamble/vizra-core/cmd/vizra	1.594s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/authz	1.781s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/cache	2.032s
+ok  	github.com/yegamble/vizra-core/internal/config	2.167s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.375s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	2.926s
+ok  	github.com/yegamble/vizra-core/internal/jobs	4.091s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/obs	1.747s
+ok  	github.com/yegamble/vizra-core/internal/search	1.786s
+ok  	github.com/yegamble/vizra-core/internal/site	1.777s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+ok  	github.com/yegamble/vizra-core/scripts	3.296s
+
+make ci: all lanes passed
+EXIT=0

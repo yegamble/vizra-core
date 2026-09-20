@@ -1,0 +1,12 @@
+$ go test -run "TestSafeError" ./internal/jobs/   # byte-index truncate
+--- FAIL: TestSafeErrorNeverCutsARuneInHalf (0.00s)
+    jobs_test.go:244: pad=1991 rune="é" produced invalid UTF-8; PostgreSQL would reject the last_error write and the job would stay leased with its cause unrecorded.
+        last 16 bytes: c3 e2 80 a6 20 28 74 72 75 6e 63 61 74 65 64 29
+--- FAIL: TestSafeErrorStillBoundsAndStillReads (0.00s)
+    jobs_test.go:257: invalid UTF-8
+--- FAIL: TestSafeErrorRedactsThenTruncatesEvenWithMultibyteText (0.00s)
+    jobs_test.go:280: redaction plus truncation produced invalid UTF-8
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/jobs	0.297s
+FAIL
+EXIT=1

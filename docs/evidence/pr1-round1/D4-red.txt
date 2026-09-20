@@ -1,0 +1,8 @@
+$ VIZRA_MODE=production VIZRA_SESSION_SECRET=changeme ... ./bin/vizra-api
+vizra-api refused to start.
+configuration is invalid (4 problem(s)):
+  - VIZRA_CORS_ALLOWED_ORIGINS: production refuses the wildcard origin '*'; list exact origins
+  - VIZRA_DEV_DISABLE_AUTH: is a development-only escape hatch and must not be set in production
+  - VIZRA_MFA_KEY_KEK: production refuses a known development value
+  - VIZRA_SESSION_SECRET: production refuses a known development value
+EXIT=1

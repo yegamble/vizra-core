@@ -1,0 +1,6 @@
+$ same binary, real secrets, no reachable database
+{"time":"2026-09-20T14:12:12.438881-04:00","level":"INFO","msg":"vizra-api starting","release":"dev","commit":"fe6101f80728","go":"go1.27.1","mode":"production"}
+{"time":"2026-09-20T14:12:12.439899-04:00","level":"INFO","msg":"vizra-api listening","addr":":8080","metrics_addr":"127.0.0.1:9090"}
+{"time":"2026-09-20T14:12:32.431224-04:00","level":"INFO","msg":"vizra-api draining","grace":"20s"}
+{"time":"2026-09-20T14:12:32.431708-04:00","level":"INFO","msg":"vizra-api stopped"}
+EXIT=124

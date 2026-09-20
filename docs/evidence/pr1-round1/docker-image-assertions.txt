@@ -1,0 +1,14 @@
+$ vizra version (loader list now populated)
+vizra local (fe6101f80728)
+  built     (not recorded)
+  go        go1.27.1
+  schema    4 (embedded)
+  image     (not recorded)
+  libvips   vips-8.18.6
+  loaders   [analyzeload csvload csvload_base csvload_source csvsave csvsave_base csvsave_target gifload gifload_base gifload_buffer gifload_source jpegload jpegload_base jpegload_buffer jpegload_source jpegsave jpegsave_base jpegsave_buffer jpegsave_mime jpegsave_target load matrixload matrixload_base matrixload_source matrixsave matrixsave_base matrixsave_target pngload pngload_base pngload_buffer pngload_source pngsave pngsave_base pngsave_buffer pngsave_target ppmload ppmload_base ppmload_buffer ppmload_source ppmsave ppmsave_base ppmsave_target profile_load radload radload_base radload_buffer radload_source radsave radsave_base radsave_buffer radsave_target rawload rawsave rawsave_base rawsave_buffer rawsave_target save tiffload tiffload_base tiffload_buffer tiffload_source tiffsave tiffsave_base tiffsave_buffer tiffsave_target vipsload vipsload_base vipsload_source vipssave vipssave_base vipssave_target webpload webpload_base webpload_buffer webpload_source webpsave webpsave_base webpsave_buffer webpsave_mime webpsave_target]
+
+$ loader count and excluded-codec check
+loaders: 80
+analyzeload,csvload,csvload_base,csvload_source,csvsave,csvsave_base,csvsave_target,gifload,gifload_base,gifload_buffer,gifload_source,jpegload,jpegload_base,jpegload_buffer,jpegload_source,jpegsave,jpegsave_base,jpegsave_buffer,jpegsave_mime,jpegsave_target,load,matrixload,matrixload_base,matrixload_source,matrixsave,matrixsave_base,matrixsave_target,pngload,pngload_base,pngload_buffer,pngload_source,pngsave,pngsave_base,pngsave_buffer,pngsave_target,ppmload,ppmload_base,ppmload_buffer,ppmload_source,ppmsave,ppmsave_base,ppmsave_target,profile_load,radload,radload_base,radload_buffer,radload_source,radsave,radsave_base,radsave_buffer,radsave_target,rawload,rawsave,rawsave_base,rawsave_buffer,rawsave_target,save,tiffload,tiffload_base,tiffload_buffer,tiffload_source,tiffsave,tiffsave_base,tiffsave_buffer,tiffsave_target,vipsload,vipsload_base,vipsload_source,vipssave,vipssave_base,vipssave_target,webpload,webpload_base,webpload_buffer,webpload_source,webpsave,webpsave_base,webpsave_buffer,webpsave_mime,webpsave_target
+excluded codecs present: []
+OK

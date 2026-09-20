@@ -1,0 +1,4 @@
+$ make sqlc-verify
+==> sqlc-verify
+  ok    internal/store/sqlcgen matches store/queries + migrations
+EXIT=0

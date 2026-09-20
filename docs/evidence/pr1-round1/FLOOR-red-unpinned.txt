@@ -1,0 +1,15 @@
+$ ./scripts/ci-required-guard.sh
+ci-required-guard:
+  ok    all 4 floor lane(s) are present and non-optional
+  ok    required check 'build-test' resolves to a job
+  ok    required check 'cache-matrix' resolves to a job
+  ok    required check 'govulncheck' resolves to a job
+  ok    required check 'docker-build' resolves to a job
+  ok    no continue-on-error on any lane
+  ok    no lane runs an empty test selection
+  ok    every job runs on GitHub-hosted ubuntu-24.04
+  FAIL  action(s) not pinned to a 40-character commit SHA:
+          .github/workflows/govulncheck.yml:21:      - uses: actions/checkout@v7
+        A moving tag is a supply-chain hole: the tag can be repointed.
+ci-required-guard: FAILED
+EXIT=1

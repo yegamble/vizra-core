@@ -1,0 +1,42 @@
+$ go test -count=1 ./internal/config/   # denylist declared but not consulted; hatch field added but not enforced
+--- FAIL: TestProductionRefusesPublishedTestKeys (0.00s)
+    --- FAIL: TestProductionRefusesPublishedTestKeys/as_the_search_HMAC_key (0.00s)
+        config_test.go:317: production ACCEPTED the key published in api/search-hmac-testvectors.json. An operator who copies it out of that file gets a channel signed with a key anyone can read from the repository. err = <nil>
+    --- FAIL: TestProductionRefusesPublishedTestKeys/as_VIZRA_SESSION_SECRET (0.00s)
+        config_test.go:330: production accepted VIZRA_SESSION_SECRET="<redacted>"; it must refuse it
+    --- FAIL: TestProductionRefusesPublishedTestKeys/as_VIZRA_MFA_KEY_KEK (0.00s)
+        config_test.go:330: production accepted VIZRA_MFA_KEY_KEK="<redacted>"; it must refuse it
+    --- FAIL: TestProductionRefusesPublishedTestKeys/the_search_package_test_key_as_VIZRA_SESSION_SECRET (0.00s)
+        config_test.go:337: production accepted VIZRA_SESSION_SECRET="<redacted>"; it must refuse it
+    --- FAIL: TestProductionRefusesPublishedTestKeys/the_search_package_test_key_as_VIZRA_MFA_KEY_KEK (0.00s)
+        config_test.go:337: production accepted VIZRA_MFA_KEY_KEK="<redacted>"; it must refuse it
+--- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent (0.00s)
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"alice" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="alice"; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"owner" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="owner"; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"0" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="0"; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"false" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="false"; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"off" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="off"; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"no" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="no"; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"_" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER=" "; it must refuse it
+    --- FAIL: TestValueBearingEscapeHatchIsRefusedWhenPresent/"-" (0.00s)
+        config_test.go:385: production accepted VIZRA_DEV_AUTOLOGIN_USER="-"; it must refuse it
+--- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="alice" (0.00s)
+        config_test.go:414: production accepted VIZRA_DEV_AUTOLOGIN_USER="alice"; it must refuse it
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="owner" (0.00s)
+        config_test.go:414: production accepted VIZRA_DEV_AUTOLOGIN_USER="owner"; it must refuse it
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="0" (0.00s)
+        config_test.go:414: production accepted VIZRA_DEV_AUTOLOGIN_USER="0"; it must refuse it
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_AUTOLOGIN_USER="false" (0.00s)
+        config_test.go:414: production accepted VIZRA_DEV_AUTOLOGIN_USER="false"; it must refuse it
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/config	0.689s
+FAIL
+EXIT=1

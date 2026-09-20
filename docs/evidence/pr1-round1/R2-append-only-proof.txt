@@ -1,0 +1,35 @@
+NEGATIVE PR  https://github.com/yegamble/vizra-core/pull/2   run: https://github.com/yegamble/vizra-core/actions/runs/35532576593/job/106135671004
+POSITIVE PR  https://github.com/yegamble/vizra-core/pull/3   run: https://github.com/yegamble/vizra-core/actions/runs/35532590902/job/106135710799
+
+=== NEGATIVE job output ===
+
+=== POSITIVE job output ===
+=== negative ===
+=== positive ===
+=== NEGATIVE (PR #2): append-only must FAIL naming the file ===
+^[[36;1m^[[0m
+^[[36;1madded="$(git diff "$base" -- migrations/manifest.sha256 | grep -cE '^\+[0-9a-f]{64} ' || true)"^[[0m
+^[[36;1mecho "append-only: ok ($added migration file hash(es) added, none removed or changed)"^[[0m
+shell: /usr/bin/bash -e {0}
+env:
+  BASE_REF: feat/m0-foundation
+##[endgroup]
+merge base: 4f8d0fc207f94a2a516607d167fcf69abd7a2148
+##[error]a migrations/manifest.sha256 line was REMOVED or CHANGED.
+    -af8405894ae1c130235453835ddbefef872b551115963da3fe525d3a1c74de07  0002_jobs.up.sql
+
+A database that already applied that migration will never re-apply it, so the
+repository and the live schema would diverge permanently while every gate stayed
+green. Fix a merged migration with a NEW migration.
+  ok    append-only manifest matches (8 migrations)
+##[error]Process completed with exit code 1.
+
+=== POSITIVE (PR #3): append-only must PASS ===
+^[[36;1mecho "append-only: ok ($added migration file hash(es) added, none removed or changed)"^[[0m
+shell: /usr/bin/bash -e {0}
+env:
+  BASE_REF: feat/m0-foundation
+##[endgroup]
+merge base: 4f8d0fc207f94a2a516607d167fcf69abd7a2148
+  ok    append-only manifest matches (10 migrations)
+append-only: ok (2 migration file hash(es) added, none removed or changed)

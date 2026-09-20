@@ -1,0 +1,4 @@
+$ make test-integration against Redis 7.2 (matrix leg 2)
+ok  	github.com/yegamble/vizra-core/internal/integration	6.402s
+ok  	github.com/yegamble/vizra-core/internal/cache	1.546s
+EXIT=0
