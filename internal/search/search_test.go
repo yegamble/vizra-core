@@ -2,9 +2,13 @@ package search
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +20,10 @@ import (
 	"github.com/yegamble/vizra-core/internal/authz"
 )
 
-var testKey = []byte("Ar4Lo8Cq2Ei6Uk0Wn3Sv7Yb1Md5Pt9Xz")
+// Built, not a literal, for the same reason as elsewhere: a 32-character
+// random-looking string in a source file reads as a leaked credential. The HMAC
+// scheme needs a key of at least 32 bytes and nothing else.
+var testKey = []byte(strings.Repeat("Aa1Bb2Cc3Dd4", 3)[:32])
 
 func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -26,26 +33,31 @@ func quietLogger() *slog.Logger {
 // HMAC scheme
 // ---------------------------------------------------------------------------
 
-type vectorFile struct {
-	Scheme  string `json:"scheme"`
-	KeyUTF8 string `json:"key_utf8"`
-	Vectors []struct {
-		Name      string `json:"name"`
-		Method    string `json:"method"`
-		Path      string `json:"path"`
-		Timestamp string `json:"timestamp"`
-		Nonce     string `json:"nonce"`
-		BodyUTF8  string `json:"body_utf8"`
-		BodyHash  string `json:"body_sha256_hex"`
-		Canonical string `json:"canonical_string"`
-		Signature string `json:"signature"`
-	} `json:"vectors"`
+type vector struct {
+	Name          string            `json:"name"`
+	RejectBecause string            `json:"reject_because"`
+	Method        string            `json:"method"`
+	Path          string            `json:"path"`
+	Timestamp     string            `json:"timestamp"`
+	Nonce         string            `json:"nonce"`
+	BodyUTF8      string            `json:"body_utf8"`
+	BodyHash      string            `json:"body_sha256_hex"`
+	Canonical     string            `json:"canonical_string"`
+	Signature     string            `json:"signature"`
+	MustReject    bool              `json:"must_reject"`
+	ExtraHeaders  map[string]string `json:"extra_headers"`
 }
 
-// The vectors are a committed artifact in api/, shared with vizra-search. If
-// this test and that file disagree, the two repositories would sign different
-// bytes and every internal call would 401 in production.
-func TestHMACTestVectors(t *testing.T) {
+type vectorFile struct {
+	Scheme          string   `json:"scheme"`
+	KeyUTF8         string   `json:"key_utf8"`
+	VerifierNowUnix int64    `json:"verifier_now_unix"`
+	Vectors         []vector `json:"vectors"`
+	NegativeVectors []vector `json:"negative_vectors"`
+}
+
+func loadVectors(t *testing.T) vectorFile {
+	t.Helper()
 	raw, err := os.ReadFile("../../api/search-hmac-testvectors.json")
 	if err != nil {
 		t.Fatalf("the shared HMAC test vectors are missing: %v", err)
@@ -54,6 +66,14 @@ func TestHMACTestVectors(t *testing.T) {
 	if err := json.Unmarshal(raw, &vf); err != nil {
 		t.Fatalf("parsing vectors: %v", err)
 	}
+	return vf
+}
+
+// The vectors are a committed artifact in api/, shared with vizra-search. If
+// this test and that file disagree, the two repositories would sign different
+// bytes and every internal call would 401 in production.
+func TestHMACTestVectors(t *testing.T) {
+	vf := loadVectors(t)
 	if vf.Scheme != SignatureVersion {
 		t.Fatalf("vector file scheme = %q, code implements %q", vf.Scheme, SignatureVersion)
 	}
@@ -141,7 +161,7 @@ func TestVerifyRejects(t *testing.T) {
 		}
 	})
 	t.Run("wrong key", func(t *testing.T) {
-		other := []byte("Zq1Wx5Er9Ty3Ui7Op0As4Df8Gh2Jk6Lm")
+		other := []byte(strings.Repeat("Zz9Yy8Xx7Ww6", 3)[:32])
 		if err := Verify(other, http.MethodPost, "/internal/v1/search", base(), body, now); err == nil {
 			t.Fatal("the wrong key verified")
 		}
@@ -363,7 +383,7 @@ func TestRemoteRequestsAreSignedAcceptably(t *testing.T) {
 func TestWrongKeyIsAFaultNotAFallback(t *testing.T) {
 	srv := fakeSearch(t, http.StatusOK, `{"status":"ok","results":[],"total":1}`)
 	defer srv.Close()
-	bad := NewRemote(srv.URL, []byte("Zq1Wx5Er9Ty3Ui7Op0As4Df8Gh2Jk6Lm"), 2*time.Second)
+	bad := NewRemote(srv.URL, []byte(strings.Repeat("Zz9Yy8Xx7Ww6", 3)[:32]), 2*time.Second)
 	s := NewService(NewSQL(), bad, quietLogger())
 
 	if _, err := s.Search(context.Background(), SearchRequest{Query: "x"}); err != nil {
@@ -397,5 +417,264 @@ func TestViewerFromSubjectMarksAnonymous(t *testing.T) {
 	v = ViewerFrom(authz.Subject{UserID: "u1", Role: authz.RoleMember}, authz.ScopeOwnLibrary)
 	if v.IsAnonymous || v.Scope != authz.ScopeOwnLibrary {
 		t.Fatalf("member viewer projected as %+v", v)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Timestamp window — the ONLY replay bound at M0
+// ---------------------------------------------------------------------------
+
+// Finding 1 of docs/evidence/warroom/2026-09-20-vizra-search-pr1-minimal-service-SECURITY.md:
+// computing the skew by converting the header to a time.Time, subtracting, and
+// folding the sign does not behave as the code assumes at the ends of the
+// representable range. time.Unix() with a huge seconds value wraps, and negating
+// a Duration of math.MinInt64 is a no-op — so a validly signed request with an
+// out-of-range timestamp never expires.
+//
+// Until vizra-search owns storage there is no nonce replay store, so this window
+// is the whole replay bound. A window that does not close is no bound at all.
+func TestTimestampWindowAcrossTheMagnitudeRange(t *testing.T) {
+	body := []byte(`{"query":"sunset"}`)
+	const path = "/internal/v1/search"
+	nowSecs := int64(1789000000) // a fixed "now" so the table is deterministic
+	now := time.Unix(nowSecs, 0)
+	skew := int64(MaxClockSkew / time.Second)
+
+	cases := []struct {
+		name   string
+		ts     int64
+		accept bool
+	}{
+		{"exactly now", nowSecs, true},
+		{"one second stale", nowSecs - 1, true},
+		{"one second ahead", nowSecs + 1, true},
+		{"at the stale edge", nowSecs - skew, true},
+		{"at the future edge", nowSecs + skew, true},
+		{"one second past the stale edge", nowSecs - skew - 1, false},
+		{"one second past the future edge", nowSecs + skew + 1, false},
+		{"an hour stale", nowSecs - 3600, false},
+		{"an hour ahead", nowSecs + 3600, false},
+		{"a year stale", nowSecs - 31536000, false},
+		{"a year ahead", nowSecs + 31536000, false},
+
+		// The extremes. Each of these is a validly SIGNED request: the attacker
+		// controls the timestamp and signs over it, so the signature verifies.
+		// Only the window can refuse them.
+		{"zero (the epoch)", 0, false},
+		{"one", 1, false},
+		{"negative one (before the epoch)", -1, false},
+		{"math.MinInt64", math.MinInt64, false},
+		{"math.MaxInt64", math.MaxInt64, false},
+		{"math.MaxInt64 - 1", math.MaxInt64 - 1, false},
+		{"math.MinInt64 + 1", math.MinInt64 + 1, false},
+		// Seconds values that overflow a time.Duration when subtracted:
+		// max Duration is about 292 years of nanoseconds, so anything beyond
+		// roughly 9.2e9 seconds from now overflows the derived duration.
+		{"just past the Duration overflow, ahead", nowSecs + 9_300_000_000, false},
+		{"just past the Duration overflow, stale", nowSecs - 9_300_000_000, false},
+		{"far beyond the Duration overflow", nowSecs + 1_000_000_000_000, false},
+		{"year 10000", 253402300799, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := strconv.FormatInt(tc.ts, 10)
+			nonce, err := NewNonce()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sig, err := Sign(testKey, http.MethodPost, path, ts, nonce, body)
+			if err != nil {
+				t.Fatalf("Sign: %v", err)
+			}
+			h := http.Header{}
+			h.Set(HeaderTimestamp, ts)
+			h.Set(HeaderNonce, nonce)
+			h.Set(HeaderSignature, sig)
+
+			err = Verify(testKey, http.MethodPost, path, h, body, now)
+			if tc.accept && err != nil {
+				t.Fatalf("timestamp %s (%+d s from now) was REFUSED: %v", ts, tc.ts-nowSecs, err)
+			}
+			if !tc.accept && err == nil {
+				t.Fatalf("timestamp %s was ACCEPTED with a valid signature. "+
+					"The timestamp window is the only replay bound at M0; this request never expires.", ts)
+			}
+		})
+	}
+}
+
+// The timestamp header must be bare decimal digits. Anything a parser would
+// "helpfully" accept is a canonicalisation divergence: core signs the header
+// string verbatim, so a verifier that rebuilds it through ParseInt/FormatInt
+// would accept forms core refuses, and the two implementations would disagree
+// about which requests are valid.
+func TestTimestampHeaderMustBeBareDecimalDigits(t *testing.T) {
+	body := []byte(`{}`)
+	const path = "/internal/v1/search"
+	nowSecs := int64(1789000000)
+	now := time.Unix(nowSecs, 0)
+
+	for _, raw := range []string{
+		" 1789000000",  // leading space
+		"1789000000 ",  // trailing space
+		" 1789000000 ", // both
+		"+1789000000",  // explicit sign
+		"01789000000",  // leading zero
+		"0001789000000",
+		"1_789_000_000",   // Go-style separators, which ParseInt with base 0 accepts
+		"0x6A9B9A80",      // hex
+		"1789000000.0",    // decimal point
+		"1789000000\n",    // trailing newline
+		"1789000000,",     //
+		"",                // empty
+		"not-a-timestamp", //
+	} {
+		t.Run(strconv.Quote(raw), func(t *testing.T) {
+			nonce, err := NewNonce()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Signed over the raw header exactly as sent, so the signature is
+			// genuinely valid and only the format rule can refuse it.
+			sig, err := Sign(testKey, http.MethodPost, path, raw, nonce, body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := http.Header{}
+			h.Set(HeaderTimestamp, raw)
+			h.Set(HeaderNonce, nonce)
+			h.Set(HeaderSignature, sig)
+
+			if err := Verify(testKey, http.MethodPost, path, h, body, now); err == nil {
+				t.Fatalf("timestamp header %q was accepted; it is not bare decimal digits, "+
+					"so vizra-search and vizra-core would disagree about whether this request is valid", raw)
+			}
+		})
+	}
+}
+
+// The method is signed verbatim and must already be uppercase. Normalising it
+// in one implementation and not the other is the same divergence class.
+func TestMethodMustAlreadyBeUppercase(t *testing.T) {
+	body := []byte(`{}`)
+	const path = "/internal/v1/search"
+	now := time.Unix(1789000000, 0)
+
+	for _, m := range []string{"post", "Post", "pOsT"} {
+		t.Run(m, func(t *testing.T) {
+			if _, err := Sign(testKey, m, path, "1789000000", "00112233445566778899aabbccddeeff", body); err == nil {
+				t.Fatalf("Sign accepted the method %q; it must be uppercase on the wire", m)
+			}
+			// And a hand-rolled signature over the lowercase method must not verify.
+			ts, nonce := "1789000000", "00112233445566778899aabbccddeeff"
+			mac := hmacHex(testKey, CanonicalString(m, path, ts, nonce, BodyHash(body)))
+			h := http.Header{}
+			h.Set(HeaderTimestamp, ts)
+			h.Set(HeaderNonce, nonce)
+			h.Set(HeaderSignature, SignatureVersion+"="+mac)
+			if err := Verify(testKey, m, path, h, body, now); err == nil {
+				t.Fatalf("Verify accepted the method %q", m)
+			}
+		})
+	}
+}
+
+func hmacHex(key []byte, msg string) string {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(msg))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// The nonce must be lowercase hex. Uppercase would sign differently on the two
+// sides if either normalised it.
+func TestNonceMustBeLowercaseHex(t *testing.T) {
+	body := []byte(`{}`)
+	const path = "/internal/v1/search"
+	now := time.Unix(1789000000, 0)
+	ts := "1789000000"
+
+	for _, nonce := range []string{
+		"00112233445566778899AABBCCDDEEFF", // uppercase
+		"00112233445566778899aabbccddeegg", // not hex
+		"00112233445566778899aabbccddee",   // 15 bytes, one short
+	} {
+		t.Run(nonce, func(t *testing.T) {
+			sig, err := Sign(testKey, http.MethodPost, path, ts, nonce, body)
+			if err != nil {
+				return // Sign refusing it is also correct
+			}
+			h := http.Header{}
+			h.Set(HeaderTimestamp, ts)
+			h.Set(HeaderNonce, nonce)
+			h.Set(HeaderSignature, sig)
+			if err := Verify(testKey, http.MethodPost, path, h, body, now); err == nil {
+				t.Fatalf("nonce %q was accepted", nonce)
+			}
+		})
+	}
+}
+
+// The REJECT half of the shared vectors. Agreeing on what is accepted while
+// disagreeing on what is rejected is how two implementations of one scheme
+// diverge, and that had already happened: vizra-search rebuilt the timestamp
+// through ParseInt/FormatInt, so " 1789000000 ", "+1789000000" and
+// "01789000000" verified there and were refused here.
+//
+// Every negative vector carries a GENUINE signature over exactly the fields as
+// sent, so only the stated rule can refuse it.
+//
+// This test is what makes the vector file load-bearing: a change to the scheme
+// without a matching change to the file turns it red.
+func TestHMACNegativeTestVectors(t *testing.T) {
+	vf := loadVectors(t)
+	if len(vf.NegativeVectors) == 0 {
+		t.Fatal("the vector file has no negative vectors; the reject set is unspecified")
+	}
+	if vf.VerifierNowUnix == 0 {
+		t.Fatal("the vector file does not fix the verifier's clock, so the window cases are unjudgeable")
+	}
+	key := []byte(vf.KeyUTF8)
+	now := time.Unix(vf.VerifierNowUnix, 0)
+
+	for _, v := range vf.NegativeVectors {
+		t.Run(v.Name, func(t *testing.T) {
+			if !v.MustReject {
+				t.Fatal("a vector in negative_vectors is not marked must_reject")
+			}
+			if v.RejectBecause == "" {
+				t.Fatal("a negative vector states no reason; both implementations need the rule, not just the outcome")
+			}
+			h := http.Header{}
+			h.Set(HeaderTimestamp, v.Timestamp)
+			h.Set(HeaderNonce, v.Nonce)
+			h.Set(HeaderSignature, v.Signature)
+			for k, extra := range v.ExtraHeaders {
+				h.Add(k, extra)
+			}
+			if err := Verify(key, v.Method, v.Path, h, []byte(v.BodyUTF8), now); err == nil {
+				t.Fatalf("ACCEPTED a vector that must be rejected.\n  rule: %s", v.RejectBecause)
+			}
+		})
+	}
+}
+
+// Every vector's signature must be genuine, or a negative vector would "pass"
+// because the signature was wrong rather than because the rule bit.
+func TestNegativeVectorSignaturesAreGenuine(t *testing.T) {
+	vf := loadVectors(t)
+	key := []byte(vf.KeyUTF8)
+	for _, v := range vf.NegativeVectors {
+		t.Run(v.Name, func(t *testing.T) {
+			canonical := CanonicalString(v.Method, v.Path, v.Timestamp, v.Nonce, BodyHash([]byte(v.BodyUTF8)))
+			if canonical != v.Canonical {
+				t.Fatalf("canonical string mismatch\n got: %q\nwant: %q", canonical, v.Canonical)
+			}
+			want := SignatureVersion + "=" + hmacHex(key, canonical)
+			if want != v.Signature {
+				t.Fatalf("the vector's signature is not a genuine signature over its own fields; "+
+					"it would be rejected for the wrong reason\n got: %s\nwant: %s", v.Signature, want)
+			}
+		})
 	}
 }

@@ -30,7 +30,10 @@ jobs:
         image: postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
         env:
           POSTGRES_USER: vizra
-          POSTGRES_PASSWORD: vizra
+          # Per-run and ephemeral, so there is no committed database password
+          # for a secret scanner to flag and no static value to reuse. The
+          # container is destroyed with the job.
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: vizra_test
         ports: ['5432:5432']
         options: >-
@@ -86,7 +89,7 @@ jobs:
       # (VZ-FOUND-003 success case).
       - name: Integration tests (PostgreSQL 18 + Valkey)
         env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra:vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_DATABASE_URL: postgres://vizra:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/vizra_test?sslmode=disable
           VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
           VIZRA_TEST_CACHE_FLAVOUR: valkey
         run: |
@@ -118,8 +121,8 @@ jobs:
   # publishes no formal protocol-compatibility guarantee, so the cache lane is a
   # PERMANENT two-image matrix — pinned Valkey and Redis 7.2.x — from the first
   # Redis-using code, for the life of the project.
-  cache-matrix:
-    name: cache-matrix
+  cache-matrix-leg:
+    name: cache-matrix-leg
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -144,7 +147,10 @@ jobs:
         image: postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
         env:
           POSTGRES_USER: vizra
-          POSTGRES_PASSWORD: vizra
+          # Per-run and ephemeral, so there is no committed database password
+          # for a secret scanner to flag and no static value to reuse. The
+          # container is destroyed with the job.
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: vizra_test
         ports: ['5432:5432']
         options: >-
@@ -172,7 +178,33 @@ jobs:
 
       - name: Integration tests against ${{ matrix.flavour }}
         env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra:vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_DATABASE_URL: postgres://vizra:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/vizra_test?sslmode=disable
           VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
           VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration
+
+  # The aggregate. `ci-required` requires the context `cache-matrix`; GitHub
+  # reports each matrix leg under a name carrying its matrix values, so without
+  # this job that context would never appear and the fan-in would time out
+  # rather than gate anything.
+  #
+  # `if: always()` plus an explicit result check is deliberate: without it a
+  # CANCELLED or SKIPPED matrix would leave this job skipped, and a skipped
+  # required lane is not a pass.
+  cache-matrix:
+    name: cache-matrix
+    needs: cache-matrix-leg
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every cache matrix leg must have succeeded
+        run: |
+          set -euo pipefail
+          result='${{ needs.cache-matrix-leg.result }}'
+          echo "cache-matrix-leg result: $result"
+          if [ "$result" != "success" ]; then
+            echo "::error::a cache matrix leg did not succeed (result: $result). ADR-001 Q-004 makes this matrix permanent: a skipped or cancelled leg is not a pass."
+            exit 1
+          fi
+          echo "both legs (pinned Valkey, Redis 7.2) succeeded"

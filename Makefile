@@ -124,7 +124,11 @@ test-integration: ## Tests needing PostgreSQL and a RESP server (VIZRA_TEST_DATA
 .PHONY: govulncheck
 govulncheck: ## Known vulnerabilities in the dependency set
 	@echo "==> govulncheck"
-	@$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+	@# v1.8.0, verified on the live proxy 2026-09-20 and run against this tree.
+	@# v1.1.4 panics on the Go 1.27 AST ("unexpected expr: *ast.KeyValueExpr"),
+	@# which is a TOOL failure, not a clean scan — and a lane that crashes is not
+	@# a pass.
+	@$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
 .PHONY: tidy-check
 tidy-check: ## go.mod and go.sum are tidy

@@ -235,37 +235,85 @@ components:
 
         The signer sends three headers:
 
-        - `X-Vizra-Timestamp` — unix seconds, as decimal digits.
-        - `X-Vizra-Nonce` — at least 16 bytes of randomness, lowercase hex.
-        - `X-Vizra-Signature` — `v1=` followed by the lowercase hex of
+        - `X-Vizra-Timestamp` — unix seconds, as BARE DECIMAL DIGITS.
+        - `X-Vizra-Nonce` — at least 16 bytes of randomness, LOWERCASE hex.
+        - `X-Vizra-Signature` — `v1=` followed by the LOWERCASE hex of
           `HMAC-SHA256(SEARCH_HMAC_KEY, canonical)`.
 
-        `canonical` is these six fields joined by a single `\n`, with no trailing
-        newline:
+        `canonical` is these six fields joined by a single `\n`, with no
+        trailing newline:
 
         ```
         v1
-        <HTTP method, uppercase>
+        <HTTP method>
         <request path, exactly as sent, no query string>
         <X-Vizra-Timestamp>
         <X-Vizra-Nonce>
         <lowercase hex SHA-256 of the raw request body>
         ```
 
-        The body hash is over the exact bytes sent, so the verifier must hash the
-        raw body before decoding it. An empty body hashes to the SHA-256 of the
-        empty string.
+        **Every field enters the canonical string VERBATIM.** No implementation
+        may uppercase, trim, reparse or reformat any of them. This scheme is
+        implemented twice — once in `vizra-core`, once in `vizra-search` — and
+        any normalisation one side performs and the other does not produces two
+        implementations that disagree about which requests are valid. That had
+        already happened: one side rebuilt the timestamp through
+        `ParseInt`→`FormatInt`, so `" 1789000000 "`, `"+1789000000"` and
+        `"01789000000"` verified there and were refused by the other.
 
-        The verifier MUST: compare with a constant-time comparison; reject a
-        timestamp more than 300 seconds from its own clock in either direction;
-        reject a body above `MAX_INTERNAL_BODY_BYTES` (default 1 MiB) *before*
-        reading it, with 413; and reject a missing or malformed header with 401.
-        Nonce replay rejection is required once search owns storage; until then
-        the timestamp window is the only replay bound, and this is recorded as a
-        known limitation rather than implied to be covered.
+        Non-canonical input is therefore REFUSED, not rewritten. The normative
+        rules:
 
-        Rejection is always 401 with body `{"error":{"code":"signature_rejected"}}`
-        and MUST NOT say which of the three headers was wrong.
+        **Method.** Uppercase ASCII letters only, used exactly as it appears on
+        the request line. A lowercase or mixed-case method is rejected; it is
+        NOT uppercased first.
+
+        **Timestamp.** Unix seconds as bare decimal digits matching
+        `^[1-9][0-9]*$`: no sign, no leading zero, no surrounding whitespace, no
+        separators, no other base. Its MAGNITUDE is validated against an
+        absolute range — at least `1000000000` (2001-09-09) and at most
+        `4102444800` (2100-01-01) — **before** it is used in any arithmetic, and
+        the skew is then computed on plain int64 seconds against a window of
+        ±300 s.
+
+        Deriving a time value from the header and folding the sign of the
+        difference does NOT close the window: at the ends of the representable
+        range that arithmetic wraps, and a validly signed request with a
+        timestamp of `253402300799` was accepted and never expired. Until
+        `vizra-search` owns a nonce store, this window is the ONLY replay bound,
+        so it has to actually close. A verifier whose own clock falls outside
+        the absolute range MUST fail closed.
+
+        **Nonce.** At least 32 lowercase-hex characters (16 bytes), at most 128,
+        even length. Uppercase hex is rejected, not lowercased.
+
+        **Headers.** Each of the three appears EXACTLY ONCE. A duplicated header
+        is ambiguous — one implementation reads the first value, another the
+        last — and is rejected rather than resolved.
+
+        **Body.** The hash is over the exact bytes received, computed BEFORE
+        decoding, so a re-encoding that changes the bytes cannot pass. An empty
+        body hashes to the SHA-256 of the empty string. A body above
+        `MAX_INTERNAL_BODY_BYTES` (default 1 MiB) is rejected with 413 *before*
+        it is read.
+
+        The signature comparison is constant-time.
+
+        Rejection is always 401 with body
+        `{"error":{"code":"signature_rejected"}}` and MUST NOT say which rule
+        was broken.
+
+        **Conformance.** `api/search-hmac-testvectors.json` is normative for
+        both repositories. Its `vectors` are ACCEPT cases and its
+        `negative_vectors` are REJECT cases, each carrying a genuine signature
+        over its own fields so that only the stated rule can refuse it. Agreeing
+        on the accept set while disagreeing on the reject set is exactly how the
+        divergence above arose, so an implementation MUST consume both halves.
+
+        **Known limitation, stated rather than implied:** there is no nonce
+        replay store in M0. The timestamp window is the whole replay bound, and
+        a captured request can be replayed within 300 s. A nonce store is
+        required once `vizra-search` owns storage.
 
   responses:
     BadRequest:
@@ -526,6 +574,15 @@ components:
           type: integer
           format: int64
           nullable: true
+          description: |
+            Deliberately present here and NOT on SuggestResponse or EventAck.
+            The authoritative report is `/readyz`; this field is an echo on the
+            one response whose CONTENTS core must interpret against an index
+            schema — hits are projected rows. A suggestion is a bare string and
+            an event acknowledgement is a count, so neither can be misread
+            because of a schema skew, and adding the field there would imply a
+            check that has nothing to check. Revisit with VZ-SEARCH-001 (M3),
+            when the projection schema is fixed.
 
     SuggestRequest:
       type: object

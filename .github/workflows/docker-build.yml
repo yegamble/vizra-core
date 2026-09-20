@@ -89,18 +89,51 @@ jobs:
           echo "image uid: $uid"
           [ "$uid" != "0" ] || { echo "::error::the release image runs as root"; exit 1; }
 
-      # ADR-001: the libvips layer sits BELOW the Go binary layer, so a Go change
-      # never rebuilds libvips. Asserted by rebuilding after touching only Go
-      # source and checking the libvips layers were cached.
+      # ADR-001: the libvips layer sits BELOW the Go binary layer, so a Go
+      # change never rebuilds libvips and the codec surface of a tag is stable
+      # across rebuilds.
+      #
+      # The assertion is on buildx's CACHED marker for the libvips step, NOT on
+      # whether the log mentions meson: buildx echoes a cached step's full
+      # command text, so grepping for "meson compile" matches even when the step
+      # was reused. That false positive failed this lane on the first run.
       - name: Assert a Go change does not rebuild libvips
         run: |
           set -euo pipefail
           printf '\n// layer-order probe\n' >> cmd/api/main.go
+          rc=0
           docker buildx build --load -t vizra-core:ci2 \
-            --cache-from type=gha --build-arg RELEASE=ci . 2>&1 | tee /tmp/rebuild.log
-          if grep -qiE 'meson (setup|compile)|Downloading vips|sha256sum -c' /tmp/rebuild.log; then
-            echo "::error::a Go-only change rebuilt libvips; the layer order is wrong (ADR-001)"
-            exit 1
-          fi
-          echo "libvips layers were reused"
+            --progress=plain --cache-from type=gha --build-arg RELEASE=ci . > /tmp/rebuild.log 2>&1 || rc=$?
           git checkout -- cmd/api/main.go
+          if [ $rc -ne 0 ]; then
+            echo "::error::the rebuild itself failed"; tail -40 /tmp/rebuild.log; exit $rc
+          fi
+
+          python3 - <<'EOF'
+          import re, sys
+
+          log = open('/tmp/rebuild.log', errors='replace').read()
+
+          # Find the step number buildx gave the libvips compile step.
+          step = None
+          for m in re.finditer(r'^#(\d+)\s+\[vips \d+/\d+\]\s+(.*)$', log, re.M):
+              if 'meson compile' in m.group(2):
+                  step = m.group(1)
+                  break
+          if step is None:
+              print('::error::could not find the libvips build step in the rebuild log; '
+                    'the assertion cannot be made and must not silently pass')
+              sys.exit(1)
+
+          print(f'libvips build step is #{step}')
+          if re.search(rf'^#{step} CACHED\s*$', log, re.M):
+              print(f'#{step} CACHED — a Go-only change reused the libvips layers')
+              sys.exit(0)
+
+          print(f'::error::step #{step} (libvips) was NOT cached on a Go-only change. '
+                'The libvips layer must sit below the Go binary layer (ADR-001).')
+          for line in log.splitlines():
+              if line.startswith(f'#{step} '):
+                  print('   ' + line)
+          sys.exit(1)
+          EOF

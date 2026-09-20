@@ -8,14 +8,25 @@ import (
 // validProduction is a minimal environment that must boot in production mode.
 // Every negative test below mutates exactly one key of this map, so a test that
 // goes red names the single thing that broke.
+// placeholderSecret builds a value of exactly n bytes that is long enough for
+// production and contains none of the known development substrings.
+//
+// It is BUILT rather than written as a literal, deliberately. A 32-character
+// random-looking string in a source file is indistinguishable from a leaked
+// credential to a scanner and to a reviewer, and the test needs neither
+// randomness nor secrecy — only length and the absence of a banned substring.
+func placeholderSecret(n int) string {
+	return strings.Repeat("Aa1Bb2Cc3Dd4", (n/12)+1)[:n]
+}
+
 func validProduction() map[string]string {
 	return map[string]string{
 		"VIZRA_MODE":           "production",
 		"VIZRA_PUBLIC_ORIGIN":  "https://photos.example.org",
-		"DATABASE_URL":         "postgres://vizra:pw@db:5432/vizra?sslmode=require",
+		"DATABASE_URL":         "postgres://vizra@db:5432/vizra?sslmode=require",
 		"VIZRA_CACHE_URL":      "redis://cache:6379/0",
-		"VIZRA_SESSION_SECRET": "Kv8Qn2Rt6Wp1Zx5Ym9Bc3Fd7Gh0Jl4Nq", // 32 bytes, not a published default
-		"VIZRA_MFA_KEY_KEK":    "Pz3Xw7Ru1Ty5Vb9Nm2Ck6Hj0Ls4Df8Ga", // 32 bytes
+		"VIZRA_SESSION_SECRET": placeholderSecret(32),
+		"VIZRA_MFA_KEY_KEK":    placeholderSecret(32),
 	}
 }
 
@@ -100,8 +111,16 @@ func TestProductionRefusesDevSecrets(t *testing.T) {
 }
 
 func TestProductionRefusesShortSecrets(t *testing.T) {
-	requireProblem(t, "VIZRA_SESSION_SECRET", "Kv8Qn2Rt6Wp1Zx5Ym9Bc3Fd7Gh0Jl4N", "VIZRA_SESSION_SECRET") // 31 bytes
-	requireProblem(t, "VIZRA_MFA_KEY_KEK", "Pz3Xw7Ru1Ty5Vb9Nm2Ck6Hj0Ls4Df8G", "VIZRA_MFA_KEY_KEK")       // 31 bytes
+	// One byte below the floor: the boundary is where an off-by-one lives.
+	requireProblem(t, "VIZRA_SESSION_SECRET", placeholderSecret(31), "VIZRA_SESSION_SECRET")
+	requireProblem(t, "VIZRA_MFA_KEY_KEK", placeholderSecret(31), "VIZRA_MFA_KEY_KEK")
+	// And exactly at the floor it is accepted, so the test is not passing for
+	// the wrong reason.
+	env := validProduction()
+	env["VIZRA_SESSION_SECRET"] = placeholderSecret(32)
+	if _, err := LoadFrom(lookupOf(env)); err != nil {
+		t.Fatalf("a 32-byte secret was refused: %v", err)
+	}
 }
 
 // ADR-003: an unset MFA KEK is a boot refusal, never a warning.
@@ -203,7 +222,7 @@ func TestSearchModeRequiresURLAndKey(t *testing.T) {
 	}
 
 	env["VIZRA_SEARCH_URL"] = "http://search:8081"
-	env["VIZRA_SEARCH_HMAC_KEY"] = "Ar4Lo8Cq2Ei6Uk0Wn3Sv7Yb1Md5Pt9Xz"
+	env["VIZRA_SEARCH_HMAC_KEY"] = placeholderSecret(32)
 	if _, err := LoadFrom(lookupOf(env)); err != nil {
 		t.Fatalf("managed search with URL and key must load: %v", err)
 	}
