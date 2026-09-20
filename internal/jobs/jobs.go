@@ -35,8 +35,22 @@ const KindNoop Kind = "noop"
 // DefaultMaxAttempts is the ladder length for a retryable failure.
 const DefaultMaxAttempts = 5
 
-// DefaultPriority: lower runs first.
-const DefaultPriority = 100
+// Priority values. LOWER RUNS FIRST.
+//
+// 0 is the Go zero value and therefore means "unset", not "most urgent" — a
+// caller who writes Priority: 0 intending "jump the queue" would otherwise get
+// the default silently, and 0 looks like the most urgent value in a
+// lower-runs-first scheme. PriorityUrgent exists so the top of the queue is
+// reachable without relying on that.
+const (
+	// PriorityUrgent is the highest priority a caller may set. Reserved for
+	// work a person is waiting on — M1's upload-finalize path is the first.
+	PriorityUrgent int16 = 1
+	// DefaultPriority is applied when Priority is left unset (0).
+	DefaultPriority int16 = 100
+	// PriorityBackground is for sweeps, reconciles and retention.
+	PriorityBackground int16 = 200
+)
 
 // NewJob is what a caller enqueues.
 type NewJob struct {
@@ -49,8 +63,10 @@ type NewJob struct {
 	// queued or leased a no-op that returns the in-flight job. Derive it from
 	// the mutation, not from time.
 	IdempotencyKey string
-	Priority       int16
-	MaxAttempts    int32
+	// Priority: LOWER RUNS FIRST. Zero means UNSET and resolves to
+	// DefaultPriority; use PriorityUrgent for the top of the queue.
+	Priority    int16
+	MaxAttempts int32
 	// RunAfter delays the first attempt. Zero means now.
 	RunAfter time.Time
 	// CorrelationID ties the job to the request that caused it. Required: a job
@@ -73,6 +89,30 @@ type Enqueued struct {
 // correlation id would be untraceable and look fine.
 var ErrNoCorrelationID = errors.New("jobs: CorrelationID is required")
 
+// MaxPayloadBytes mirrors the jobs_payload_bounded CHECK in migration 0002.
+// The database is the real control; this exists so a caller gets a named Go
+// error naming the size, rather than a constraint violation from three layers
+// down.
+const MaxPayloadBytes = 65536
+
+// MaxKindBytes and MaxCorrelationIDBytes mirror their CHECK constraints.
+const (
+	MaxKindBytes          = 64
+	MaxCorrelationIDBytes = 128
+)
+
+// ErrPayloadTooLarge is returned when a payload exceeds MaxPayloadBytes. A job
+// needing more should reference a row rather than carry it: ClaimJob RETURNs
+// payload on every claim, so a fat row is pulled over the wire and through
+// TOAST each time it is looked at, and it inflates every backup.
+var ErrPayloadTooLarge = errors.New("jobs: payload exceeds the 64 KiB limit; reference a row instead of carrying it")
+
+// ErrKindTooLong and ErrCorrelationIDTooLong mirror the remaining bounds.
+var (
+	ErrKindTooLong          = errors.New("jobs: kind exceeds 64 characters")
+	ErrCorrelationIDTooLong = errors.New("jobs: correlation id exceeds 128 characters")
+)
+
 // Enqueue writes the job row.
 //
 // The first argument after ctx is a pgx.Tx, NOT a pool and NOT an interface a
@@ -91,9 +131,20 @@ func Enqueue(ctx context.Context, tx pgx.Tx, j NewJob) (Enqueued, error) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
+	if len(j.Kind) > MaxKindBytes {
+		return Enqueued{}, fmt.Errorf("%w (kind is %d characters)", ErrKindTooLong, len(j.Kind))
+	}
+	if len(j.CorrelationID) > MaxCorrelationIDBytes {
+		return Enqueued{}, fmt.Errorf("%w (correlation id is %d characters)", ErrCorrelationIDTooLong, len(j.CorrelationID))
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return Enqueued{}, fmt.Errorf("jobs: encoding payload for kind %s: %w", j.Kind, err)
+	}
+	// Checked against the MARSHALLED bytes, which is what the column stores and
+	// what jobs_payload_bounded measures.
+	if len(raw) > MaxPayloadBytes {
+		return Enqueued{}, fmt.Errorf("%w (payload is %d bytes, limit %d)", ErrPayloadTooLarge, len(raw), MaxPayloadBytes)
 	}
 	if j.MaxAttempts <= 0 {
 		j.MaxAttempts = DefaultMaxAttempts

@@ -39,6 +39,7 @@ WHERE id = (
     SELECT id FROM jobs
     WHERE state = 'queued'
       AND run_after <= now()
+      AND attempts < max_attempts
       AND kind = ANY($3::text[])
     ORDER BY priority, run_after
     FOR UPDATE SKIP LOCKED
@@ -65,6 +66,22 @@ type ClaimJobRow struct {
 
 // FOR UPDATE SKIP LOCKED: two workers never claim the same row, and a locked
 // row never blocks the other worker's scan.
+//
+// `attempts` counts CLAIMS, not failures: it is incremented here, at claim
+// time, so a worker that dies mid-job (OOM kill, SIGKILL, node eviction,
+// libvips crash — ADR-004 expects all of these and has no boot blanket
+// requeue) consumes one attempt. That is deliberate: it is the crash-loop
+// brake, and without it a job that kills its worker every time is retried
+// forever.
+//
+// `AND attempts < max_attempts` is what makes that safe. Without it, a row that
+// had already burned its budget was still SELECTED — and then the UPDATE's
+// `attempts + 1` violated jobs_attempts_bounded, the worker logged a transient
+// claim failure and slept, and because the row sorts first by (priority,
+// run_after) it was re-selected on the very next poll. One poisoned job stalled
+// the entire site's queue and needed an operator with psql. The sweep below
+// dead-letters such rows, so this predicate is the second half of that fix,
+// not a way of hiding them.
 func (q *Queries) ClaimJob(ctx context.Context, arg ClaimJobParams) (ClaimJobRow, error) {
 	row := q.db.QueryRow(ctx, claimJob, arg.LeasedBy, arg.LeaseDuration, arg.Kinds)
 	var i ClaimJobRow
@@ -420,22 +437,38 @@ func (q *Queries) RetryJob(ctx context.Context, arg RetryJobParams) (int64, erro
 
 const sweepExpiredLeases = `-- name: SweepExpiredLeases :many
 UPDATE jobs
-SET state        = 'queued',
+SET state = CASE WHEN attempts >= max_attempts THEN 'dead' ELSE 'queued' END,
+    last_error = CASE
+        WHEN attempts >= max_attempts
+        THEN 'lease elapsed with attempts exhausted: the worker holding this job stopped without recording an outcome'
+        ELSE last_error
+    END,
+    finished_at  = CASE WHEN attempts >= max_attempts THEN now() ELSE NULL END,
     leased_by    = NULL,
     leased_until = NULL,
     updated_at   = now()
 WHERE state = 'leased' AND leased_until < now()
-RETURNING id, kind, attempts
+RETURNING id, kind, attempts, state
 `
 
 type SweepExpiredLeasesRow struct {
 	ID       uuid.UUID
 	Kind     string
 	Attempts int32
+	State    string
 }
 
-// Reclaims ONLY rows whose lease has actually elapsed. There is no boot blanket
+// Reclaims rows whose lease has actually elapsed. There is no boot blanket
 // requeue (ADR-004): this sweep, leader-gated, is the whole recovery mechanism.
+//
+// A row whose attempts are exhausted is DEAD-LETTERED rather than requeued.
+// That is what ADR-004's "max_attempts exhaustion yields dead" means for the
+// crash path: a worker that dies repeatedly burns the budget without any
+// handler ever returning an error, so the retry path never sees it and only
+// the sweep can declare it dead. Requeueing it instead left an unclaimable row
+// at the head of the claim order forever.
+//
+// One statement, so the two outcomes cannot diverge under concurrency.
 func (q *Queries) SweepExpiredLeases(ctx context.Context) ([]SweepExpiredLeasesRow, error) {
 	rows, err := q.db.Query(ctx, sweepExpiredLeases)
 	if err != nil {
@@ -445,7 +478,12 @@ func (q *Queries) SweepExpiredLeases(ctx context.Context) ([]SweepExpiredLeasesR
 	items := []SweepExpiredLeasesRow{}
 	for rows.Next() {
 		var i SweepExpiredLeasesRow
-		if err := rows.Scan(&i.ID, &i.Kind, &i.Attempts); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Attempts,
+			&i.State,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

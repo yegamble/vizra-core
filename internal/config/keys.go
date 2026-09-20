@@ -11,6 +11,10 @@ type Key struct {
 	Secret bool
 	// RequiredInProduction marks a key whose absence is a production boot refusal.
 	RequiredInProduction bool
+	// RefuseIfPresent marks an escape hatch whose value is NOT a boolean, so
+	// production must refuse it on PRESENCE with any non-empty value rather
+	// than on truthiness.
+	RefuseIfPresent bool
 	// Default is the development default. Empty means "no default".
 	Default string
 	Doc     string
@@ -25,7 +29,9 @@ var EscapeHatches = []Key{
 	{Name: "VIZRA_DEV_DISABLE_AUTH", Doc: "Skips authentication entirely. Development only."},
 	{Name: "VIZRA_DEV_ALLOW_ANY_ORIGIN", Doc: "Disables the CSRF same-origin check. Development only."},
 	{Name: "VIZRA_DEV_SKIP_MIGRATIONS", Doc: "Boots without applying migrations. Development only."},
-	{Name: "VIZRA_DEV_AUTOLOGIN_USER", Doc: "Signs every request in as this user. Development only."},
+	// Its value is a USERNAME, so no realistic setting of it is "truthy".
+	// Refused on PRESENCE — see the production block in config.go.
+	{Name: "VIZRA_DEV_AUTOLOGIN_USER", RefuseIfPresent: true, Doc: "Signs every request in as this user. Development only."},
 	{Name: "VIZRA_DEV_FAKE_SEARCH", Doc: "Returns canned search results. Development only."},
 	{Name: "VIZRA_DEV_INSECURE_COOKIES", Doc: "Drops the Secure attribute from session cookies. Development only."},
 	{Name: "VIZRA_DEV_TRUST_ANY_HMAC", Doc: "Accepts any internal HMAC signature. Development only."},
@@ -51,7 +57,6 @@ var Registry = []Key{
 	{Name: "VIZRA_CORS_ALLOWED_ORIGINS", Doc: "Comma-separated exact origins. Production refuses '*'."},
 	{Name: "VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN", Doc: "Set to true to allow a plain-http VIZRA_PUBLIC_ORIGIN in production. Explicit by design (ADR-002)."},
 	{Name: "VIZRA_QUEUE_AGE_THRESHOLD", Default: "15m", Doc: "Oldest queued job age above which readiness reports degraded and doctor FAILs (Q-028)."},
-	{Name: "VIZRA_MAX_INTERNAL_BODY_BYTES", Default: "1048576", Doc: "Cap on an internal search request body, enforced before the body is read."},
 	{Name: "VIZRA_WORKER_CONCURRENCY", Default: "4", Doc: "Maximum jobs a worker process runs at once."},
 	{Name: "VIZRA_JOB_LEASE", Default: "60s", Doc: "Lease duration. The heartbeat renews at lease/3."},
 	{Name: "VIZRA_JOB_TIMEOUT", Default: "5m", Doc: "Per-job wall-clock timeout, applied as a context deadline."},

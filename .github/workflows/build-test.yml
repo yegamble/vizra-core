@@ -17,6 +17,81 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The half of the append-only guarantee that scripts/migration-manifest.sh
+  # cannot make on its own.
+  #
+  # `migration-manifest.sh check` compares the manifest to the files ON DISK in
+  # the same commit. That is self-consistency: `make migrations-manifest`
+  # regenerates every hash and turns it green again, so on its own it catches
+  # the honest mistake and not the deadline-pressure edit. A production database
+  # that already applied 0002 never re-applies it, so an edited migration means
+  # the repository and the live schema diverge permanently while every gate is
+  # green.
+  #
+  # This job diffs the manifest against the MERGE BASE and fails when a line is
+  # removed or changed, or when a migration file is deleted or renamed. Adding a
+  # migration passes.
+  append-only:
+    name: append-only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history: a merge-base diff needs more than a shallow clone.
+          fetch-depth: 0
+
+      - name: Merged migrations are frozen
+        env:
+          # On pull_request this is the target branch. On merge_group the queue
+          # branch encodes the base, and GITHUB_BASE_REF is empty, so fall back
+          # to the default branch.
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          base_ref="${BASE_REF:-}"
+          if [ -z "$base_ref" ]; then
+            base_ref="${{ github.event.repository.default_branch }}"
+            echo "no base_ref for event '${{ github.event_name }}'; comparing against the default branch '$base_ref'"
+          fi
+          git fetch --no-tags --depth=0 origin "$base_ref"
+          base="$(git merge-base "origin/$base_ref" HEAD)"
+          echo "merge base: $base"
+
+          fail=0
+
+          # 1. A manifest line REMOVED or CHANGED means a merged migration's
+          #    bytes moved. Added lines (a new migration) are fine.
+          removed="$(git diff "$base" -- migrations/manifest.sha256 | grep -E '^-[0-9a-f]{64} ' || true)"
+          if [ -n "$removed" ]; then
+            echo "::error::a migrations/manifest.sha256 line was REMOVED or CHANGED."
+            printf '%s\n' "$removed" | sed 's/^/    /'
+            echo ""
+            echo "A database that already applied that migration will never re-apply it, so the"
+            echo "repository and the live schema would diverge permanently while every gate stayed"
+            echo "green. Fix a merged migration with a NEW migration."
+            fail=1
+          fi
+
+          # 2. A migration file deleted or renamed is the same violation wearing
+          #    a different hat.
+          gone="$(git diff --diff-filter=DR --name-only "$base" -- 'migrations/*.sql' || true)"
+          if [ -n "$gone" ]; then
+            echo "::error::migration file(s) deleted or renamed:"
+            printf '%s\n' "$gone" | sed 's/^/    /'
+            fail=1
+          fi
+
+          # 3. And the manifest must still match the files on disk, so the two
+          #    halves cannot disagree.
+          ./scripts/migration-manifest.sh check
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+
+          added="$(git diff "$base" -- migrations/manifest.sha256 | grep -cE '^\+[0-9a-f]{64} ' || true)"
+          echo "append-only: ok ($added migration file hash(es) added, none removed or changed)"
+
   build-test:
     name: build-test
     # GitHub-hosted ubuntu-24.04 is the clean target (ADR-009). The owner's

@@ -26,6 +26,22 @@ CREATE TABLE sites (
 
 CREATE UNIQUE INDEX sites_handle_key ON sites (handle);
 
+-- EXACTLY one row, enforced by the database rather than by a comment.
+--
+-- `privacy_mode` is step (1) of the frozen precedence matrix: on a private site
+-- an anonymous viewer is denied every read surface. Without this index a second
+-- row — a bad import, an M2 admin surface, a restore that merges two dumps —
+-- makes the answer depend on which handle sorts first, so a site set to
+-- `private` with handle 'z-main' would lose to an accidental 'a-test' row with
+-- the default 'public' and the whole instance would open to anonymous readers
+-- with no error anywhere.
+--
+-- Permanently safe: ADR-007 § Site and tenant seam rejects schema-per-tenant
+-- and chooses database-per-tenant, so it is one row per DATABASE for the life
+-- of the product. Under tenancy (M5) each tenant database carries its own
+-- singleton.
+CREATE UNIQUE INDEX sites_singleton ON sites ((true));
+
 -- The single default site. The id is a fixed uuidv7-shaped constant so a fresh
 -- database is byte-identical on every machine and fixtures can reference it.
 INSERT INTO sites (id, handle, base_url)

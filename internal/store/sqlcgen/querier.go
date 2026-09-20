@@ -14,6 +14,22 @@ type Querier interface {
 	AdvisoryUnlock(ctx context.Context, arg AdvisoryUnlockParams) (bool, error)
 	// FOR UPDATE SKIP LOCKED: two workers never claim the same row, and a locked
 	// row never blocks the other worker's scan.
+	//
+	// `attempts` counts CLAIMS, not failures: it is incremented here, at claim
+	// time, so a worker that dies mid-job (OOM kill, SIGKILL, node eviction,
+	// libvips crash — ADR-004 expects all of these and has no boot blanket
+	// requeue) consumes one attempt. That is deliberate: it is the crash-loop
+	// brake, and without it a job that kills its worker every time is retried
+	// forever.
+	//
+	// `AND attempts < max_attempts` is what makes that safe. Without it, a row that
+	// had already burned its budget was still SELECTED — and then the UPDATE's
+	// `attempts + 1` violated jobs_attempts_bounded, the worker logged a transient
+	// claim failure and slept, and because the row sorts first by (priority,
+	// run_after) it was re-selected on the very next poll. One poisoned job stalled
+	// the entire site's queue and needed an operator with psql. The sweep below
+	// dead-letters such rows, so this predicate is the second half of that fix,
+	// not a way of hiding them.
 	ClaimJob(ctx context.Context, arg ClaimJobParams) (ClaimJobRow, error)
 	CompleteJob(ctx context.Context, arg CompleteJobParams) (int64, error)
 	CountAuditEvents(ctx context.Context) (int64, error)
@@ -30,8 +46,15 @@ type Querier interface {
 	EnqueueJob(ctx context.Context, arg EnqueueJobParams) (EnqueueJobRow, error)
 	// A terminal error bypasses the retry ladder entirely.
 	FailJob(ctx context.Context, arg FailJobParams) (int64, error)
-	// Core has exactly one site row (ADR-007). Ordering by handle makes the result
-	// deterministic even if a future migration ever adds one.
+	// Core has exactly one site row (ADR-007), enforced by the sites_singleton
+	// unique index in migration 0001.
+	//
+	// No ORDER BY and no LIMIT, deliberately. An ORDER BY ... LIMIT 1 would make a
+	// second row a SILENT wrong answer — whichever handle sorts first wins, and
+	// `privacy_mode` is step (1) of the frozen precedence matrix, so a private site
+	// could quietly start answering as a public one. Without the LIMIT, a second
+	// row is a loud :one error at the first read. "Deterministic" is not the
+	// property that matters here; "correct" is.
 	GetDefaultSite(ctx context.Context) (Site, error)
 	GetDefaultStorageLocation(ctx context.Context) (StorageLocation, error)
 	GetJob(ctx context.Context, id uuid.UUID) (Job, error)
@@ -49,8 +72,17 @@ type Querier interface {
 	// A retryable failure with attempts left: back to queued, moved out along the
 	// ladder.
 	RetryJob(ctx context.Context, arg RetryJobParams) (int64, error)
-	// Reclaims ONLY rows whose lease has actually elapsed. There is no boot blanket
+	// Reclaims rows whose lease has actually elapsed. There is no boot blanket
 	// requeue (ADR-004): this sweep, leader-gated, is the whole recovery mechanism.
+	//
+	// A row whose attempts are exhausted is DEAD-LETTERED rather than requeued.
+	// That is what ADR-004's "max_attempts exhaustion yields dead" means for the
+	// crash path: a worker that dies repeatedly burns the budget without any
+	// handler ever returning an error, so the retry path never sees it and only
+	// the sweep can declare it dead. Requeueing it instead left an unclaimable row
+	// at the head of the claim order forever.
+	//
+	// One statement, so the two outcomes cannot diverge under concurrency.
 	SweepExpiredLeases(ctx context.Context) ([]SweepExpiredLeasesRow, error)
 	// Leader election by a SESSION-scoped advisory lock in its TWO-INTEGER form, so
 	// it cannot collide with golang-migrate's single-bigint lock (ADR-004).

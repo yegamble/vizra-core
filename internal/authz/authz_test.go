@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -382,5 +383,115 @@ func TestStaffRoleWithoutAuditedContextIsNotStaff(t *testing.T) {
 	}
 	if d, _ := e.Decide(context.Background(), admin, ActionAdminConsole, r); d.Allowed() {
 		t.Fatal("an admin outside an audited context reached the admin console surface")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Security Finding 1 — an unset Visibility must DENY, not default to public
+// ---------------------------------------------------------------------------
+
+// Decide used to normalise an empty Visibility to VisibilityPublic, so the one
+// evaluator every read surface calls failed OPEN on the most common programming
+// mistake it exists to catch: a Resource built without its visibility. A NULL
+// column scanned into a string, a struct populated before the visibility join
+// lands, a hydration path that fills OwnerID first — each yielded ALLOW for an
+// anonymous viewer, including on federation_outbound and ipfs_publication.
+//
+// AGENTS.md: "Private media must never reach public IPFS or public federation
+// exports."
+func TestUnknownVisibilityDenies(t *testing.T) {
+	e := NewEvaluator(Options{})
+	unknown := []Visibility{
+		"",          // the zero value: the whole point of this test
+		"PUBLIC",    // right label, wrong case
+		"Public",    //
+		"scheduled", // a state a later milestone might add
+		"moderated", //
+		"deleted",   //
+		" public",   // whitespace
+		"public\n",  //
+	}
+	for _, vis := range unknown {
+		for _, a := range Actions {
+			name := string(a) + "/" + strconv.Quote(string(vis))
+			t.Run(name, func(t *testing.T) {
+				// The most permissive subject and resource otherwise: owner,
+				// staff, grant, IPFS opt-in. Only the visibility is unknown.
+				for _, class := range []string{"A", "M", "G", "O", "S"} {
+					r := Resource{
+						OwnerID:         ownerID,
+						Visibility:      vis,
+						DownloadSetting: DownloadAll,
+						Scope:           ScopeOwnLibrary,
+						OwnerAllowsIPFS: true,
+						AlbumPrivacy:    AlbumPublic,
+					}
+					d, reason := e.Decide(context.Background(), subjectFor(class), a, r)
+					if d.Allowed() {
+						t.Fatalf("%s with visibility %q ALLOWED for viewer class %s (reason %q). "+
+							"An unset or unrecognised visibility must deny: a caller bug that denies is a 404 in "+
+							"staging, a caller bug that allows is a private photo on the fediverse.",
+							a, vis, class, reason)
+					}
+					if reason != ReasonVisibilityUnknown {
+						t.Fatalf("%s/%s: reason = %q, want %q", a, class, reason, ReasonVisibilityUnknown)
+					}
+				}
+			})
+		}
+	}
+}
+
+// The zero Resource is the case the package doc claims to handle.
+func TestZeroResourceDeniesEverySurface(t *testing.T) {
+	e := NewEvaluator(Options{})
+	for _, a := range Actions {
+		d, reason := e.Decide(context.Background(), Subject{}, a, Resource{OwnerID: "u1"})
+		if d.Allowed() {
+			t.Errorf("a zero-valued Resource ALLOWED %s for an anonymous subject (reason %q)", a, reason)
+		}
+	}
+}
+
+// Row 4 is governed by album privacy, so the same rule applies to it.
+func TestUnknownAlbumPrivacyDenies(t *testing.T) {
+	e := NewEvaluator(Options{})
+	for _, priv := range []AlbumPrivacy{"", "PUBLIC", "Public", "hidden", "unlisted"} {
+		for _, class := range []string{"A", "M", "G", "O", "S"} {
+			r := Resource{OwnerID: ownerID, Visibility: VisibilityPublic, AlbumPrivacy: priv}
+			d, reason := e.Decide(context.Background(), subjectFor(class), ActionAlbumPage, r)
+			if d.Allowed() {
+				t.Errorf("album page with privacy %q ALLOWED for viewer class %s (reason %q)", priv, class, reason)
+			}
+			if reason != ReasonVisibilityUnknown {
+				t.Errorf("album privacy %q, class %s: reason = %q, want %q", priv, class, reason, ReasonVisibilityUnknown)
+			}
+		}
+	}
+}
+
+// A denial on an unknown visibility must render 404, not 403: a 403 confirms
+// the row exists.
+func TestHideExistenceForAnythingNotPublicOrUnlisted(t *testing.T) {
+	for _, v := range []Visibility{"", "scheduled", "PUBLIC", "moderated", VisibilityPrivate} {
+		if !HideExistence(Resource{Visibility: v}) {
+			t.Errorf("visibility %q does not hide existence; a 403 on it would confirm the row exists", v)
+		}
+	}
+	for _, v := range []Visibility{VisibilityPublic, VisibilityUnlisted} {
+		if HideExistence(Resource{Visibility: v}) {
+			t.Errorf("%s must not hide existence: the URL is the capability, and a 404 would be a lie", v)
+		}
+	}
+}
+
+// The asymmetry with DownloadSetting is deliberate and is asserted, so nobody
+// "fixes" it later by making it deny.
+func TestDownloadSettingStillDefaultsToAll(t *testing.T) {
+	e := NewEvaluator(Options{})
+	r := Resource{OwnerID: ownerID, Visibility: VisibilityPublic, DownloadSetting: ""}
+	if d, reason := e.Decide(context.Background(), subjectFor("A"), ActionOriginalDownload, r); !d.Allowed() {
+		t.Fatalf("an unset DownloadSetting denied (reason %q). It is a NARROWING setting whose permissive "+
+			"end is the ADR-007 row-2 product default, unlike Visibility which is the subject of the decision.", reason)
 	}
 }

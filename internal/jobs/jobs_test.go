@@ -1,6 +1,7 @@
 package jobs_test
 
 import (
+	"errors"
 	"os/exec"
 	"strings"
 	"testing"
@@ -104,5 +105,110 @@ func TestEnqueueRefusesAnUntraceableJob(t *testing.T) {
 	_, err = jobs.Enqueue(t.Context(), nil, jobs.NewJob{CorrelationID: "c1"})
 	if err == nil {
 		t.Fatal("a job with no kind was accepted")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Security Finding 5 — last_error must be redacted BEFORE it is truncated
+// ---------------------------------------------------------------------------
+
+// jobs.last_error is queryable, is rendered in /admin/jobs, and travels in any
+// pg_dump an operator shares. ADR-002 says secrets do not enter a queryable
+// table. A Go HTTP error is a *url.Error that formats as
+// `Post "https://user:pw@host/path": ...`, so an M1 handler doing an S3 put, a
+// federation delivery or a webhook call produces exactly that text.
+//
+// The value classes are deliberately the same ones internal/obs/log_test.go
+// uses, so the two stay in step.
+func TestLastErrorIsRedactedBeforeItIsStored(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    string
+		secret string
+	}{
+		{"DSN password", `Post "postgres://vizra:hunter2@db:5432/vizra": dial tcp: refused`, "hunter2"},
+		{"presigned S3 URL", `Get "https://b.example/o?X-Amz-Signature=abc123def456&X-Amz-Expires=900": timeout`, "abc123def456"},
+		{"bearer token", "upstream rejected: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", "eyJhbGciOiJIUzI1NiJ9"},
+		{"vizra API key", "webhook auth failed for key vzk_LiveKeyMaterial0123456789", "vzk_LiveKeyMaterial0123456789"},
+		{"cache URL password", `dial rediss://default:s3cr3tpw@cache:6379/0: refused`, "s3cr3tpw"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := jobs.SafeErrorForTest(tc.err)
+			if strings.Contains(got, tc.secret) {
+				t.Fatalf("last_error would have stored %q:\n%s", tc.secret, got)
+			}
+			if !strings.Contains(got, "redacted") {
+				t.Fatalf("nothing was redacted, so the secret may simply be absent:\n%s", got)
+			}
+		})
+	}
+}
+
+// The ORDER is the point. Truncating first would cut a credential in half and
+// store the first half, which is still a leak; redacting first replaces it
+// before the cut is made.
+func TestASecretStraddlingTheTruncationBoundaryIsRedacted(t *testing.T) {
+	// Place a presigned URL so that it spans the 2000-byte cut.
+	const secret = "X-Amz-Signature=SuperSecretSignatureMaterial0123456789"
+	prefix := strings.Repeat("a", 1980)
+	raw := "failed fetching https://b.example/o?" + prefix + "&" + secret + " after 3 tries"
+
+	got := jobs.SafeErrorForTest(raw)
+	if strings.Contains(got, "SuperSecretSignatureMaterial") {
+		t.Fatalf("a secret straddling the truncation boundary was stored:\n%s", got)
+	}
+	// And the whole point of truncating still holds.
+	if len(got) > 2100 {
+		t.Fatalf("the bound was lost: %d bytes", len(got))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 4 — the payload bound, in Go
+// ---------------------------------------------------------------------------
+
+func TestEnqueueRefusesAnOversizedPayload(t *testing.T) {
+	big := map[string]string{"blob": strings.Repeat("x", jobs.MaxPayloadBytes)}
+	_, err := jobs.Enqueue(t.Context(), nil, jobs.NewJob{
+		Kind: jobs.KindNoop, CorrelationID: "c1", Payload: big,
+	})
+	if !errors.Is(err, jobs.ErrPayloadTooLarge) {
+		t.Fatalf("err = %v, want ErrPayloadTooLarge. ClaimJob RETURNs payload on every claim, "+
+			"so an unbounded one is pulled over the wire each time the row is looked at.", err)
+	}
+	// The accept side needs a real transaction, so it lives in the integration
+	// suite (TestEnqueueRefusesAnUnboundedPayload), which also proves the bound
+	// exists in the DATABASE and not only in this caller.
+}
+
+func TestEnqueueRefusesAnOversizedKindOrCorrelationID(t *testing.T) {
+	_, err := jobs.Enqueue(t.Context(), nil, jobs.NewJob{
+		Kind: jobs.Kind(strings.Repeat("k", jobs.MaxKindBytes+1)), CorrelationID: "c1",
+	})
+	if !errors.Is(err, jobs.ErrKindTooLong) {
+		t.Fatalf("err = %v, want ErrKindTooLong", err)
+	}
+	_, err = jobs.Enqueue(t.Context(), nil, jobs.NewJob{
+		Kind: jobs.KindNoop, CorrelationID: strings.Repeat("c", jobs.MaxCorrelationIDBytes+1),
+	})
+	if !errors.Is(err, jobs.ErrCorrelationIDTooLong) {
+		t.Fatalf("err = %v, want ErrCorrelationIDTooLong", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 9 — priority 0 means "unset", and urgent is reachable
+// ---------------------------------------------------------------------------
+
+func TestPriorityOrdering(t *testing.T) {
+	if !(jobs.PriorityUrgent < jobs.DefaultPriority && jobs.DefaultPriority < jobs.PriorityBackground) {
+		t.Fatalf("priorities are not ordered urgent < default < background: %d %d %d",
+			jobs.PriorityUrgent, jobs.DefaultPriority, jobs.PriorityBackground)
+	}
+	// Zero must not be usable as "most urgent": it is the Go zero value and
+	// therefore means unset. PriorityUrgent is how a caller reaches the top.
+	if jobs.PriorityUrgent == 0 {
+		t.Fatal("PriorityUrgent is 0, which is indistinguishable from unset")
 	}
 }

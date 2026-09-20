@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -676,5 +677,94 @@ func TestNegativeVectorSignaturesAreGenuine(t *testing.T) {
 					"it would be rejected for the wrong reason\n got: %s\nwant: %s", v.Signature, want)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Security Finding 6 — no redirect following on the internal hop
+// ---------------------------------------------------------------------------
+
+// Go strips Authorization, WWW-Authenticate and Cookie on a cross-host
+// redirect. It knows nothing about X-Vizra-Signature, X-Vizra-Timestamp or
+// X-Vizra-Nonce, so before the CheckRedirect policy those were forwarded to
+// whatever host the redirect named — handing a valid signature to a third party
+// and turning core into a server-side fetch an attacker steers.
+func TestARedirectIsNeverFollowedAndNoSignatureLeaks(t *testing.T) {
+	var (
+		mu       sync.Mutex
+		second   int
+		sawVizra []string
+	)
+	// The host a compromised or misconfigured search service would send us to.
+	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		second++
+		for k := range r.Header {
+			if strings.HasPrefix(strings.ToLower(k), "x-vizra-") {
+				sawVizra = append(sawVizra, k)
+			}
+		}
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok","results":[],"total":99}`))
+	}))
+	defer attacker.Close()
+
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, attacker.URL+r.URL.Path, http.StatusFound)
+	}))
+	defer redirector.Close()
+
+	s := NewService(NewSQL(), NewRemote(redirector.URL, testKey, 2*time.Second), quietLogger())
+
+	// The read is still served — from SQL.
+	res, err := s.Search(context.Background(), SearchRequest{Query: "sunset"})
+	if err != nil {
+		t.Fatalf("a redirecting search service must still be answered from SQL: %v", err)
+	}
+	if res.Total == 99 {
+		t.Fatal("core used the redirected host's answer")
+	}
+
+	mu.Lock()
+	gotSecond, gotHeaders := second, append([]string(nil), sawVizra...)
+	mu.Unlock()
+	if gotSecond != 0 {
+		t.Fatalf("core made %d request(s) to the redirect target; it must make none", gotSecond)
+	}
+	if len(gotHeaders) > 0 {
+		t.Fatalf("signature headers reached a second host: %v", gotHeaders)
+	}
+	// And the fault is visible, not silent.
+	if got := s.Health(context.Background()); got != HealthDegraded {
+		t.Fatalf("health = %s after a redirect, want degraded", got)
+	}
+}
+
+// The liveness ping must carry the same policy: it is the call Probe makes on a
+// cold client, so a redirect there would be the first request core ever sends.
+func TestPingDoesNotFollowRedirects(t *testing.T) {
+	var second int
+	var mu sync.Mutex
+	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		second++
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer attacker.Close()
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, attacker.URL+"/healthz", http.StatusMovedPermanently)
+	}))
+	defer redirector.Close()
+
+	s := NewService(NewSQL(), NewRemote(redirector.URL, testKey, 2*time.Second), quietLogger())
+	if got := s.Health(context.Background()); got != HealthDegraded {
+		t.Fatalf("health = %s for a search service that 301s its probe, want degraded", got)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if second != 0 {
+		t.Fatalf("ping followed the redirect %d time(s)", second)
 	}
 }

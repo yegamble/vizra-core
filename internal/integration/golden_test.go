@@ -804,3 +804,483 @@ func ptr(s string) *string { return &s }
 func interval(d time.Duration) pgtype.Interval {
 	return pgtype.Interval{Microseconds: d.Microseconds(), Valid: true}
 }
+
+// ---------------------------------------------------------------------------
+// Backend Finding 1 — a crash-looping job must not wedge the queue
+// ---------------------------------------------------------------------------
+
+// Three individually-correct decisions used to combine into a total queue
+// outage: `attempts` is incremented at CLAIM time, the sweep requeued an
+// elapsed lease without touching `attempts`, and jobs_attempts_bounded makes
+// exceeding max_attempts a hard error.
+//
+// After max_attempts worker deaths the row could no longer be claimed, and
+// because the claim subselect orders by (priority, run_after) it was re-selected
+// on every poll — so the claim raised a constraint violation each cycle, the
+// worker logged a transient failure and slept, and every other job for that site
+// was never claimed. One poisoned job, one operator with psql.
+func TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	ctx := t.Context()
+	q := sqlcgen.New(pool)
+
+	// The poison is enqueued FIRST so it sits at the head of the claim order.
+	poison := enqueue(t, pool, jobs.NewJob{Kind: jobs.KindNoop, MaxAttempts: 2, CorrelationID: "poison"})
+	healthy := enqueue(t, pool, jobs.NewJob{Kind: jobs.KindNoop, MaxAttempts: 5, CorrelationID: "healthy"})
+
+	// Simulate a worker that dies mid-job: claim, never record an outcome, let
+	// the lease elapse, sweep. Repeat past max_attempts.
+	for i := range 3 {
+		row, err := q.ClaimJob(ctx, sqlcgen.ClaimJobParams{
+			LeasedBy:      ptr("dying-worker"),
+			LeaseDuration: interval(time.Minute),
+			Kinds:         []string{string(jobs.KindNoop)},
+		})
+		if err != nil {
+			// The bug was a constraint violation here, on cycle 3.
+			if !errors.Is(err, pgx.ErrNoRows) {
+				t.Fatalf("cycle %d: ClaimJob failed: %v\n"+
+					"A claim must never raise jobs_attempts_bounded: the exhausted row is "+
+					"then permanently at the head of the claim order and no other job is ever claimed.", i+1, err)
+			}
+			// No claimable row left is a legitimate outcome once the poison is dead.
+			continue
+		}
+		// The worker dies: the lease elapses with no outcome recorded.
+		if _, err := pool.Exec(ctx,
+			`UPDATE jobs SET leased_until = now() - interval '1 minute' WHERE id = $1`, row.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.SweepExpiredLeases(ctx); err != nil {
+			t.Fatalf("cycle %d: sweep failed: %v", i+1, err)
+		}
+	}
+
+	p, err := q.GetJob(ctx, poison.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.State != "dead" {
+		t.Fatalf("the poison job is %q, want dead. A job whose worker dies max_attempts times must be "+
+			"dead-lettered by the sweep — the retry path never sees it, because no handler ever returned "+
+			"an error.", p.State)
+	}
+	if p.LastError == nil || !strings.Contains(*p.LastError, "lease elapsed") {
+		t.Fatalf("last_error = %v, want it to name lease exhaustion", p.LastError)
+	}
+	if !p.FinishedAt.Valid {
+		t.Fatal("a dead job has no finished_at; retention cannot find it")
+	}
+
+	// The whole point: the job behind it is claimable.
+	h, err := q.ClaimJob(ctx, sqlcgen.ClaimJobParams{
+		LeasedBy: ptr("healthy-worker"), LeaseDuration: interval(time.Minute),
+		Kinds: []string{string(jobs.KindNoop)},
+	})
+	if err != nil {
+		t.Fatalf("the job enqueued behind the poison could not be claimed: %v", err)
+	}
+	if h.ID != healthy.ID {
+		t.Fatalf("claimed %s, want the healthy job %s", h.ID, healthy.ID)
+	}
+	if _, err := q.CompleteJob(ctx, sqlcgen.CompleteJobParams{ID: h.ID, LeasedBy: ptr("healthy-worker")}); err != nil {
+		t.Fatal(err)
+	}
+
+	// And the depth gauge is not stuck.
+	snap, err := jobs.Collect(ctx, pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Depth) != 0 {
+		t.Fatalf("live depth is %v after the crash loop; it must drain", snap.Depth)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 3 — the claim plan must not sort the backlog
+// ---------------------------------------------------------------------------
+
+// Asserts the PROPERTY (no Sort node), not a timing, so it cannot be flaky in
+// CI. With the index ordered (state, run_after, priority) while the claim
+// orders by (priority, run_after), every claim sorted the whole eligible
+// backlog and spilled to disk — and the cost grew with backlog depth, which is
+// exactly when the queue is deepest.
+func TestClaimPlanDoesNotSortTheBacklog(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	ctx := t.Context()
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO jobs (id, kind, payload, state, priority, attempts, max_attempts, run_after, correlation_id, created_at, updated_at)
+		SELECT gen_random_uuid(), 'noop', '{}'::jsonb, 'queued',
+		       (100 + (i % 5))::smallint, 0, 5, now() - (i || ' seconds')::interval,
+		       'bulk-' || i, now(), now()
+		FROM generate_series(1, 10000) AS i`); err != nil {
+		t.Fatalf("seeding 10k queued rows: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `ANALYZE jobs`); err != nil {
+		t.Fatal(err)
+	}
+
+	var plan string
+	err := pool.QueryRow(ctx, `
+		EXPLAIN (FORMAT JSON)
+		SELECT id FROM jobs
+		WHERE state = 'queued'
+		  AND run_after <= now()
+		  AND attempts < max_attempts
+		  AND kind = ANY(ARRAY['noop']::text[])
+		ORDER BY priority, run_after
+		LIMIT 1`).Scan(&plan)
+	if err != nil {
+		t.Fatalf("EXPLAIN: %v", err)
+	}
+	t.Logf("claim plan:\n%s", plan)
+
+	if strings.Contains(plan, `"Sort`) {
+		t.Fatalf("the claim plan contains a Sort node at 10k queued rows.\n"+
+			"Every claim would sort the whole eligible backlog and spill to disk.\n%s", plan)
+	}
+	if !strings.Contains(plan, "jobs_claim") {
+		t.Fatalf("the claim plan does not use jobs_claim:\n%s", plan)
+	}
+}
+
+// The partial predicate is load-bearing: the index must not carry terminal rows.
+func TestClaimIndexExcludesTerminalRows(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	var def string
+	if err := pool.QueryRow(t.Context(),
+		`SELECT indexdef FROM pg_indexes WHERE indexname = 'jobs_claim'`).Scan(&def); err != nil {
+		t.Fatalf("jobs_claim does not exist: %v", err)
+	}
+	t.Logf("jobs_claim = %s", def)
+	if !strings.Contains(def, "WHERE") || !strings.Contains(def, "queued") {
+		t.Fatalf("jobs_claim is not partial on state='queued'; it would index every "+
+			"succeeded, failed and dead row for the whole retention window:\n%s", def)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 4 — the bound is in the DATABASE, not only in the caller
+// ---------------------------------------------------------------------------
+
+func TestEnqueueRefusesAnUnboundedPayload(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	ctx := t.Context()
+
+	t.Run("the Go error", func(t *testing.T) {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		_, err = jobs.Enqueue(ctx, tx, jobs.NewJob{
+			Kind: jobs.KindNoop, CorrelationID: "c1",
+			Payload: map[string]string{"blob": strings.Repeat("x", jobs.MaxPayloadBytes)},
+		})
+		if !errors.Is(err, jobs.ErrPayloadTooLarge) {
+			t.Fatalf("err = %v, want ErrPayloadTooLarge", err)
+		}
+		// And no row was written.
+		var n int64
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM jobs`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Fatalf("%d row(s) written despite the refusal", n)
+		}
+	})
+
+	// The half that proves the bound is not only in this caller. A future
+	// writer — a migration script, another service, psql — hits the same wall.
+	t.Run("a raw INSERT is rejected by the database", func(t *testing.T) {
+		_, err := pool.Exec(ctx, `
+			INSERT INTO jobs (id, kind, payload, state, priority, attempts, max_attempts, run_after, correlation_id, created_at, updated_at)
+			VALUES (gen_random_uuid(), 'noop', jsonb_build_object('blob', repeat('x', 100000)),
+			        'queued', 100, 0, 5, now(), 'c1', now(), now())`)
+		if err == nil {
+			t.Fatal("the database accepted a 100 KB payload; jobs_payload_bounded is not enforcing")
+		}
+		if !strings.Contains(err.Error(), "jobs_payload_bounded") {
+			t.Fatalf("rejected for the wrong reason: %v", err)
+		}
+	})
+
+	t.Run("an oversized kind and correlation_id are rejected", func(t *testing.T) {
+		_, err := pool.Exec(ctx, `
+			INSERT INTO jobs (id, kind, payload, state, priority, attempts, max_attempts, run_after, correlation_id, created_at, updated_at)
+			VALUES (gen_random_uuid(), repeat('k', 200), '{}'::jsonb, 'queued', 100, 0, 5, now(), 'c1', now(), now())`)
+		if err == nil || !strings.Contains(err.Error(), "jobs_kind_bounded") {
+			t.Fatalf("a 200-character kind: %v", err)
+		}
+		_, err = pool.Exec(ctx, `
+			INSERT INTO jobs (id, kind, payload, state, priority, attempts, max_attempts, run_after, correlation_id, created_at, updated_at)
+			VALUES (gen_random_uuid(), 'noop', '{}'::jsonb, 'queued', 100, 0, 5, now(), repeat('c', 500), now(), now())`)
+		if err == nil || !strings.Contains(err.Error(), "jobs_correlation_bounded") {
+			t.Fatalf("a 500-character correlation_id: %v", err)
+		}
+	})
+
+	// A payload comfortably under the limit still works, so the bound does not
+	// break the normal path.
+	t.Run("a normal payload is accepted", func(t *testing.T) {
+		out := enqueue(t, pool, jobs.NewJob{
+			Kind: jobs.KindNoop, CorrelationID: "c-ok",
+			Payload: map[string]any{"asset_id": "abc", "version": 3},
+		})
+		if out.ID.String() == "" {
+			t.Fatal("a normal enqueue failed")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 7 — a graceful shutdown must RECORD the outcome
+// ---------------------------------------------------------------------------
+
+// Before the fix the handler ran to completion on SIGTERM (correct) and then
+// every outcome write failed instantly with "context canceled": the row stayed
+// `leased`, the sweep requeued it two minutes later, and it ran AGAIN. Every
+// rolling deploy re-delivered every in-flight job.
+func TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob(t *testing.T) {
+	_, resolver, pool := freshDatabase(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	release := make(chan struct{})
+	started := make(chan struct{}, 1)
+
+	w := jobs.NewWorker(resolver, map[string]*pgxpool.Pool{"default": pool}, nil, jobs.Options{
+		Lease: 30 * time.Second, Timeout: 30 * time.Second, Concurrency: 1,
+		PollInterval: 50 * time.Millisecond, SweepInterval: time.Hour,
+		DrainGrace: 15 * time.Second, WorkerID: "shutdown-worker",
+	})
+	w.Register("blocking", func(hctx context.Context, j jobs.Claimed) error {
+		started <- struct{}{}
+		<-release
+		return nil
+	})
+
+	stopped := make(chan struct{})
+	go func() { _ = w.Run(ctx); close(stopped) }()
+
+	j := enqueue(t, pool, jobs.NewJob{Kind: "blocking", CorrelationID: "drain"})
+	select {
+	case <-started:
+	case <-time.After(20 * time.Second):
+		t.Fatal("the handler never started")
+	}
+
+	// SIGTERM arrives while the job is in flight.
+	cancel()
+	time.Sleep(200 * time.Millisecond)
+	close(release)
+
+	select {
+	case <-stopped:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the worker did not stop within the drain grace")
+	}
+
+	q := sqlcgen.New(pool)
+	row, err := q.GetJob(context.Background(), j.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.State != "succeeded" {
+		t.Fatalf("after a graceful shutdown the job is %q, want succeeded.\n"+
+			"A drain that runs the handler and then cannot record the result is worse than no drain: "+
+			"it pays the shutdown latency AND redelivers.", row.State)
+	}
+
+	// And the sweep has nothing to reclaim, so the next deploy does not
+	// re-deliver it.
+	reclaimed, err := q.SweepExpiredLeases(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reclaimed) != 0 {
+		t.Fatalf("the sweep reclaimed %d row(s) after a graceful restart; it must reclaim none", len(reclaimed))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 8 — an actual ladder walk, and worker-level crash recovery
+// ---------------------------------------------------------------------------
+
+// The previous retry test enqueued with MaxAttempts 1, so RetryJob's
+// `attempts < max_attempts` guard was false on the first failure and the job
+// went straight to dead — the backoff path was never executed against a
+// database despite the test being named for it.
+func TestRetryLadderActuallyWalksTheLadder(t *testing.T) {
+	_, resolver, pool := freshDatabase(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+
+	var mu sync.Mutex
+	calls := 0
+	w := jobs.NewWorker(resolver, map[string]*pgxpool.Pool{"default": pool}, nil, jobs.Options{
+		Lease: 10 * time.Second, Timeout: 10 * time.Second, Concurrency: 1,
+		PollInterval: 50 * time.Millisecond, SweepInterval: time.Hour,
+		WorkerID: "ladder-worker",
+	})
+	w.Register("flaky", func(context.Context, jobs.Claimed) error {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		return errors.New("transient")
+	})
+	go func() { _ = w.Run(ctx) }()
+
+	j := enqueue(t, pool, jobs.NewJob{Kind: "flaky", MaxAttempts: 3, CorrelationID: "ladder"})
+	q := sqlcgen.New(pool)
+
+	// First failure: back to queued, attempts 1, run_after pushed out along the
+	// ladder — which is the assertion the old test could not make.
+	waitFor(t, ctx, func() bool {
+		row, err := q.GetJob(ctx, j.ID)
+		return err == nil && row.State == "queued" && row.Attempts == 1
+	}, "the first failure to requeue with attempts=1")
+
+	row, err := q.GetJob(ctx, j.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !row.RunAfter.Time.After(time.Now().Add(10 * time.Second)) {
+		t.Fatalf("run_after = %v; the first ladder step is 30s, so it must be pushed well into the future",
+			row.RunAfter.Time)
+	}
+	if row.LastError == nil || !strings.Contains(*row.LastError, "transient") {
+		t.Fatalf("last_error = %v, want the handler's cause", row.LastError)
+	}
+
+	// Drive the remaining attempts without waiting out the real backoff.
+	for range 2 {
+		if _, err := pool.Exec(ctx, `UPDATE jobs SET run_after = now() WHERE id = $1 AND state = 'queued'`, j.ID); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(400 * time.Millisecond)
+	}
+	waitFor(t, ctx, func() bool {
+		row, err := q.GetJob(ctx, j.ID)
+		return err == nil && row.State == "dead"
+	}, "the exhausted job to be dead-lettered")
+
+	mu.Lock()
+	got := calls
+	mu.Unlock()
+	if got < 3 {
+		t.Fatalf("the handler ran %d time(s); MaxAttempts 3 must walk the ladder, not skip it", got)
+	}
+}
+
+// A worker-level crash recovery: the sweep STATEMENT was tested, but never that
+// a job whose worker died is subsequently re-claimed and completed by a worker.
+func TestAJobWhoseWorkerDiedIsReclaimedAndCompleted(t *testing.T) {
+	_, resolver, pool := freshDatabase(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+	q := sqlcgen.New(pool)
+
+	j := enqueue(t, pool, jobs.NewJob{Kind: jobs.KindNoop, MaxAttempts: 5, CorrelationID: "recover"})
+
+	// A worker claims it and dies without recording anything.
+	if _, err := q.ClaimJob(ctx, sqlcgen.ClaimJobParams{
+		LeasedBy: ptr("dead-worker"), LeaseDuration: interval(time.Minute),
+		Kinds: []string{string(jobs.KindNoop)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE jobs SET leased_until = now() - interval '1 minute' WHERE id = $1`, j.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// A live worker, with a fast sweep, recovers it end to end.
+	w := jobs.NewWorker(resolver, map[string]*pgxpool.Pool{"default": pool}, nil, jobs.Options{
+		Lease: 10 * time.Second, Timeout: 10 * time.Second, Concurrency: 1,
+		PollInterval: 50 * time.Millisecond, SweepInterval: 300 * time.Millisecond,
+		WorkerID: "recovery-worker",
+	})
+	go func() { _ = w.Run(ctx) }()
+
+	waitFor(t, ctx, func() bool {
+		row, err := q.GetJob(ctx, j.ID)
+		return err == nil && row.State == "succeeded"
+	}, "the abandoned job to be swept, re-claimed and completed")
+}
+
+// ---------------------------------------------------------------------------
+// Backend Finding 5 and 6 — schema invariants
+// ---------------------------------------------------------------------------
+
+func TestSitesIsASingleton(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	ctx := t.Context()
+
+	_, err := pool.Exec(ctx,
+		`INSERT INTO sites (id, handle, base_url) VALUES ($1, 'a-test', 'https://a.example')`, uuid.New())
+	if err == nil {
+		t.Fatal("a second site row was accepted.\n" +
+			"privacy_mode is step (1) of the frozen precedence matrix, so a second row makes the " +
+			"answer depend on which handle sorts first — a private site with handle 'z-main' would " +
+			"lose to an accidental 'a-test' row defaulting to 'public'.")
+	}
+	if !strings.Contains(err.Error(), "sites_singleton") {
+		t.Fatalf("rejected for the wrong reason: %v", err)
+	}
+
+	// And the read is still correct with the one row.
+	s, err := sqlcgen.New(pool).GetDefaultSite(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Handle != "default" {
+		t.Fatalf("GetDefaultSite returned %q", s.Handle)
+	}
+}
+
+func TestAuditEventsRefusesAFullIPAddress(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	ctx := t.Context()
+
+	insert := func(v any) error {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO audit_events (id, actor_kind, action, subject_type, ip_prefix)
+			 VALUES ($1, 'system', 'test', 'site', $2)`, uuid.New(), v)
+		return err
+	}
+
+	t.Run("a full address is refused", func(t *testing.T) {
+		for _, addr := range []string{
+			"203.0.113.47",
+			"203.0.113.47/32",
+			"192.168.1.1",
+			"2001:db8::1",
+			"2001:db8:0:0:0:0:0:dead",
+		} {
+			if err := insert(addr); err == nil {
+				t.Errorf("ip_prefix accepted the full address %q; the migration promises a truncated "+
+					"prefix only, and the first M1 caller that passes c.RealIP() would store this", addr)
+			} else if !strings.Contains(err.Error(), "audit_events_ip_prefix_shape") {
+				t.Errorf("%q rejected for the wrong reason: %v", addr, err)
+			}
+		}
+	})
+
+	t.Run("a truncated prefix is accepted", func(t *testing.T) {
+		for _, prefix := range []string{
+			"203.0.113.0", "203.0.113.0/24", "2001:db8::", "2001:db8::/48", "2001:db8::/64",
+		} {
+			if err := insert(prefix); err != nil {
+				t.Errorf("ip_prefix refused the truncated prefix %q: %v", prefix, err)
+			}
+		}
+	})
+
+	t.Run("null is accepted", func(t *testing.T) {
+		if err := insert(nil); err != nil {
+			t.Errorf(`"no IP available" must be representable: %v`, err)
+		}
+	})
+}

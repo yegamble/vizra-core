@@ -14,6 +14,7 @@
 # rather than quietly shrinking the gate — see
 # docs/evidence/warroom/2026-09-20-vizra-user-pr1-skeleton-SECURITY.md Finding 2.
 
+append-only
 build-test
 cache-matrix
 govulncheck

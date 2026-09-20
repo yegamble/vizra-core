@@ -297,6 +297,14 @@ components:
         `MAX_INTERNAL_BODY_BYTES` (default 1 MiB) is rejected with 413 *before*
         it is read.
 
+        **Who enforces what.** `MAX_INTERNAL_BODY_BYTES` is configured and
+        enforced by `vizra-search`, which is the SERVER of these routes. It is
+        deliberately NOT a `vizra-core` configuration key: core is the client,
+        and an operator-settable knob in core that changed nothing would be a
+        promise the software does not keep. Core bounds the other direction —
+        the RESPONSE it will read from search — at a fixed 8 MiB, in
+        `internal/search/remote.go`.
+
         The signature comparison is constant-time.
 
         Rejection is always 401 with body

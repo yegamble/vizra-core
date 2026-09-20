@@ -111,6 +111,9 @@ func New(deps Deps) *Server {
 	// body carries one; then the single Host -> site middleware (Q-008 checklist
 	// item 2); then the route attribute for tracing.
 	e.Pre(requestIDMiddleware())
+	// Before the site middleware, so a request rejected there still carries the
+	// hardening headers.
+	e.Use(securityHeadersMiddleware())
 	e.Use(siteMiddleware(deps.Resolver, deps.Logger))
 	e.Use(routeAttributeMiddleware())
 

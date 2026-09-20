@@ -62,12 +62,11 @@ type Config struct {
 	CORSAllowedOrigins  []string
 	AllowInsecureOrigin bool
 
-	QueueAgeThreshold    time.Duration
-	MaxInternalBodyBytes int64
-	WorkerConcurrency    int
-	JobLease             time.Duration
-	JobTimeout           time.Duration
-	ShutdownGrace        time.Duration
+	QueueAgeThreshold time.Duration
+	WorkerConcurrency int
+	JobLease          time.Duration
+	JobTimeout        time.Duration
+	ShutdownGrace     time.Duration
 }
 
 // Lookup is os.LookupEnv, or any equivalent over a candidate env file.
@@ -127,6 +126,17 @@ var knownDevSecrets = []string{
 	"test", "testing", "todo", "vizra", "vizra-dev", "xxx", "0000", "1234",
 }
 
+// isPublishedSecret reports an exact match against a value this repository
+// publishes. Exact, not substring: these are known strings, not a heuristic.
+func isPublishedSecret(v string) bool {
+	for _, p := range knownPublishedSecrets {
+		if v == p {
+			return true
+		}
+	}
+	return false
+}
+
 func looksLikeDevSecret(v string) bool {
 	l := strings.ToLower(v)
 	for _, bad := range knownDevSecrets {
@@ -140,6 +150,39 @@ func looksLikeDevSecret(v string) bool {
 }
 
 const minSecretBytes = 32
+
+// knownPublishedSecrets are values this repository PUBLISHES. They are refused
+// in production by exact match, at any length, regardless of what the substring
+// heuristic thinks.
+//
+// The heuristic cannot see them: they are 32 bytes and match no English word.
+// But the first one is the key in api/search-hmac-testvectors.json — the file
+// that documents the very key it is for, with the field named `key_utf8` next
+// to a working example. That is where an operator wiring up search will look,
+// and a core<->search channel signed with a key anyone can read from the
+// repository is a full compromise of that boundary: the contract carries viewer
+// identity and an index-events endpoint, and there is no nonce store yet.
+//
+// Refusing three exact strings costs four lines. The general problem — "you
+// cannot denylist the internet" — is unsolvable; this specific one is nearly
+// free, because we published these ourselves.
+//
+// TestProductionRefusesPublishedTestKeys reads the first value FROM the vectors
+// file at test time, so editing that file without updating this list is red.
+var knownPublishedSecrets = []string{
+	// api/search-hmac-testvectors.json, field "key_utf8".
+	"Ar4Lo8Cq2Ei6Uk0Wn3Sv7Yb1Md5Pt9Xz",
+	// internal/search/search_test.go, testKey.
+	"Aa1Bb2Cc3Dd4Aa1Bb2Cc3Dd4Aa1Bb2Cc",
+}
+
+// KnownPublishedSecrets returns a copy, so a test can assert its own fixtures
+// do not collide with the denylist.
+func KnownPublishedSecrets() []string {
+	out := make([]string, len(knownPublishedSecrets))
+	copy(out, knownPublishedSecrets)
+	return out
+}
 
 // LoadFrom is the one validator. Boot, setup, doctor and CI all reach the
 // fail-secure block through here.
@@ -192,14 +235,10 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 	c.JobLease = mustDuration(get, bad, "VIZRA_JOB_LEASE")
 	c.JobTimeout = mustDuration(get, bad, "VIZRA_JOB_TIMEOUT")
 	c.ShutdownGrace = mustDuration(get, bad, "VIZRA_SHUTDOWN_GRACE")
-	c.MaxInternalBodyBytes = mustInt64(get, bad, "VIZRA_MAX_INTERNAL_BODY_BYTES")
 	c.WorkerConcurrency = int(mustInt64(get, bad, "VIZRA_WORKER_CONCURRENCY"))
 
 	if c.WorkerConcurrency < 1 {
 		bad("VIZRA_WORKER_CONCURRENCY", "must be at least 1")
-	}
-	if c.MaxInternalBodyBytes < 1024 {
-		bad("VIZRA_MAX_INTERNAL_BODY_BYTES", "must be at least 1024")
 	}
 	if c.JobLease > 0 && c.JobTimeout > 0 && c.JobTimeout <= c.JobLease {
 		bad("VIZRA_JOB_TIMEOUT", "must exceed VIZRA_JOB_LEASE, or a running job loses its lease before it can finish")
@@ -244,9 +283,17 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		} else if u, err := url.Parse(c.SearchURL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
 			bad("VIZRA_SEARCH_URL", "must be an absolute http or https URL")
 		}
-		if len(c.SearchHMACKey) < minSecretBytes {
+		switch {
+		case len(c.SearchHMACKey) < minSecretBytes:
 			bad("VIZRA_SEARCH_HMAC_KEY", fmt.Sprintf("must be at least %d bytes when VIZRA_SEARCH_MODE is not 'off'", minSecretBytes))
-		} else if production && looksLikeDevSecret(c.SearchHMACKey) {
+		case production && isPublishedSecret(c.SearchHMACKey):
+			// Named first and specifically: this is the value an operator is
+			// most likely to have copied, and the message has to tell them why
+			// it will not do — without echoing it.
+			bad("VIZRA_SEARCH_HMAC_KEY",
+				"this value is published in this repository (api/search-hmac-testvectors.json is a TEST VECTOR, not a configuration value). "+
+					"Generate a real key: openssl rand -base64 32")
+		case production && looksLikeDevSecret(c.SearchHMACKey):
 			bad("VIZRA_SEARCH_HMAC_KEY", "production refuses a known development value")
 		}
 	}
@@ -264,6 +311,11 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 			case k.val == "":
 				// ADR-003: an unset MFA KEK is a boot refusal, never a warning.
 				bad(k.name, "must be set in production")
+			case isPublishedSecret(k.val):
+				// Checked BEFORE the length rule: a published value is refused
+				// at any length, and the operator needs the specific reason.
+				bad(k.name, "this value is published in this repository and must never be a production secret. "+
+					"Generate a real one: openssl rand -base64 32")
 			case len(k.val) < minSecretBytes:
 				bad(k.name, fmt.Sprintf("must be at least %d bytes in production; got %d", minSecretBytes, len(k.val)))
 			case looksLikeDevSecret(k.val):
@@ -282,8 +334,31 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		}
 
 		// Every dev escape hatch, refused by name.
+		//
+		// Two rules, because not every hatch is a boolean. A BOOLEAN hatch is
+		// refused when truthy, which preserves the deliberate affordance of a
+		// shared template that lists the hatches set to 0. A VALUE-BEARING
+		// hatch — VIZRA_DEV_AUTOLOGIN_USER, whose documented value is a
+		// username — is refused on PRESENCE with any non-empty value, because
+		// no realistic setting of it is "truthy" and testing truthiness meant
+		// it was never refused at all.
 		for _, h := range EscapeHatches {
-			if v, ok := lookup(h.Name); ok && truthy(strings.TrimSpace(v)) {
+			raw, ok := lookup(h.Name)
+			if !ok {
+				continue
+			}
+			switch {
+			case h.RefuseIfPresent:
+				// Only a COMPLETELY empty value is tolerated, so an operator may
+				// leave the key in a template with nothing after the `=`.
+				// Whitespace is refused rather than trimmed away: `KEY= ` is
+				// ambiguous, and the fail-secure reading of an ambiguous env
+				// file is that the hatch is set. The value is never echoed — it
+				// may name a real account.
+				if raw != "" {
+					bad(h.Name, "is a development-only escape hatch that carries a value, and must not be present in production")
+				}
+			case truthy(strings.TrimSpace(raw)):
 				bad(h.Name, "is a development-only escape hatch and must not be set in production")
 			}
 		}

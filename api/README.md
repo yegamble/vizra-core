@@ -26,6 +26,35 @@ reasons that are not style preferences:
 repositories cannot drift. **Change it here first**; the search repository's
 drift check then forces the follow-up PR.
 
+## The HMAC test vectors are NOT a configuration value
+
+`search-hmac-testvectors.json` pins the exact bytes both repositories must sign.
+Its `key_utf8` field is a **test vector**. It must never be used as
+`VIZRA_SEARCH_HMAC_KEY`, in any environment an outsider can reach.
+
+This is not only documentation: `internal/config` refuses that exact value in
+production, by exact match, along with every other key this repository
+publishes (`knownPublishedSecrets`). Documentation is not the control; the
+refusal is. But the label costs nothing, and this file is where an operator
+wiring up search will look.
+
+Generate a real key:
+
+```sh
+openssl rand -base64 32
+```
+
+The file also carries `negative_vectors` — cases that must be REJECTED. They
+matter more than the accept cases: agreeing on what is accepted while
+disagreeing on what is rejected is how two implementations of one scheme
+diverge, and it had already happened once.
+
+## Who enforces the body limit
+
+`MAX_INTERNAL_BODY_BYTES` belongs to `vizra-search`, which serves these routes.
+`vizra-core` is the client and has no such key — it bounds the response it will
+read, at a fixed 8 MiB.
+
 ## Changing a contract
 
 `api/openapi.yaml` and `migrations/` have one owner per slice: the `vizra-core`

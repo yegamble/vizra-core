@@ -152,7 +152,14 @@ type Resource struct {
 	Visibility Visibility
 	// AlbumPrivacy governs ActionAlbumPage. Empty defaults to AlbumPublic.
 	AlbumPrivacy AlbumPrivacy
-	// DownloadSetting is the owner's setting for row 2. Empty defaults to DownloadAll.
+	// DownloadSetting is the owner's setting for row 2. Empty means DownloadAll.
+	//
+	// This default is DELIBERATELY the permissive one, unlike Visibility and
+	// AlbumPrivacy above which deny when unset. The asymmetry is not an
+	// oversight: DownloadSetting only ever NARROWS a decision already made by
+	// visibility, its permissive end is the ADR-007 row-2 product default, and
+	// the column will be NOT NULL DEFAULT 'all'. Visibility is the decision
+	// itself; this is a modifier on it.
 	DownloadSetting DownloadSetting
 	// Scope distinguishes a site read from the owner's own library (row 9).
 	Scope Scope
@@ -188,6 +195,9 @@ type Reason string
 
 const (
 	ReasonSurfaceNotInMatrix Reason = "surface_not_in_matrix"
+	// ReasonVisibilityUnknown covers an unset or unrecognised Visibility, and an
+	// unset or unrecognised AlbumPrivacy on the album page. Both deny.
+	ReasonVisibilityUnknown  Reason = "visibility_unknown"
 	ReasonSitePrivate        Reason = "site_private_anonymous"
 	ReasonPublic             Reason = "public"
 	ReasonOwner              Reason = "owner"
@@ -222,7 +232,19 @@ func NewEvaluator(opts Options) *Evaluator { return &Evaluator{opts: opts} }
 
 // HideExistence reports whether a denial must be rendered as 404 rather than
 // 403: private resources return 404 to non-viewers, hiding existence (ADR-003).
-func HideExistence(r Resource) bool { return r.Visibility == VisibilityPrivate }
+//
+// Anything that is NOT public or unlisted hides existence, not just `private`.
+// A denial on an unset or unrecognised visibility rendered as 403 would confirm
+// the row exists — which is the leak the 404 convention is for — and an unknown
+// state is exactly when we know least about what we are allowed to reveal.
+func HideExistence(r Resource) bool {
+	switch r.Visibility {
+	case VisibilityPublic, VisibilityUnlisted:
+		return false
+	default:
+		return true
+	}
+}
 
 // Decide is the signature ADR-003 fixes. ctx is accepted so the evaluator can
 // carry a deadline and audit correlation when decisions become audit events;
@@ -244,9 +266,29 @@ func (e *Evaluator) Decide(ctx context.Context, subject Subject, action Action, 
 
 	owner := resource.OwnerID != "" && subject.UserID == resource.OwnerID
 	staff := subject.Staff && subject.Role.AtLeast(RoleManager)
+
+	// The visibility is the SUBJECT of the decision, so an unset or
+	// unrecognised one denies — it is never normalised to a default.
+	//
+	// This is the mistake the evaluator exists to catch. A NULL column scanned
+	// into a string, a struct populated before the visibility join lands, a
+	// hydration path that fills OwnerID first: each produces a Resource whose
+	// visibility was never assigned. Defaulting that to public made the one
+	// evaluator every read surface calls fail OPEN — including on
+	// federation_outbound and ipfs_publication, where AGENTS.md says private
+	// media must never reach. A caller bug that denies is a 404 in staging; a
+	// caller bug that allows is a private photo on the fediverse.
+	//
+	// It also covers a visibility a FUTURE migration adds ("scheduled",
+	// "moderated") being read by an older binary during a rolling deploy.
+	//
+	// ADR-007 ruling 5 says DENY for any surface not in the table; the same
+	// reasoning applies to any INPUT not in it.
 	vis := resource.Visibility
-	if vis == "" {
-		vis = VisibilityPublic
+	switch vis {
+	case VisibilityPublic, VisibilityUnlisted, VisibilityPrivate:
+	default:
+		return Deny, ReasonVisibilityUnknown
 	}
 
 	switch k {
@@ -276,9 +318,13 @@ func (e *Evaluator) Decide(ctx context.Context, subject Subject, action Action, 
 		return Deny, ReasonSiteOwnerRequired
 
 	case kindAlbum: // row 4 — album privacy governs, not item visibility
+		// Same rule as visibility above, for the same reason: this field IS the
+		// decision for this surface, so an unset or unrecognised value denies.
 		priv := resource.AlbumPrivacy
-		if priv == "" {
-			priv = AlbumPublic
+		switch priv {
+		case AlbumPublic, AlbumPrivate, AlbumLink, AlbumPassword:
+		default:
+			return Deny, ReasonVisibilityUnknown
 		}
 		if owner {
 			return Allow, ReasonOwner

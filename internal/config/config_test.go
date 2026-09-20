@@ -1,6 +1,9 @@
 package config
 
 import (
+	"encoding/json"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -16,7 +19,7 @@ import (
 // credential to a scanner and to a reviewer, and the test needs neither
 // randomness nor secrecy — only length and the absence of a banned substring.
 func placeholderSecret(n int) string {
-	return strings.Repeat("Aa1Bb2Cc3Dd4", (n/12)+1)[:n]
+	return strings.Repeat("Vz9Kp4Mw2Ng7", (n/12)+1)[:n]
 }
 
 func validProduction() map[string]string {
@@ -159,8 +162,14 @@ func TestEveryEscapeHatchIsRefusedInProduction(t *testing.T) {
 	for _, h := range EscapeHatches {
 		t.Run(h.Name, func(t *testing.T) {
 			requireProblem(t, h.Name, "true", h.Name)
-			// A falsey value is not a refusal: an operator may leave the key
-			// present and set to 0 in a shared template.
+			if h.RefuseIfPresent {
+				// A value-bearing hatch is refused on PRESENCE, so there is no
+				// tolerated value. TestValueBearingEscapeHatchIsRefusedWhenPresent
+				// covers it.
+				return
+			}
+			// For a BOOLEAN hatch a falsey value is not a refusal: an operator
+			// may leave the key present and set to 0 in a shared template.
 			env := validProduction()
 			env[h.Name] = "false"
 			if _, err := LoadFrom(lookupOf(env)); err != nil {
@@ -258,5 +267,164 @@ func TestRegistryHasNoDuplicateKeys(t *testing.T) {
 			t.Errorf("duplicate configuration key %s", k.Name)
 		}
 		seen[k.Name] = true
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Security Finding 2 — the key this repository PUBLISHES is not a production secret
+// ---------------------------------------------------------------------------
+
+// api/search-hmac-testvectors.json is where an operator wiring up search WILL
+// look: it is the file that documents the very key it is for, and the field is
+// named `key_utf8` next to a working example. The substring denylist cannot see
+// it — it is 32 bytes and matches no English word — so production used to
+// accept it, and a core<->search channel signed with a key anyone can read from
+// the repository is a full compromise of that boundary.
+//
+// The value is READ FROM THE VECTORS FILE at test time rather than duplicated
+// here, so editing the vectors file without updating the refusal turns this
+// red instead of silently un-covering it.
+func publishedHMACKey(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile("../../api/search-hmac-testvectors.json")
+	if err != nil {
+		t.Fatalf("the vectors file is missing: %v", err)
+	}
+	var vf struct {
+		KeyUTF8 string `json:"key_utf8"`
+	}
+	if err := json.Unmarshal(raw, &vf); err != nil {
+		t.Fatalf("parsing the vectors file: %v", err)
+	}
+	if vf.KeyUTF8 == "" {
+		t.Fatal("the vectors file has no key_utf8")
+	}
+	return vf.KeyUTF8
+}
+
+func TestProductionRefusesPublishedTestKeys(t *testing.T) {
+	published := publishedHMACKey(t)
+
+	t.Run("as the search HMAC key", func(t *testing.T) {
+		env := validProduction()
+		env["VIZRA_SEARCH_MODE"] = "managed"
+		env["VIZRA_SEARCH_URL"] = "http://search:8081"
+		env["VIZRA_SEARCH_HMAC_KEY"] = published
+
+		_, err := LoadFrom(lookupOf(env))
+		ve, ok := AsValidationError(err)
+		if !ok || !ve.Has("VIZRA_SEARCH_HMAC_KEY") {
+			t.Fatalf("production ACCEPTED the key published in api/search-hmac-testvectors.json. "+
+				"An operator who copies it out of that file gets a channel signed with a key anyone "+
+				"can read from the repository. err = %v", err)
+		}
+		if strings.Contains(err.Error(), published) {
+			t.Fatalf("the refusal echoed the key: %v", err)
+		}
+	})
+
+	// The same value must be refused wherever a secret is expected, not only in
+	// the field it happens to belong to.
+	for _, key := range []string{"VIZRA_SESSION_SECRET", "VIZRA_MFA_KEY_KEK"} {
+		t.Run("as "+key, func(t *testing.T) {
+			requireProblem(t, key, published, key)
+		})
+	}
+
+	// Every in-repo test key, not only the published one.
+	for _, key := range []string{"VIZRA_SESSION_SECRET", "VIZRA_MFA_KEY_KEK"} {
+		t.Run("the search package test key as "+key, func(t *testing.T) {
+			requireProblem(t, key, strings.Repeat("Aa1Bb2Cc3Dd4", 3)[:32], key)
+		})
+	}
+
+	// Development must still accept them, or the vectors stop being usable.
+	t.Run("development still accepts them", func(t *testing.T) {
+		env := map[string]string{
+			"DATABASE_URL":          "postgres://localhost:5432/vizra",
+			"VIZRA_SEARCH_MODE":     "managed",
+			"VIZRA_SEARCH_URL":      "http://search:8081",
+			"VIZRA_SEARCH_HMAC_KEY": published,
+			"VIZRA_SESSION_SECRET":  published,
+		}
+		if err := CheckEnv(env); err != nil {
+			t.Fatalf("development refused the test vectors' key; the vectors must stay usable: %v", err)
+		}
+	})
+}
+
+// The baseline this suite uses must not itself be on the denylist, or every
+// other test in the file would be passing for the wrong reason.
+func TestTheTestBaselineIsNotAPublishedSecret(t *testing.T) {
+	for _, n := range []int{31, 32, 40} {
+		v := placeholderSecret(n)
+		for _, published := range KnownPublishedSecrets() {
+			if v == published {
+				t.Fatalf("placeholderSecret(%d) collides with a published secret; "+
+					"validProduction() would be refused and every negative test would pass vacuously", n)
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Security Finding 3 — a hatch that carries a VALUE is never truthy
+// ---------------------------------------------------------------------------
+
+// VIZRA_DEV_AUTOLOGIN_USER's documented value is a USERNAME. The production
+// refusal tested truthiness, so no realistic setting of it was ever refused —
+// and the old test actively cemented the hole by asserting that a non-truthy
+// value MUST boot.
+//
+// The consumer arrives in M1 with sessions. VIZRA_DEV_AUTOLOGIN_USER=owner in a
+// production env file would then sign every request in as the site owner, and
+// authz would correctly allow everything.
+func TestValueBearingEscapeHatchIsRefusedWhenPresent(t *testing.T) {
+	for _, v := range []string{"alice", "owner", "0", "false", "off", "no", "1", "true", " ", "-"} {
+		t.Run(strconv.Quote(v), func(t *testing.T) {
+			requireProblem(t, "VIZRA_DEV_AUTOLOGIN_USER", v, "VIZRA_DEV_AUTOLOGIN_USER")
+		})
+	}
+	// Present but empty is not "set": an operator may leave the key in a
+	// template with no value.
+	env := validProduction()
+	env["VIZRA_DEV_AUTOLOGIN_USER"] = ""
+	if _, err := LoadFrom(lookupOf(env)); err != nil {
+		t.Fatalf("an empty value must not refuse boot: %v", err)
+	}
+}
+
+// Drives every hatch from a per-hatch value table rather than the literal
+// "true", so a hatch whose realistic value is not a boolean cannot slip through
+// again.
+func TestEveryEscapeHatchIsRefusedForItsRealisticValues(t *testing.T) {
+	// The values an operator would actually write for each hatch.
+	realistic := map[string][]string{
+		"VIZRA_DEV_AUTOLOGIN_USER": {"alice", "owner", "0", "false"},
+	}
+	const booleanDefault = "true"
+
+	for _, h := range EscapeHatches {
+		values, ok := realistic[h.Name]
+		if !ok {
+			values = []string{booleanDefault, "1", "yes", "on"}
+		}
+		for _, v := range values {
+			t.Run(h.Name+"="+strconv.Quote(v), func(t *testing.T) {
+				requireProblem(t, h.Name, v, h.Name)
+			})
+		}
+		if h.RefuseIfPresent {
+			continue
+		}
+		// A BOOLEAN hatch keeps the deliberate affordance: a shared template may
+		// list it set to a falsey value.
+		t.Run(h.Name+"=false tolerated", func(t *testing.T) {
+			env := validProduction()
+			env[h.Name] = "false"
+			if _, err := LoadFrom(lookupOf(env)); err != nil {
+				t.Fatalf("%s=false must not refuse boot: %v", h.Name, err)
+			}
+		})
 	}
 }

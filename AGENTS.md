@@ -26,7 +26,12 @@ openapi-verify  sqlc-verify  ci-guard  test-race
 
 A missing tool is a FAILURE, never a silent skip. `make sqlc-verify` without
 sqlc installed exits 1 and says the lane is BLOCKED — because a lane that did
-not run is not a pass.
+not run is not a pass. The same applies to `python3` and PyYAML, which the gate
+guard needs.
+
+CI adds two lanes `make ci` cannot run locally: `append-only`, which diffs the
+migration manifest against the merge base (a merge-base diff needs the history,
+not a working tree), and `docker-build`.
 
 Integration tests need real services and are behind `-tags=integration`:
 
@@ -56,7 +61,16 @@ decision it protects.
 | Every config key has exactly one documented home | `TestEveryKeyHasATemplateEntry` and its converse |
 | No credential, signed URL, session id or API key ever reaches a log line | `internal/obs`, `TestRedactionOfEveryValueClass` |
 | Default-deny authorization over the frozen ADR-007 matrix | `internal/authz`, `TestFrozenMatrix` (315 cases) |
-| A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.sh`, `FLOOR_LANES` |
+| A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
+| An unset or unrecognised visibility DENIES; it is never normalised to public | `internal/authz`, `TestUnknownVisibilityDenies` |
+| A value this repository publishes is never a production secret | `internal/config`, `knownPublishedSecrets`, `TestProductionRefusesPublishedTestKeys` |
+| A crash-looping job is dead-lettered, not left at the head of the claim order | `SweepExpiredLeases`, `TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue` |
+| A merged migration's bytes are frozen | the `append-only` CI job (merge-base diff) + `migration-manifest.sh` + CODEOWNERS |
+| Every doctor verdict is tested | `internal/doctor` (the checks are pure; `cmd/vizra` only does I/O) |
+| migrate-lint, the gate guard and the import lint have their own negative cases | `scripts/scripts_test.go` against `scripts/testdata/` |
+| `last_error` is redacted before it is truncated | `internal/jobs`, `TestLastErrorIsRedactedBeforeItIsStored` |
+| The internal search client never follows a redirect | `internal/search`, `TestARedirectIsNeverFollowedAndNoSignatureLeaks` |
+| Every route, including the 404 path, carries the hardening headers | `internal/httpapi`, `TestEveryRouteCarriesHardeningHeaders` |
 
 ## Pinned versions
 

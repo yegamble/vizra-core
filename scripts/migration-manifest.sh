@@ -9,9 +9,24 @@
 #   check     recompute every hash and compare with migrations/manifest.sha256
 #   generate  rewrite the manifest (for a NEW migration only)
 #
-# `check` is the local half. CI adds the other half: it asserts that the diff of
-# manifest.sha256 against the base branch contains only ADDED lines, so
-# regenerating the manifest cannot launder an edit to a merged migration.
+# TWO HALVES, and this file is only one of them. Saying so precisely, because
+# this header previously described a CI control that did not exist — and a
+# comment describing a control that does not exist is worse than no comment.
+#
+#   THIS SCRIPT (`check`) compares the manifest to the files ON DISK in the same
+#   commit. It is self-consistency: it catches the honest mistake of editing a
+#   migration and forgetting the manifest. On its own it does NOT enforce
+#   append-only, because `make migrations-manifest` regenerates every hash and
+#   turns the check green again.
+#
+#   THE CI JOB `append-only` in .github/workflows/build-test.yml is what makes
+#   the guarantee real. It checks out with fetch-depth 0, diffs
+#   migrations/manifest.sha256 against the merge base, and fails when a line is
+#   REMOVED or CHANGED, or when a migrations/*.sql file is deleted or renamed.
+#   Adding lines — a new migration — passes.
+#
+#   CODEOWNERS on migrations/** is the third layer: a changed hash needs owner
+#   review even if both mechanical checks were somehow satisfied.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

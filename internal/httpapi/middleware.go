@@ -88,6 +88,38 @@ func routeAttributeMiddleware() echo.MiddlewareFunc {
 	}
 }
 
+// securityHeadersMiddleware sets the response defaults every route gets,
+// including the error paths — which is where a per-handler approach always
+// misses one.
+//
+// Cache-Control: no-store is the one that matters on a photo host, and it is a
+// VISIBILITY control rather than a header checklist item. The default must be
+// no-store so that the public-derivative path opts IN to caching; the reverse —
+// caching by default with private routes opting out — is how a private
+// derivative ends up in a shared cache. ADR-007 row 21: only public derivatives
+// are shared-cacheable, and every key carries visibility_version. A handler that
+// serves a public derivative overwrites this header deliberately.
+//
+// No CSP here: this server returns JSON. CSP and frame-ancestors belong to
+// vizra-user's HTML origin, and both setting them would be worse than one.
+func securityHeadersMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			h := c.Response().Header()
+			// Never let a browser sniff a JSON body into something executable.
+			h.Set("X-Content-Type-Options", "nosniff")
+			// An API URL can carry an asset's public key; do not send it onward.
+			h.Set("Referrer-Policy", "no-referrer")
+			// Refuse cross-origin embedding of anything this server returns.
+			h.Set("Cross-Origin-Resource-Policy", "same-origin")
+			// Set before the handler runs, so a handler that legitimately caches
+			// (a public derivative, M1) can overwrite it rather than fight it.
+			h.Set("Cache-Control", "no-store")
+			return next(c)
+		}
+	}
+}
+
 // errorHandler renders every error as the Error schema of api/openapi.yaml and
 // never leaks an internal message. A 500's cause goes to the log with the
 // request id; the client gets the id and nothing else.

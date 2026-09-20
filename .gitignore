@@ -1,3 +1,11 @@
 /bin/
 *.test
+
+# Environment files. `.env` alone was not enough once a deployment tree with an
+# env/ directory lands, and an env file is the one place a real credential is
+# supposed to live.
 .env
+.env.*
+*.env
+env/*.env
+!.env.example

@@ -15,7 +15,21 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# --dir lets the meta-test (scripts/scripts_test.go) run this against fixture
+# trees under scripts/testdata/migratelint, so the rules have negative cases of
+# their own. Without that, the destructive-statement regex was protected by
+# nothing: a mutant that removed COLUMN from the alternation survived the whole
+# gate.
 DIR=migrations
+CHECK_MANIFEST=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dir) DIR="$2"; CHECK_MANIFEST=0; shift 2 ;;
+    --no-manifest) CHECK_MANIFEST=0; shift ;;
+    *) printf 'migrate-lint: unknown argument %s\n' "$1" >&2; exit 2 ;;
+  esac
+done
 fail=0
 err() { printf '  FAIL  %s\n' "$*" >&2; fail=1; }
 ok()  { printf '  ok    %s\n' "$*"; }
@@ -93,8 +107,10 @@ for f in "${ups[@]}"; do
 done
 
 # --- 5. append-only checksum manifest ----------------------------------------
-if ! ./scripts/migration-manifest.sh check; then
-  fail=1
+if [ "$CHECK_MANIFEST" -eq 1 ]; then
+  if ! ./scripts/migration-manifest.sh check; then
+    fail=1
+  fi
 fi
 
 if [ $fail -ne 0 ]; then

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -350,4 +351,89 @@ func equalFold(a, b string) bool {
 		}
 	}
 	return true
+}
+
+// ---------------------------------------------------------------------------
+// Security Finding 9 — hardening headers on EVERY route, including errors
+// ---------------------------------------------------------------------------
+
+// Driven off s.Routes() rather than a hand-written path list, so a route added
+// in a later slice cannot miss the headers without this test noticing.
+func TestEveryRouteCarriesHardeningHeaders(t *testing.T) {
+	s := newProbeServer(t, nil)
+	routes := s.Routes()
+	if len(routes) == 0 {
+		t.Fatal("the server registered no routes; this test would pass vacuously")
+	}
+
+	want := map[string]string{
+		"X-Content-Type-Options":       "nosniff",
+		"Referrer-Policy":              "no-referrer",
+		"Cross-Origin-Resource-Policy": "same-origin",
+		// The one that matters on a photo host: the DEFAULT must be no-store so
+		// the public-derivative path opts IN to caching. The reverse is how a
+		// private derivative reaches a shared cache (ADR-007 row 21).
+		"Cache-Control": "no-store",
+	}
+
+	checked := 0
+	for _, r := range routes {
+		if strings.Contains(r.Path, "*") {
+			continue // Echo's automatic not-found entry; covered below explicitly
+		}
+		t.Run(r.Method+" "+r.Path, func(t *testing.T) {
+			req := httptest.NewRequest(r.Method, r.Path, nil)
+			rec := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rec, req)
+			for h, v := range want {
+				if got := rec.Header().Get(h); got != v {
+					t.Errorf("%s = %q, want %q", h, got, v)
+				}
+			}
+		})
+		checked++
+	}
+	if checked < 4 {
+		t.Fatalf("only %d route(s) were checked; the M0 contract has four probes", checked)
+	}
+}
+
+// The error paths are where a per-handler approach always misses one.
+func TestErrorResponsesCarryHardeningHeaders(t *testing.T) {
+	s := newProbeServer(t, nil)
+	for _, tc := range []struct {
+		name string
+		path string
+		code int
+	}{
+		{"unknown route 404", "/does-not-exist", http.StatusNotFound},
+		{"unknown nested route 404", "/v1/nope/deeper", http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rec, req)
+			if rec.Code != tc.code {
+				t.Fatalf("status = %d, want %d", rec.Code, tc.code)
+			}
+			if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+				t.Errorf("the error path lost the hardening headers (X-Content-Type-Options = %q)", got)
+			}
+			if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+				t.Errorf("Cache-Control = %q on an error response, want no-store", got)
+			}
+		})
+	}
+}
+
+// Deps.Limiter is plumbed through but no M0 route uses it. Named so it is not
+// mistaken for coverage.
+func TestMetricsAreNotOnThePublicServer(t *testing.T) {
+	s := newProbeServer(t, nil)
+	for _, p := range []string{"/metrics", "/debug/pprof/", "/debug/vars"} {
+		code, _ := get(t, s, p)
+		if code != http.StatusNotFound {
+			t.Errorf("%s returned %d on the public listener; metrics bind their own address", p, code)
+		}
+	}
 }

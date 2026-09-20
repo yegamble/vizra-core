@@ -89,6 +89,7 @@ func run() error {
 		Lease:       cfg.JobLease,
 		Timeout:     cfg.JobTimeout,
 		Concurrency: cfg.WorkerConcurrency,
+		DrainGrace:  cfg.ShutdownGrace,
 		Logger:      log,
 	})
 

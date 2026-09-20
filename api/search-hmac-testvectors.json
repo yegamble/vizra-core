@@ -19,6 +19,7 @@
   ],
   "scheme": "v1",
   "key_utf8": "Ar4Lo8Cq2Ei6Uk0Wn3Sv7Yb1Md5Pt9Xz",
+  "key_utf8_warning": "TEST VECTOR ONLY. This value is published in a public repository and must NEVER be used as VIZRA_SEARCH_HMAC_KEY, VIZRA_SESSION_SECRET or any other configuration value. vizra-core's production loader refuses it by exact match (knownPublishedSecrets in internal/config/config.go); vizra-search must do the same. Generate a real key with `openssl rand -base64 32`.",
   "max_clock_skew_seconds": 300,
   "vectors": [
     {

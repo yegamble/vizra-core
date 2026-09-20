@@ -24,9 +24,18 @@
 # Contract sources. One owner per slice; other repositories consume them at a
 # recorded commit SHA.
 /api/                   @yegamble
+/api/**                 @yegamble
 
-# Append-only, and compiled into the release binary.
+# Append-only, and compiled into the release binary. The third layer of the
+# append-only guarantee, after migration-manifest.sh (self-consistency) and the
+# `append-only` CI job (the merge-base diff): a changed hash needs owner review
+# even if both mechanical checks were somehow satisfied.
 /migrations/            @yegamble
+/migrations/**          @yegamble
+
+# The secret-scanner exclusions. Widening them must need owner review, or the
+# exclusion list becomes the way a real secret gets in.
+/.gitguardian.yaml      @yegamble
 /sqlc.yaml              @yegamble
 /store/queries/         @yegamble
 

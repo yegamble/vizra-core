@@ -37,7 +37,28 @@ func NewRemote(baseURL string, key []byte, timeout time.Duration) *RemoteClient 
 	return &RemoteClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		key:     key,
-		http:    &http.Client{Timeout: timeout},
+		http: &http.Client{
+			Timeout: timeout,
+			// NEVER follow a redirect.
+			//
+			// Go's stdlib strips Authorization, WWW-Authenticate and Cookie on a
+			// cross-host redirect. It knows nothing about X-Vizra-Signature,
+			// X-Vizra-Timestamp or X-Vizra-Nonce, so those would be forwarded to
+			// whatever host the redirect names — handing a valid signature to a
+			// third party, and turning core into a server-side fetch whose
+			// destination an attacker chooses, loopback and link-local included.
+			//
+			// The whole point of HMAC-signing this hop is that vizra-search is a
+			// SEPARATE trust domain; if it were fully trusted the signature would
+			// be pointless. The internal contract is a fixed set of endpoints on
+			// a configured base URL, so a redirect is never a legitimate answer
+			// and refusing to follow it is both the secure and the correct
+			// behaviour. The 3xx then falls through to the non-200 branch, the
+			// Service falls back to SQL, and readiness reports degraded.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 }
 

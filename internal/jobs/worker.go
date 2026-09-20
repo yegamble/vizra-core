@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yegamble/vizra-core/internal/obs"
 	"github.com/yegamble/vizra-core/internal/site"
 	"github.com/yegamble/vizra-core/internal/store/sqlcgen"
 )
@@ -56,6 +57,10 @@ type Options struct {
 	// SweepInterval is how often the leader reclaims elapsed leases.
 	SweepInterval time.Duration
 	Logger        *slog.Logger
+	// DrainGrace bounds how long Run waits for in-flight jobs after ctx is
+	// cancelled. A stuck handler must not hold shutdown past the container's
+	// kill deadline.
+	DrainGrace time.Duration
 	// WorkerID identifies the lease holder. Defaults to hostname+pid+random.
 	WorkerID string
 }
@@ -76,6 +81,9 @@ func (o *Options) applyDefaults() {
 	if o.SweepInterval <= 0 {
 		o.SweepInterval = 2 * time.Minute
 	}
+	if o.DrainGrace <= 0 {
+		o.DrainGrace = 20 * time.Second
+	}
 	if o.Logger == nil {
 		o.Logger = slog.Default()
 	}
@@ -92,6 +100,10 @@ func (o *Options) applyDefaults() {
 const (
 	leaderLockClassID  = 0x565A // 'VZ'
 	leaderLockObjectID = 1      // the job sweep
+
+	// outcomeWriteTimeout bounds the detached write that records a job's
+	// outcome after ctx is cancelled.
+	outcomeWriteTimeout = 10 * time.Second
 )
 
 // Worker runs the loop for every site the resolver knows (Q-008 item 5: the
@@ -192,9 +204,23 @@ loop:
 			w.run(ctx, pool, j, log)
 		}(*claimed)
 	}
-	// Drain: a job already leased by this process must be allowed to finish and
+	// Drain: a job already leased by this process is allowed to finish and
 	// record its outcome, or the sweep reclaims work that actually succeeded.
-	inFlight.Wait()
+	//
+	// BOUNDED. A handler can legitimately run for JobTimeout (5 minutes by
+	// default), which is longer than a container's kill deadline, so an
+	// unbounded wait here means the orchestrator SIGKILLs the process
+	// mid-write and the drain achieves nothing. Past the grace period we stop
+	// waiting and let the sweep do its job — which is now correct, because the
+	// sweep dead-letters an exhausted row instead of requeueing it forever.
+	done := make(chan struct{})
+	go func() { inFlight.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(w.opts.DrainGrace):
+		log.Warn("jobs: drain grace elapsed with jobs still running; their leases will be swept",
+			"grace", w.opts.DrainGrace.String())
+	}
 }
 
 func (w *Worker) claim(ctx context.Context, pool *pgxpool.Pool) (*Claimed, error) {
@@ -225,6 +251,21 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 	jobCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), w.opts.Timeout)
 	defer cancel()
 
+	// Recording the OUTCOME must survive SIGTERM, or the drain below is
+	// pointless: the handler would run to completion and then every
+	// Complete/Retry/DeadLetter/Fail would fail instantly with "context
+	// canceled", the row would stay `leased`, and two minutes later the sweep
+	// would requeue it — so every rolling deploy would re-deliver every
+	// in-flight job, up to Concurrency per site, forever. Idempotent handlers
+	// make that survivable rather than corrupting, but it turns a routine
+	// restart into guaranteed duplicate external effects: email, federation
+	// delivery, IPFS pin.
+	//
+	// Detached from ctx, and short: a database that is also going away must not
+	// hold shutdown open.
+	recCtx, recCancel := context.WithTimeout(context.WithoutCancel(ctx), outcomeWriteTimeout)
+	defer recCancel()
+
 	// Heartbeat at lease/3. It is conditional on still holding the lease: if the
 	// sweep took the job, renewal fails and the handler's context is cancelled,
 	// so two workers cannot both believe they own it.
@@ -236,7 +277,7 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 	if !ok {
 		// Claim filters by registered kind, so this means the filter and the
 		// registry disagreed. Terminal: retrying would loop forever.
-		w.finishFailed(ctx, q, j, fmt.Sprintf("no handler registered for kind %s", j.Kind), log)
+		w.finishFailed(recCtx, q, j, fmt.Sprintf("no handler registered for kind %s", j.Kind), log)
 		return
 	}
 
@@ -245,7 +286,7 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 
 	switch {
 	case err == nil:
-		n, cerr := q.CompleteJob(ctx, sqlcgen.CompleteJobParams{ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID)})
+		n, cerr := q.CompleteJob(recCtx, sqlcgen.CompleteJobParams{ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID)})
 		if cerr != nil {
 			log.Error("jobs: recording success failed", "error", cerr.Error())
 			return
@@ -256,10 +297,10 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 			log.Warn("jobs: lease was lost before completion could be recorded; the job will be redelivered")
 		}
 	case IsTerminal(err):
-		w.finishFailed(ctx, q, j, err.Error(), log)
+		w.finishFailed(recCtx, q, j, err.Error(), log)
 	case j.Attempts >= j.MaxAttempts:
-		n, derr := q.DeadLetterJob(ctx, sqlcgen.DeadLetterJobParams{
-			ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(truncate(err.Error())),
+		n, derr := q.DeadLetterJob(recCtx, sqlcgen.DeadLetterJobParams{
+			ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(safeError(err.Error())),
 		})
 		if derr != nil || n == 0 {
 			log.Warn("jobs: recording dead-letter failed", "rows", n)
@@ -267,9 +308,9 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 		log.Error("jobs: exhausted attempts", "attempts", j.Attempts, "error", err.Error())
 	default:
 		backoff := Backoff(j.Attempts) + jitter(Backoff(j.Attempts))
-		n, rerr := q.RetryJob(ctx, sqlcgen.RetryJobParams{
+		n, rerr := q.RetryJob(recCtx, sqlcgen.RetryJobParams{
 			ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID),
-			Backoff: toInterval(backoff), LastError: strPtr(truncate(err.Error())),
+			Backoff: toInterval(backoff), LastError: strPtr(safeError(err.Error())),
 		})
 		if rerr != nil || n == 0 {
 			log.Warn("jobs: scheduling retry failed", "rows", n)
@@ -280,7 +321,7 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 
 func (w *Worker) finishFailed(ctx context.Context, q *sqlcgen.Queries, j Claimed, msg string, log *slog.Logger) {
 	if _, err := q.FailJob(ctx, sqlcgen.FailJobParams{
-		ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(truncate(msg)),
+		ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(safeError(msg)),
 	}); err != nil {
 		log.Error("jobs: recording terminal failure failed", "error", err.Error())
 	}
@@ -366,8 +407,20 @@ func (w *Worker) sweepOnce(ctx context.Context, pool *pgxpool.Pool, log *slog.Lo
 	if err != nil {
 		return err
 	}
-	if len(rows) > 0 {
-		log.Warn("jobs: reclaimed elapsed leases", "count", len(rows))
+	var requeued, dead int
+	for _, r := range rows {
+		if r.State == "dead" {
+			dead++
+			// Named individually: a job that died because its worker kept
+			// stopping is an operator signal, not a statistic.
+			log.Error("jobs: dead-lettered after repeated lease loss",
+				"job_id", r.ID.String(), "kind", r.Kind, "attempts", r.Attempts)
+			continue
+		}
+		requeued++
+	}
+	if requeued > 0 || dead > 0 {
+		log.Warn("jobs: swept elapsed leases", "requeued", requeued, "dead_lettered", dead)
 	}
 	return nil
 }
@@ -389,9 +442,25 @@ func jitter(d time.Duration) time.Duration {
 	return time.Duration(rand.Int64N(int64(d/5))) - d/10
 }
 
-// truncate bounds what a handler's error text can write into a row. last_error
-// is shown in /admin/jobs, so an unbounded error message is both a storage and
-// a rendering problem.
+// safeError is what may be written to jobs.last_error.
+//
+// REDACT FIRST, THEN TRUNCATE. ADR-002 says secrets do not enter a queryable
+// table, and last_error is both queryable and rendered in /admin/jobs and in
+// any pg_dump an operator shares. A Go HTTP error is a *url.Error that formats
+// as `Post "https://user:pw@host/path": ...`, so an M1 handler doing an S3 put,
+// a federation delivery or a webhook call will produce exactly that text.
+//
+// The order matters: truncating first could cut a credential in half and store
+// the first 2000 bytes of it, which is still a leak. Redacting first means a
+// secret straddling the boundary is replaced before the cut is made.
+//
+// A CHECK constraint cannot express this, so the control belongs here — which
+// is the same argument the logger already made for obs.Redact.
+func safeError(s string) string { return truncate(obs.Redact(s)) }
+
+// truncate bounds what a handler's error text can write into a row. The
+// database also enforces this (jobs_last_error_bounded, 4096), so this is the
+// friendly half of a bound that is real either way.
 func truncate(s string) string {
 	const max = 2000
 	if len(s) <= max {
