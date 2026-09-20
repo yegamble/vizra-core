@@ -1622,23 +1622,50 @@ func TestAWorkerWithAPlainHandlerLogsNoCredentials(t *testing.T) {
 	terminal := enqueue(t, pool, jobs.NewJob{Kind: "leaky-terminal", MaxAttempts: 5, CorrelationID: "t"})
 	retrying := enqueue(t, pool, jobs.NewJob{Kind: "leaky-retry", MaxAttempts: 3, CorrelationID: "r"})
 
+	// WAIT ON THE OBSERVABLE THIS TEST ACTUALLY READS — the log buffer.
+	//
+	// The first version of this waited on `c.Attempts >= 1` for the retry job.
+	// That is a PROXY, and it becomes true too early: ClaimJob increments
+	// `attempts` in the same UPDATE that sets state='leased' — its own comment
+	// says "`attempts` counts CLAIMS, not failures: it is incremented here, at
+	// claim time" — so the wait was satisfied the instant the job was claimed,
+	// before the handler returned, before RetryJob ran, and before
+	// `jobs: retrying` had been written to the buffer the assertions below
+	// read. The result was a 1-in-30 red on a lane this very slice exists to
+	// make deterministic (verifier FINDING 1, round 1: 2 of 120 full runs).
+	//
+	// The rule, which is the actual lesson: a wait must be on the thing the
+	// assertion reads, never on a state change that happens to precede it.
+	// The database conditions are kept because they are still necessary — they
+	// just are not sufficient.
+	lines := []string{
+		"jobs: exhausted attempts",
+		"jobs: terminal failure",
+		"jobs: retrying",
+	}
 	q := sqlcgen.New(pool)
 	waitFor(t, ctx, func() bool {
 		a, err1 := q.GetJob(ctx, exhausted.ID)
 		b, err2 := q.GetJob(ctx, terminal.ID)
 		c, err3 := q.GetJob(ctx, retrying.ID)
-		return err1 == nil && err2 == nil && err3 == nil &&
-			a.State == "dead" && b.State == "failed" && c.Attempts >= 1
-	}, "the dead-letter, terminal and retry branches to have all logged")
+		if err1 != nil || err2 != nil || err3 != nil ||
+			a.State != "dead" || b.State != "failed" || c.Attempts < 1 {
+			return false
+		}
+		logged := workerLog.String()
+		for _, line := range lines {
+			if !strings.Contains(logged, line) {
+				return false
+			}
+		}
+		return true
+	}, "all three branches to have written their log line")
 
-	// Every branch must actually have run, or this test would pass by logging
-	// nothing at all.
+	// Kept deliberately after the wait: it turns a timeout into a named
+	// message saying WHICH branch never logged, instead of a bare deadline.
+	// This test would otherwise be able to pass by logging nothing at all.
 	out := workerLog.String()
-	for _, line := range []string{
-		"jobs: exhausted attempts",
-		"jobs: terminal failure",
-		"jobs: retrying",
-	} {
+	for _, line := range lines {
 		if !strings.Contains(out, line) {
 			t.Fatalf("the worker never logged %q, so this test proved nothing about it:\n%s", line, out)
 		}
