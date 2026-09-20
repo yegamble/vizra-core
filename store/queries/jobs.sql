@@ -6,11 +6,25 @@
 -- enqueue of the same (kind, idempotency_key) while one is still queued or
 -- leased must return no row, so the caller can fetch the in-flight job instead
 -- of creating a duplicate.
+--
+-- POSTGRESQL IS THE SINGLE CLOCK AUTHORITY. A NULL @run_after means "run now",
+-- and now() resolves it HERE, in the same transaction that stamps created_at.
+-- It must never be resolved in Go: ClaimJob's eligibility predicate is
+-- `run_after <= now()` against the DATABASE clock, so an application-side
+-- time.Now() compares two different clocks. When the database trails the
+-- application host — ordinary NTP skew between two containers, measured at
+-- ~1 ms locally and routinely far more in production — a job whose intent was
+-- "run now" is not claimable until the skew has elapsed, and a claim inside
+-- that window gets no rows on a queued, unleased row that is sitting right
+-- there. That was verifier FINDING V-1: two integration tests failed 3 runs in
+-- 20. A non-NULL @run_after is the caller's deliberate schedule and is stored
+-- verbatim, past or future.
 INSERT INTO jobs (
     id, kind, payload, idempotency_key, state, priority,
     attempts, max_attempts, run_after, correlation_id
 ) VALUES (
-    $1, $2, $3, $4, 'queued', $5, 0, $6, $7, $8
+    @id, @kind, @payload, @idempotency_key, 'queued', @priority, 0, @max_attempts,
+    COALESCE(sqlc.narg(run_after)::timestamptz, now()), @correlation_id
 )
 ON CONFLICT DO NOTHING
 RETURNING id, kind, state, run_after, created_at;
@@ -126,6 +140,25 @@ WHERE id = @id AND state = 'leased' AND leased_by = @leased_by;
 -- handler ever returning an error, so the retry path never sees it and only
 -- the sweep can declare it dead. Requeueing it instead left an unclaimable row
 -- at the head of the claim order forever.
+--
+-- CONTRACT FOR ANY FUTURE REQUEUE OF A DEAD OR EXHAUSTED ROW — an M2
+-- `vizra jobs retry`, an admin "retry this job" control, a bulk replay:
+-- IT MUST RESET `attempts` TO 0 (or raise `max_attempts`) IN THE SAME
+-- STATEMENT that sets state back to 'queued'. Setting state alone recreates
+-- exactly the row this sweep exists to prevent: `state='queued' AND
+-- attempts >= max_attempts`, which ClaimJob's `AND attempts < max_attempts`
+-- can never take, and which the claim subselect nevertheless re-orders to the
+-- head of the queue on every poll. That is the unclaimable-but-queued zombie,
+-- and clearing it needs an operator with psql. The invariant is greppable:
+--
+--   SELECT count(*) FROM jobs WHERE state='queued' AND attempts>=max_attempts; -- must be 0
+--
+-- `attempts` counts CLAIMS, so resetting it is the correct semantic for a
+-- deliberate human replay: the operator is granting a fresh budget, not
+-- pretending the earlier crashes never happened — last_error still records
+-- them. Written here rather than in a design note because this is the
+-- statement whoever writes that command will read.
+-- (Backend seat's carried-forward M2 note, PR #1 final closure.)
 --
 -- One statement, so the two outcomes cannot diverge under concurrency.
 UPDATE jobs

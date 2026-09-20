@@ -152,10 +152,14 @@ func Enqueue(ctx context.Context, tx pgx.Tx, j NewJob) (Enqueued, error) {
 	if j.Priority == 0 {
 		j.Priority = DefaultPriority
 	}
-	runAfter := j.RunAfter
-	if runAfter.IsZero() {
-		runAfter = time.Now()
-	}
+	// A zero RunAfter means "run now", and it stays NULL all the way into the
+	// statement so that PostgreSQL's own now() resolves it — see EnqueueJob in
+	// store/queries/jobs.sql. Resolving it here with time.Now() would write the
+	// APPLICATION host's clock into a column that ClaimJob compares against the
+	// DATABASE's clock, and a job meant to run now would then be invisible to
+	// the claim loop for the duration of the skew between them (verifier
+	// FINDING V-1). toTimestamptz already maps a zero time to a NULL
+	// pgtype.Timestamptz, so there is nothing to do but not interfere.
 
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -175,7 +179,7 @@ func Enqueue(ctx context.Context, tx pgx.Tx, j NewJob) (Enqueued, error) {
 		IdempotencyKey: idem,
 		Priority:       j.Priority,
 		MaxAttempts:    j.MaxAttempts,
-		RunAfter:       toTimestamptz(runAfter),
+		RunAfter:       toTimestamptz(j.RunAfter),
 		CorrelationID:  j.CorrelationID,
 	})
 	if err == nil {

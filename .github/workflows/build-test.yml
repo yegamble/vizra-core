@@ -188,6 +188,18 @@ jobs:
           docker exec vizra-cache valkey-cli ping | grep -q PONG
           make test-integration
 
+      # The SAME suite in a random permutation. Verifier FINDING V-1 was an
+      # order- and timing-dependent failure that the fixed source order exposed
+      # only sometimes; a lane that can go red at random gets re-run until
+      # green, and at that point it has stopped being evidence. The seed is in
+      # the log, so a failing permutation is reproducible with -shuffle=<seed>.
+      - name: Integration tests, shuffled order (PostgreSQL 18 + Valkey)
+        env:
+          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+          VIZRA_TEST_CACHE_FLAVOUR: valkey
+        run: make test-integration-shuffle
+
       - name: Upload the test log
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -266,6 +278,17 @@ jobs:
           VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
           VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration
+
+      # See the shuffled step in build-test: order dependence is checked on
+      # BOTH cache flavours, because an order-dependent failure that only
+      # appears against one server is exactly the kind of thing this permanent
+      # matrix exists to catch (ADR-001 Q-004).
+      - name: Integration tests against ${{ matrix.flavour }}, shuffled order
+        env:
+          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+          VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
+        run: make test-integration-shuffle
 
   # The aggregate. `ci-required` requires the context `cache-matrix`; GitHub
   # reports each matrix leg under a name carrying its matrix values, so without

@@ -306,6 +306,116 @@ func TestEnqueueIdempotency(t *testing.T) {
 	}
 }
 
+// PostgreSQL is the SINGLE CLOCK AUTHORITY for job eligibility.
+//
+// `run_after` was stamped from the APPLICATION host clock when the caller did
+// not ask for a delay, while ClaimJob tests `run_after <= now()` against the
+// DATABASE clock. Every other timestamp in a job's life — created_at,
+// leased_until, RetryJob's run_after, the sweep's `leased_until < now()`,
+// finished_at — is assigned by the database, so this was the only place in the
+// system where two clocks were compared.
+//
+// The consequence, measured on this machine at 415a6d1 with the database ~1 ms
+// behind the host: a job whose intent is "run now" was not eligible until the
+// skew had elapsed, and a claim issued inside that window got pgx.ErrNoRows on
+// a row that was sitting right there, queued and unleased. In the integration
+// suite that made TestHeartbeatRequiresStillHoldingTheLease and
+// TestSweepReclaimsOnlyElapsedLeases fail 3 runs in 20 (verifier FINDING V-1).
+// In production the API and the database are different containers on different
+// hosts and ordinary NTP skew is milliseconds to seconds, so the same window
+// hides freshly enqueued work from the claim loop for real.
+//
+// The rule this test pins: when the caller does NOT specify RunAfter, the
+// database supplies it, and it is therefore the same instant as created_at. An
+// explicit RunAfter is a deliberate wall-clock decision by the caller and is
+// stored verbatim.
+func TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	ctx := t.Context()
+	q := sqlcgen.New(pool)
+
+	// 1. No RunAfter: the database assigns it, in the same transaction and
+	//    therefore from the same now() as created_at.
+	j := enqueue(t, pool, jobs.NewJob{Kind: jobs.KindNoop, CorrelationID: "db-clock"})
+
+	var sameInstant bool
+	var runAfter, createdAt time.Time
+	var skewMicros int64
+	if err := pool.QueryRow(ctx,
+		`SELECT run_after = created_at, run_after, created_at,
+		        (EXTRACT(EPOCH FROM (run_after - created_at)) * 1e6)::bigint
+		   FROM jobs WHERE id = $1`, j.ID,
+	).Scan(&sameInstant, &runAfter, &createdAt, &skewMicros); err != nil {
+		t.Fatal(err)
+	}
+	if !sameInstant {
+		t.Fatalf("run_after (%s) is not created_at (%s): they differ by %d µs, so run_after was "+
+			"read from a clock OTHER than the one ClaimJob compares it against. A job that is "+
+			"meant to run now is then not claimable for the duration of that difference.",
+			runAfter.UTC().Format(time.RFC3339Nano), createdAt.UTC().Format(time.RFC3339Nano), skewMicros)
+	}
+
+	// 2. And the consequence that matters: it is claimable IMMEDIATELY, with no
+	//    settling time, on the very next statement.
+	if _, err := q.ClaimJob(ctx, sqlcgen.ClaimJobParams{
+		LeasedBy: ptr("worker-now"), LeaseDuration: interval(time.Minute),
+		Kinds: []string{string(jobs.KindNoop)},
+	}); err != nil {
+		t.Fatalf("a job enqueued to run now was not claimable on the next statement: %v", err)
+	}
+
+	// 3. An explicit RunAfter is the caller's decision and must survive intact —
+	//    otherwise "the database assigns now()" would have quietly become
+	//    "the database always assigns now()" and every scheduled job would fire
+	//    at once.
+	future := time.Now().Add(2 * time.Hour).UTC().Truncate(time.Microsecond)
+	scheduled := enqueue(t, pool, jobs.NewJob{
+		Kind: jobs.KindNoop, CorrelationID: "scheduled", RunAfter: future,
+	})
+	var storedFuture time.Time
+	var eligible bool
+	if err := pool.QueryRow(ctx,
+		`SELECT run_after, run_after <= now() FROM jobs WHERE id = $1`, scheduled.ID,
+	).Scan(&storedFuture, &eligible); err != nil {
+		t.Fatal(err)
+	}
+	if !storedFuture.UTC().Equal(future) {
+		t.Fatalf("an explicit RunAfter was not stored verbatim: stored %s, asked for %s",
+			storedFuture.UTC().Format(time.RFC3339Nano), future.Format(time.RFC3339Nano))
+	}
+	if eligible {
+		t.Fatal("a job scheduled two hours out is already eligible; the delay was discarded")
+	}
+	// The value the caller gets back is the value the database holds.
+	if !scheduled.RunAfter.UTC().Equal(future) {
+		t.Fatalf("Enqueue returned run_after %s, the row holds %s",
+			scheduled.RunAfter.UTC().Format(time.RFC3339Nano), future.Format(time.RFC3339Nano))
+	}
+	// And a claim must not take it.
+	if _, err := q.ClaimJob(ctx, sqlcgen.ClaimJobParams{
+		LeasedBy: ptr("worker-now"), LeaseDuration: interval(time.Minute),
+		Kinds: []string{string(jobs.KindNoop)},
+	}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("a claim took a job scheduled two hours out (err = %v)", err)
+	}
+
+	// 4. A RunAfter in the PAST is equally deliberate — a retry ladder writes
+	//    one — and must not be pushed forward to now().
+	past := time.Now().Add(-90 * time.Minute).UTC().Truncate(time.Microsecond)
+	backdated := enqueue(t, pool, jobs.NewJob{
+		Kind: jobs.KindNoop, CorrelationID: "backdated", RunAfter: past,
+	})
+	var storedPast time.Time
+	if err := pool.QueryRow(ctx,
+		`SELECT run_after FROM jobs WHERE id = $1`, backdated.ID).Scan(&storedPast); err != nil {
+		t.Fatal(err)
+	}
+	if !storedPast.UTC().Equal(past) {
+		t.Fatalf("an explicit past RunAfter was rewritten to %s, asked for %s",
+			storedPast.UTC().Format(time.RFC3339Nano), past.Format(time.RFC3339Nano))
+	}
+}
+
 // Two concurrent claims must never take the same row (FOR UPDATE SKIP LOCKED).
 func TestConcurrentClaimsNeverTakeTheSameJob(t *testing.T) {
 	_, resolver, pool := freshDatabase(t)
@@ -461,7 +571,7 @@ func TestWorkerRunsAndCompletesAJob(t *testing.T) {
 		return nil
 	})
 
-	go func() { _ = w.Run(ctx) }()
+	startWorker(t, ctx, cancel, w)
 
 	a := enqueue(t, pool, jobs.NewJob{Kind: "counting", Payload: map[string]string{"key": "k"}, CorrelationID: "c1"})
 	b := enqueue(t, pool, jobs.NewJob{Kind: "counting", Payload: map[string]string{"key": "k"}, CorrelationID: "c2"})
@@ -508,7 +618,7 @@ func TestRetryLadderAndTerminalFailure(t *testing.T) {
 	w.Register("always-terminal", func(context.Context, jobs.Claimed) error {
 		return jobs.Terminal{Err: errors.New("malformed payload")}
 	})
-	go func() { _ = w.Run(ctx) }()
+	startWorker(t, ctx, cancel, w)
 
 	retryable := enqueue(t, pool, jobs.NewJob{Kind: "always-retryable", MaxAttempts: 1, CorrelationID: "c1"})
 	terminal := enqueue(t, pool, jobs.NewJob{Kind: "always-terminal", MaxAttempts: 5, CorrelationID: "c2"})
@@ -1134,7 +1244,7 @@ func TestRetryLadderActuallyWalksTheLadder(t *testing.T) {
 		mu.Unlock()
 		return errors.New("transient")
 	})
-	go func() { _ = w.Run(ctx) }()
+	startWorker(t, ctx, cancel, w)
 
 	j := enqueue(t, pool, jobs.NewJob{Kind: "flaky", MaxAttempts: 3, CorrelationID: "ladder"})
 	q := sqlcgen.New(pool)
@@ -1205,7 +1315,7 @@ func TestAJobWhoseWorkerDiedIsReclaimedAndCompleted(t *testing.T) {
 		PollInterval: 50 * time.Millisecond, SweepInterval: 300 * time.Millisecond,
 		WorkerID: "recovery-worker",
 	})
-	go func() { _ = w.Run(ctx) }()
+	startWorker(t, ctx, cancel, w)
 
 	waitFor(t, ctx, func() bool {
 		row, err := q.GetJob(ctx, j.ID)
@@ -1381,7 +1491,7 @@ func TestAMultibyteErrorIsStoredInLastError(t *testing.T) {
 	w.Register("multibyte-fail", func(context.Context, jobs.Claimed) error {
 		return errors.New(msg)
 	})
-	go func() { _ = w.Run(ctx) }()
+	startWorker(t, ctx, cancel, w)
 
 	j := enqueue(t, pool, jobs.NewJob{Kind: "multibyte-fail", MaxAttempts: 1, CorrelationID: "utf8"})
 	q := sqlcgen.New(pool)
@@ -1419,6 +1529,166 @@ func TestAMultibyteErrorIsStoredInLastError(t *testing.T) {
 		t.Fatalf("last_error is %d bytes; jobs_last_error_bounded caps it at 4096", len(stored))
 	}
 	t.Logf("stored %d bytes, valid UTF-8, redacted, message preserved", len(stored))
+}
+
+// ---------------------------------------------------------------------------
+// Verifier FINDING V-2 — redaction must live at the call site, not in the wiring
+// ---------------------------------------------------------------------------
+
+// The worker must not depend on WHICH slog handler it was built with to keep
+// credentials out of its own log.
+//
+// `last_error` has always been safe: it goes through safeError, which is
+// truncate(obs.Redact(s)). The log lines carrying the same handler error did
+// not — they passed err.Error() raw and relied entirely on cmd/api and
+// cmd/worker installing obs.NewLogger with slog.SetDefault. Any other caller
+// that builds a Worker with its own logger — an admin tool, a one-off
+// migration command, a test — logged the credential in the clear. The
+// protection belonged at the call site.
+//
+// This test builds a Worker with a PLAIN slog.TextHandler, deliberately NOT the
+// redacting one, and drives every branch that logs a handler error:
+//
+//	dead-letter  ("jobs: exhausted attempts")  — MaxAttempts 1, plain error
+//	terminal     ("jobs: terminal failure")    — jobs.Terminal
+//	retry        ("jobs: retrying")            — MaxAttempts 3, plain error
+//
+// The value classes are the ones internal/obs/log_test.go pins, restricted to
+// the ones that can appear inside free error text (the secret-NAMED-attribute
+// classes are a handler concern and do not arise here, where the key is
+// "error").
+func TestAWorkerWithAPlainHandlerLogsNoCredentials(t *testing.T) {
+	_, resolver, pool := freshDatabase(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+
+	// Same construction as internal/obs/log_test.go, so the two stay in step.
+	var (
+		fakeToken  = "ey" + strings.Repeat("Jh", 9) + "ZyI6MQ"
+		fakeAPIKey = "vzk_" + strings.Repeat("Nn4Pp7", 5)
+	)
+	secrets := map[string]string{
+		"DSN password":                       "hunter2",
+		"cache URL password":                 "s3cr3tpw",
+		"presigned URL signature":            "abc123def456",
+		"bearer token":                       fakeToken,
+		"Vizra API key":                      fakeAPIKey,
+		"signature material in a second URL": "SuperSecretSignatureMaterial0123456789",
+		"presigned URL credential":           "AKIAIOSFODNN7EXAMPLE",
+	}
+	// One error text carrying every class, shaped the way a real handler error
+	// carries them: inside URLs and tool output. Each credential sits where its
+	// class actually occurs — obs.Redact's presigned rule is anchored on the
+	// query separator, so X-Amz-Credential is written as a query parameter and
+	// not as a bare word. (A BARE `X-Amz-Credential=…` outside a URL is not
+	// covered by obs.Redact today; that is a pattern-coverage question in the
+	// same family as verifier FINDING V-3(b) and is reported to the chair
+	// rather than fixed here, where the subject is the CALL SITE.)
+	failure := "upload failed: dialling postgres://vizra:hunter2@db:5432/vizra; " +
+		"cache rediss://default:s3cr3tpw@cache:6379/0; " +
+		"GET https://bucket.s3.example/obj?X-Amz-Signature=abc123def456" +
+		"&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE&X-Amz-Expires=900 ; " +
+		"retry with https://b.example/o?X-Amz-Signature=SuperSecretSignatureMaterial0123456789 ; " +
+		"upstream said Authorization: Bearer " + fakeToken + " ; " +
+		"caller key " + fakeAPIKey
+
+	var workerLog safeBuffer
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("worker log:\n%s", workerLog.String())
+		}
+	})
+
+	w := jobs.NewWorker(resolver, map[string]*pgxpool.Pool{"default": pool}, nil, jobs.Options{
+		Lease: 10 * time.Second, Timeout: 10 * time.Second, Concurrency: 2,
+		PollInterval: 50 * time.Millisecond, SweepInterval: time.Hour,
+		WorkerID: "plain-handler-worker",
+		// DELIBERATELY the plain handler. obs.NewLogger would redact at the
+		// handler and prove nothing about the call sites.
+		Logger: slog.New(slog.NewTextHandler(&workerLog, &slog.HandlerOptions{Level: slog.LevelDebug})),
+	})
+	w.Register("leaky-exhausted", func(context.Context, jobs.Claimed) error {
+		return errors.New(failure)
+	})
+	w.Register("leaky-terminal", func(context.Context, jobs.Claimed) error {
+		return jobs.Terminal{Err: errors.New(failure)}
+	})
+	w.Register("leaky-retry", func(context.Context, jobs.Claimed) error {
+		return errors.New(failure)
+	})
+	startWorker(t, ctx, cancel, w)
+
+	exhausted := enqueue(t, pool, jobs.NewJob{Kind: "leaky-exhausted", MaxAttempts: 1, CorrelationID: "x"})
+	terminal := enqueue(t, pool, jobs.NewJob{Kind: "leaky-terminal", MaxAttempts: 5, CorrelationID: "t"})
+	retrying := enqueue(t, pool, jobs.NewJob{Kind: "leaky-retry", MaxAttempts: 3, CorrelationID: "r"})
+
+	q := sqlcgen.New(pool)
+	waitFor(t, ctx, func() bool {
+		a, err1 := q.GetJob(ctx, exhausted.ID)
+		b, err2 := q.GetJob(ctx, terminal.ID)
+		c, err3 := q.GetJob(ctx, retrying.ID)
+		return err1 == nil && err2 == nil && err3 == nil &&
+			a.State == "dead" && b.State == "failed" && c.Attempts >= 1
+	}, "the dead-letter, terminal and retry branches to have all logged")
+
+	// Every branch must actually have run, or this test would pass by logging
+	// nothing at all.
+	out := workerLog.String()
+	for _, line := range []string{
+		"jobs: exhausted attempts",
+		"jobs: terminal failure",
+		"jobs: retrying",
+	} {
+		if !strings.Contains(out, line) {
+			t.Fatalf("the worker never logged %q, so this test proved nothing about it:\n%s", line, out)
+		}
+	}
+
+	for name, secret := range secrets {
+		if strings.Contains(out, secret) {
+			t.Fatalf("the worker's own log leaked the %s (%q) with a plain handler installed. "+
+				"Redaction must happen at the call site, not in whichever handler the process "+
+				"happened to wire up.\n%s", name, secret, out)
+		}
+	}
+	// The line must still be USEFUL: an operator needs the cause, not a blank.
+	if !strings.Contains(out, "upload failed") {
+		t.Fatalf("redaction removed the diagnosis as well as the secret:\n%s", out)
+	}
+	t.Logf("%d log bytes across three branches, all seven credential classes absent", len(out))
+}
+
+// startWorker runs w and GUARANTEES its goroutine is gone before the test
+// returns.
+//
+// Five tests here used to leave `go func() { _ = w.Run(ctx) }()` running with
+// only a `defer cancel()`, so a worker outlived its test. That matters because
+// NewWorker registers KindNoop UNCONDITIONALLY (internal/jobs/worker.go), which
+// means every worker in this suite polls for `noop` — the kind most of these
+// tests enqueue. A leaked one is therefore a live route to claiming the NEXT
+// test's job.
+//
+// It is NOT what caused verifier FINDING V-1: the diagnostic at the moment of
+// failure showed a single backend connected and the row still queued and
+// unleased, and the cause was the application-vs-database clock comparison
+// fixed in EnqueueJob. But `-shuffle=on` now reorders these tests on every run,
+// and "the pool would probably have been closed by then" is not an isolation
+// argument.
+func startWorker(t *testing.T, ctx context.Context, cancel context.CancelFunc, w *jobs.Worker) {
+	t.Helper()
+	stopped := make(chan struct{})
+	go func() { _ = w.Run(ctx); close(stopped) }()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-stopped:
+		case <-time.After(30 * time.Second):
+			// Never silently: a worker that will not stop is a drain bug, and
+			// the next test would inherit it.
+			t.Errorf("the worker goroutine did not return within 30s of cancellation; "+
+				"it is still polling and the next test would run alongside it (%s)", t.Name())
+		}
+	})
 }
 
 // safeBuffer is a bytes.Buffer the worker's goroutines may write to while the
