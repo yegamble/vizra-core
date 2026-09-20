@@ -1,0 +1,17 @@
+$ make openapi-verify
+==> openapi-verify
+--- FAIL: TestEverySpecOperationHasARoute (0.00s)
+    openapi_contract_test.go:124: api/openapi.yaml describes 1 operation(s) cmd/api does not serve:
+          GET /stats
+        
+        A published contract that 404s is worse than an undocumented route: vizra-user generates a client from this file.
+--- FAIL: TestM0ContractIsTheFourProbes (0.00s)
+    openapi_contract_test.go:155: the M0 public contract is
+          [GET /healthz GET /readyz GET /schemaz GET /stats GET /version]
+        want
+          [GET /healthz GET /readyz GET /schemaz GET /version]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.626s
+FAIL
+make: *** [openapi-verify] Error 1
+EXIT=2

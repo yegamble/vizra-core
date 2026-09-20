@@ -1,0 +1,28 @@
+=== R-1: delete the doctor.CheckSchema CALL SITE in cmd/vizra/doctor.go ===
+--- FAIL: TestDoctorReportsEveryCheck (0.00s)
+    doctor_test.go:116: `vizra doctor` does not report "schema".
+        Its call site in cmd/vizra/doctor.go is missing, so the check has silently vanished from what an operator sees — whatever internal/doctor's own tests say.
+        reported: configuration, docker compose, database, database version, cache, cache version floor, search
+--- FAIL: TestDoctorFailsAndExitsNonZeroOnEachRealDefect (0.00s)
+    --- FAIL: TestDoctorFailsAndExitsNonZeroOnEachRealDefect/schema_behind (0.00s)
+        doctor_test.go:233: no check named "schema" in [configuration docker compose database database version cache cache version floor search]
+    --- FAIL: TestDoctorFailsAndExitsNonZeroOnEachRealDefect/schema_dirty (0.00s)
+        doctor_test.go:233: no check named "schema" in [configuration docker compose database database version cache cache version floor search]
+FAIL
+--- and internal/doctor's own tests still pass, which is exactly why this mutant survived before ---
+ok  	github.com/yegamble/vizra-core/internal/doctor	0.250s
+
+=== R-2: remove ReadTimeout and WriteTimeout from the api server ===
+--- FAIL: TestAPIServerBoundsEveryPhaseOfAConnection (0.00s)
+    main_test.go:35: ReadTimeout is zero. In net/http zero means NO LIMIT, not a sensible default: once the headers are in, a slow-body client holds the connection indefinitely.
+    main_test.go:35: WriteTimeout is zero. In net/http zero means NO LIMIT, not a sensible default: a client that stops reading the response holds the handler and its connection.
+    main_test.go:48: ReadHeaderTimeout (10s) exceeds ReadTimeout (0s); the header budget would never bite
+FAIL
+FAIL	github.com/yegamble/vizra-core/cmd/api	0.347s
+FAIL
+
+=== restored: both green ===
+ok  	github.com/yegamble/vizra-core/cmd/api	0.596s
+ok  	github.com/yegamble/vizra-core/cmd/vizra	0.354s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+EXIT=0

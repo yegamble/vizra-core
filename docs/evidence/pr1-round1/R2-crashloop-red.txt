@@ -1,0 +1,8 @@
+=== Backend Finding 1 RED: revert the two query edits (attempts guard + sweep dead-letter) ===
+--- FAIL: TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue (0.52s)
+    golden_test.go:842: cycle 3: ClaimJob failed: ERROR: new row for relation "jobs" violates check constraint "jobs_attempts_bounded" (SQLSTATE 23514)
+        A claim must never raise jobs_attempts_bounded: the exhausted row is then permanently at the head of the claim order and no other job is ever claimed.
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	0.909s
+FAIL
+EXIT=0

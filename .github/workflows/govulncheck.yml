@@ -1,0 +1,27 @@
+# govulncheck — known vulnerabilities in the dependency set (ADR-001 § Bump
+# policy). A floor lane.
+name: govulncheck
+
+on:
+  pull_request:
+  merge_group:
+  schedule:
+    # Weekly, so a vulnerability disclosed after a merge is still found.
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: govulncheck
+        run: make govulncheck

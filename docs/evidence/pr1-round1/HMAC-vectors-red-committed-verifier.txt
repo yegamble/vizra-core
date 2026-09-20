@@ -1,0 +1,33 @@
+$ go test -count=1 -run TestHMAC ./internal/search/
+--- FAIL: TestHMACNegativeTestVectors (0.00s)
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-plus (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: the timestamp must be bare decimal digits: ParseInt accepts a leading '+', so a verifier that reformats the header would accept what a verifier that signs it verbatim refuses
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-zero (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: bare decimal digits, first digit non-zero
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-zeros (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: bare decimal digits, first digit non-zero
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-year-10000 (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: above max_timestamp_unix; this is the value that was ACCEPTED before the magnitude check existed
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-duration-overflow-ahead (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: above max_timestamp_unix; subtracting this as a derived duration overflows
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-duration-overflow-far (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: above max_timestamp_unix
+    --- FAIL: TestHMACNegativeTestVectors/nonce-uppercase-hex (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: the nonce must be LOWERCASE hex; a verifier that lowercased it would accept what a verbatim verifier refuses
+    --- FAIL: TestHMACNegativeTestVectors/nonce-not-hex (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: hex characters only
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-duplicated-header (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: a duplicated signature header is ambiguous — one implementation reads the first value and another the last; refuse rather than pick
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/search	0.465s
+FAIL
+EXIT=1

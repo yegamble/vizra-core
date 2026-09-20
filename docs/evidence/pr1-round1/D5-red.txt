@@ -1,0 +1,19 @@
+$ make migrate-lint
+==> migrate-lint
+migrate-lint: migrations
+  ok    4 migrations form a gapless 1..4 sequence
+  FAIL  migrations/manifest.sha256 does not match the files on disk.
+
+        4c4
+        < 779b50280408bf1f22a4fd3d04da6ce282cbeef151a0102ab2efa4b60e15244b  0002_jobs.up.sql
+        ---
+        > 1c245472a4ae3f433ef8863bd0c177ca852ad210252901a98f9e8fab00510d45  0002_jobs.up.sql
+
+        A CHANGED hash for an existing migration is an append-only violation:
+        a database that already applied it will never re-apply it, so the edit
+        produces two different schemas claiming the same version. Fix it with a
+        NEW migration instead.
+        Only when you have ADDED a migration: make migrations-manifest
+migrate-lint: FAILED
+make: *** [migrate-lint] Error 1
+EXIT=2

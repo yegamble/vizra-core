@@ -1,0 +1,67 @@
+--- M8a: the schema-drift check reports statusOK ---
+--- FAIL: TestCheckSchema (0.00s)
+    --- FAIL: TestCheckSchema/behind:_the_code_may_be_reading_columns_that_do_not_exist (0.00s)
+        doctor_test.go:79: status = OK, want FAIL (detail "database at 2, this binary embeds 4: run `vizra migrate`").
+            A doctor that reports OK on a drifted schema actively misdirects the investigation.
+    --- FAIL: TestCheckSchema/ahead:_this_binary_must_not_be_rolled_out (0.00s)
+        doctor_test.go:79: status = OK, want FAIL (detail "database at 9 is NEWER than this binary's 4: refused").
+            A doctor that reports OK on a drifted schema actively misdirects the investigation.
+    --- FAIL: TestCheckSchema/dirty:_a_migration_failed_part-way (0.00s)
+        doctor_test.go:79: status = OK, want FAIL (detail "resolve it deliberately").
+            A doctor that reports OK on a drifted schema actively misdirects the investigation.
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.258s
+EXIT=0
+error: pathspec 'internal/doctor/doctor.go' did not match any file(s) known to git
+--- M8b: the cache floor check is deleted ---
+--- FAIL: TestCheckCacheReportsFlavourAndVersion (0.00s)
+    doctor_test.go:145: no check named "cache version floor" in [{Name:cache Status:OK Detail:valkey 9.1.2}]
+--- FAIL: TestCheckCacheBelowTheFloorFails (0.00s)
+    doctor_test.go:152: no check named "cache version floor" in [{Name:cache Status:OK Detail:redis 6.2.0}]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.299s
+FAIL
+EXIT=0
+error: pathspec 'internal/doctor/doctor.go' did not match any file(s) known to git
+--- M8c: an invalid configuration reports statusOK ---
+--- FAIL: TestCheckConfigReportsEveryProblemAndFails (0.00s)
+    doctor_test.go:214: config: VIZRA_CORS_ALLOWED_ORIGINS reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_DEV_DISABLE_AUTH reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_MFA_KEY_KEK reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_PUBLIC_ORIGIN reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_SESSION_SECRET reported OK for an invalid configuration
+    doctor_test.go:218: an invalid configuration exits 0; `vizra doctor && deploy` would proceed
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.255s
+FAIL
+EXIT=0
+error: pathspec 'internal/doctor/doctor.go' did not match any file(s) known to git
+--- restored: all green ---
+--- FAIL: TestCheckSchema (0.00s)
+    --- FAIL: TestCheckSchema/behind:_the_code_may_be_reading_columns_that_do_not_exist (0.00s)
+        doctor_test.go:79: status = OK, want FAIL (detail "database at 2, this binary embeds 4: run `vizra migrate`").
+            A doctor that reports OK on a drifted schema actively misdirects the investigation.
+    --- FAIL: TestCheckSchema/ahead:_this_binary_must_not_be_rolled_out (0.00s)
+        doctor_test.go:79: status = OK, want FAIL (detail "database at 9 is NEWER than this binary's 4: refused").
+            A doctor that reports OK on a drifted schema actively misdirects the investigation.
+    --- FAIL: TestCheckSchema/dirty:_a_migration_failed_part-way (0.00s)
+        doctor_test.go:79: status = OK, want FAIL (detail "resolve it deliberately").
+            A doctor that reports OK on a drifted schema actively misdirects the investigation.
+--- FAIL: TestCheckCacheReportsFlavourAndVersion (0.00s)
+    doctor_test.go:145: no check named "cache version floor" in [{Name:cache Status:OK Detail:valkey 9.1.2}]
+--- FAIL: TestCheckCacheBelowTheFloorFails (0.00s)
+    doctor_test.go:152: no check named "cache version floor" in [{Name:cache Status:OK Detail:redis 6.2.0}]
+--- FAIL: TestCheckConfigReportsEveryProblemAndFails (0.00s)
+    doctor_test.go:214: config: VIZRA_CORS_ALLOWED_ORIGINS reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_DEV_DISABLE_AUTH reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_MFA_KEY_KEK reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_PUBLIC_ORIGIN reported OK for an invalid configuration
+    doctor_test.go:214: config: VIZRA_SESSION_SECRET reported OK for an invalid configuration
+    doctor_test.go:218: an invalid configuration exits 0; `vizra doctor && deploy` would proceed
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.237s
+FAIL
+EXIT=1
+$ go test -count=1 ./internal/doctor/   # all three mutants reverted
+ok  	github.com/yegamble/vizra-core/internal/doctor	0.424s
+EXIT=0

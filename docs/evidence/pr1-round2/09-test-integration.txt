@@ -1,0 +1,23 @@
+
+$ make test-integration (PostgreSQL 18.6 + Valkey 9.1.2)
+==> test-integration
+ok  	github.com/yegamble/vizra-core/cmd/api	1.565s
+ok  	github.com/yegamble/vizra-core/cmd/vizra	2.348s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/authz	1.955s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/cache	1.798s
+ok  	github.com/yegamble/vizra-core/internal/config	1.263s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.138s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	2.727s
+ok  	github.com/yegamble/vizra-core/internal/integration	8.742s
+ok  	github.com/yegamble/vizra-core/internal/jobs	3.762s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/obs	1.948s
+ok  	github.com/yegamble/vizra-core/internal/search	1.983s
+ok  	github.com/yegamble/vizra-core/internal/site	2.007s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+ok  	github.com/yegamble/vizra-core/scripts	3.606s
+EXIT=0

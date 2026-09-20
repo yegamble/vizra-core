@@ -1,0 +1,3 @@
+$ go test -count=1 ./internal/authz/   # after the fix
+ok  	github.com/yegamble/vizra-core/internal/authz	0.242s
+EXIT=0

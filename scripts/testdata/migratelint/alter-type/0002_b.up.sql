@@ -1,0 +1,1 @@
+ALTER TABLE widgets ALTER COLUMN id TYPE text;

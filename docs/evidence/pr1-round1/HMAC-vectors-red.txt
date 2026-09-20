@@ -1,0 +1,21 @@
+$ go test -count=1 -run TestHMACNegativeTestVectors ./internal/search/
+--- FAIL: TestHMACNegativeTestVectors (0.00s)
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-plus (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: the timestamp must be bare decimal digits: ParseInt accepts a leading '+', so a verifier that reformats the header would accept what a verifier that signs it verbatim refuses
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-zero (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: bare decimal digits, first digit non-zero
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-zeros (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: bare decimal digits, first digit non-zero
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-leading-space (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: bare decimal digits; no surrounding whitespace
+    --- FAIL: TestHMACNegativeTestVectors/timestamp-trailing-space (0.00s)
+        search_test.go:656: ACCEPTED a vector that must be rejected.
+              rule: bare decimal digits; no surrounding whitespace
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/search	0.455s
+FAIL
+EXIT=1

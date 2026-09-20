@@ -1,0 +1,7 @@
+$ go test -tags=integration -v -run TestAMultibyteErrorIsStoredInLastError ./internal/integration/
+# truncate() is rune-safe
+=== RUN   TestAMultibyteErrorIsStoredInLastError
+    golden_test.go:1421: stored 2014 bytes, valid UTF-8, redacted, message preserved
+--- PASS: TestAMultibyteErrorIsStoredInLastError (0.36s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	0.879s

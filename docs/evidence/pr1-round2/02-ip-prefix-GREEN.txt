@@ -1,0 +1,16 @@
+$ go test -tags=integration -v -run TestAuditEventsRefusesAFullIPAddress ./internal/integration/   # frozen grammar
+=== RUN   TestAuditEventsRefusesAFullIPAddress
+=== RUN   TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused
+=== RUN   TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused
+=== RUN   TestAuditEventsRefusesAFullIPAddress/uppercase_hex_is_refused
+=== RUN   TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted
+=== RUN   TestAuditEventsRefusesAFullIPAddress/null_is_accepted
+--- PASS: TestAuditEventsRefusesAFullIPAddress (0.07s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused (0.00s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused (0.00s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/uppercase_hex_is_refused (0.00s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted (0.00s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/null_is_accepted (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	0.565s
+EXIT=0

@@ -1,0 +1,14 @@
+$ ./scripts/ci-required-guard.sh
+ci-required-guard:
+  FAIL  required lane 'build-test' is MISSING from .github/required-checks.txt.
+        It is a floor lane (scripts/ci-required-guard.sh, FLOOR_LANES).
+        Deleting a manifest line does not shrink the gate; it turns this lane red.
+  ok    required check 'cache-matrix' resolves to a job
+  ok    required check 'govulncheck' resolves to a job
+  ok    required check 'docker-build' resolves to a job
+  ok    no continue-on-error on any lane
+  ok    no lane runs an empty test selection
+  ok    every job runs on GitHub-hosted ubuntu-24.04
+  ok    every third-party action is pinned to a commit SHA
+ci-required-guard: FAILED
+EXIT=1

@@ -1,0 +1,15 @@
+$ make sqlc-verify
+==> sqlc-verify
+--- a/internal/store/sqlcgen/jobs.sql.go
++++ b/internal/store/sqlcgen/jobs.sql.go
+@@ -38,7 +38,7 @@
+ WHERE id = (
+     SELECT id FROM jobs
+     WHERE state = 'queued'
+-      AND run_after <= now() + interval '1 hour'
++      AND run_after <= now()
+       AND kind = ANY($3::text[])
+     ORDER BY priority, run_after
+     FOR UPDATE SKIP LOCKED
+make: *** [sqlc-verify] Error 1
+EXIT=2

@@ -1,0 +1,101 @@
+# ci-required — the ONE required check (ADR-002 § CI fan-in).
+#
+# It runs on `pull_request` AND `merge_group`, so a merge-queue entry is gated by
+# the same check as the pull request. The ruleset requires the `ci-required`
+# CONTEXT, which means an untriggered workflow leaves the merge BLOCKED rather
+# than invisibly unchecked.
+#
+# Anything other than success fails: failure, cancellation, timeout, SKIP, or
+# never having run. That is the whole point — a skipped required lane is not a
+# pass (AGENTS.md).
+name: ci-required
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+  checks: read
+  statuses: read
+
+jobs:
+  ci-required:
+    name: ci-required
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The guard runs FIRST and independently of the fan-in below. It enforces
+      # the floor: a pull request cannot shrink its own gate by deleting a line
+      # from .github/required-checks.txt.
+      - name: Guard the manifest
+        run: ./scripts/ci-required-guard.sh
+
+      - name: Wait for every required check and fail on anything but success
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t required < <(grep -vE '^\s*(#|$)' .github/required-checks.txt | sed 's/[[:space:]]*$//')
+          printf 'required checks (%d): %s\n' "${#required[@]}" "${required[*]}"
+          printf 'head sha: %s\n\n' "$HEAD_SHA"
+
+          deadline=$(( $(date +%s) + 25*60 ))
+          while :; do
+            runs=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs?per_page=100" \
+                     --jq '.check_runs[] | "\(.name)\t\(.status)\t\(.conclusion // "")"')
+
+            pending=0
+            failed=0
+            report=""
+            for name in "${required[@]}"; do
+              line=$(printf '%s\n' "$runs" | awk -F'\t' -v n="$name" '$1==n {print; exit}')
+              if [ -z "$line" ]; then
+                # NEVER RAN is a failure condition, not a neutral one. It is
+                # treated as pending until the deadline, then fails.
+                report="${report}  PENDING   ${name} (no check run reported yet)\n"
+                pending=1
+                continue
+              fi
+              status=$(printf '%s' "$line" | cut -f2)
+              conclusion=$(printf '%s' "$line" | cut -f3)
+              if [ "$status" != "completed" ]; then
+                report="${report}  ${status^^}   ${name}\n"
+                pending=1
+                continue
+              fi
+              case "$conclusion" in
+                success)
+                  report="${report}  SUCCESS   ${name}\n" ;;
+                # Everything else — failure, cancelled, timed_out, skipped,
+                # neutral, action_required, stale — is NOT a pass.
+                *)
+                  report="${report}  FAILED    ${name} (conclusion: ${conclusion:-none})\n"
+                  failed=1 ;;
+              esac
+            done
+
+            printf "%b" "$report"
+
+            if [ $failed -eq 1 ]; then
+              echo
+              echo "::error::a required check did not succeed. A skipped, cancelled, timed-out or never-run lane is not a pass."
+              exit 1
+            fi
+            if [ $pending -eq 0 ]; then
+              echo
+              echo "all ${#required[@]} required check(s) succeeded"
+              exit 0
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo
+              echo "::error::timed out waiting for required checks. A check that never ran is not a pass."
+              exit 1
+            fi
+            sleep 20
+            echo "--- re-polling ---"
+          done

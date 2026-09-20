@@ -1,0 +1,53 @@
+# Secret-scanning exclusions — one path, one written reason, no blanket globs.
+#
+# WHY THIS FILE EXISTS. Silencing a scanner is not a fix. Neither is a scanner
+# that is red forever: an alert nobody reads is an alert that will not be read
+# on the day it matters. The middle is an explicit list where every entry names
+# the value and says why it is not a credential, reviewable in a diff and under
+# CODEOWNERS so widening it needs owner review.
+#
+# TRIAGE VERDICT (recorded here so a later auditor does not re-litigate it):
+# every hit on this branch was enumerated against real credential formats —
+# AKIA*, gh[pousr]_*, glpat-, sk-, xox*-, PEM private-key headers, JWTs — across
+# all branch commits. ZERO matches. NOTHING NEEDS ROTATING. Every value below is
+# synthetic and several are LOAD-BEARING: they are the inputs to the redaction
+# tests, and deleting them would delete the coverage.
+#
+# There is deliberately NO `*_test.go` glob. A real secret in a test file is
+# still a real secret, and a test directory is exactly where one gets pasted
+# "just to try it".
+
+version: 2
+
+secret:
+  ignored-paths:
+    # The local-development quickstart. `vizra:vizra` on a throwaway container
+    # bound to 127.0.0.1 on a non-default port, documented so a contributor can
+    # copy-paste it. CI no longer sets a password at all
+    # (POSTGRES_HOST_AUTH_METHOD=trust); this is the human-facing equivalent.
+    - README.md
+
+    # The INPUTS to the log-redaction tests. "hunter2" and "s3cr3tpw" are
+    # self-evidently fake, and their whole purpose is to be fed to obs.Redact so
+    # the test can assert they never reach a log line. Remove them and
+    # VZ-OPS-005 loses its coverage.
+    - internal/obs/log_test.go
+
+    # `postgres://vizra:pw@db:5432/vizra` as a parser fixture for the site
+    # resolver. It is never dialled.
+    - internal/site/site_test.go
+
+    # `http://user:sup3rsecret@127.0.0.1:1/` — the fixture for
+    # TestTransportErrorDoesNotLeakCredentials, which asserts that a userinfo
+    # URL in a transport error never reaches a log line. Port 1, never reachable.
+    - internal/search/search_test.go
+
+    # The HMAC test vectors. `key_utf8` is a published TEST VECTOR that both
+    # repositories sign against; it is not a credential to anything.
+    #
+    # It IS, however, a usable production key shape, which is a design problem
+    # rather than a leak — so the control is not this exclusion. internal/config
+    # refuses this exact value in production by exact match
+    # (knownPublishedSecrets), and the file carries a `key_utf8_warning` saying
+    # so. See api/README.md.
+    - api/search-hmac-testvectors.json

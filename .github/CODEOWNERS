@@ -1,0 +1,47 @@
+# CODEOWNERS — ADR-002 § Branch protection and rulesets, item 7.
+#
+# Owner review is required for workflows, gate scripts, the required-check
+# manifest, migrations, the API contracts, and the privacy/auth modules. The
+# reason is concrete: a required-checks manifest edited in the same PR as the
+# code it guards defeats the gate.
+#
+# NOTE: this file lists the owners. The RULESET that makes the review mandatory
+# is applied by the repository owner after PR1 lands, because `ci-required` must
+# exist before it can be a required check (ADR-002 item 9). Until that ruleset is
+# applied, no ledger entry may reach VERIFIED on CI evidence alone (item 10).
+
+# Default: the owner.
+*                       @yegamble
+
+# The gate itself.
+/.github/               @yegamble
+/.github/workflows/     @yegamble
+/.github/required-checks.txt @yegamble
+/.github/expected-ruleset.json @yegamble
+/scripts/               @yegamble
+/Makefile               @yegamble
+
+# Contract sources. One owner per slice; other repositories consume them at a
+# recorded commit SHA.
+/api/                   @yegamble
+/api/**                 @yegamble
+
+# Append-only, and compiled into the release binary. The third layer of the
+# append-only guarantee, after migration-manifest.sh (self-consistency) and the
+# `append-only` CI job (the merge-base diff): a changed hash needs owner review
+# even if both mechanical checks were somehow satisfied.
+/migrations/            @yegamble
+/migrations/**          @yegamble
+
+# The secret-scanner exclusions. Widening them must need owner review, or the
+# exclusion list becomes the way a real secret gets in.
+/.gitguardian.yaml      @yegamble
+/sqlc.yaml              @yegamble
+/store/queries/         @yegamble
+
+# Privacy and authorization. ADR-002 names internal/auth*, internal/authz and
+# internal/privacy explicitly.
+/internal/authz/        @yegamble
+/internal/auth/         @yegamble
+/internal/privacy/      @yegamble
+/internal/config/       @yegamble

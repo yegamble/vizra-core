@@ -1,0 +1,3 @@
+$ go test -count=1 ./internal/config/   # after the fix
+ok  	github.com/yegamble/vizra-core/internal/config	0.480s
+EXIT=0

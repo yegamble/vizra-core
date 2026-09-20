@@ -1,0 +1,3 @@
+$ go test -count=1 ./internal/search/
+ok  	github.com/yegamble/vizra-core/internal/search	0.790s
+EXIT=0

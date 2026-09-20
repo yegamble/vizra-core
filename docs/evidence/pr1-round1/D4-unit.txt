@@ -1,0 +1,42 @@
+$ go test -count=1 -v -run TestProductionRefusesDevSecrets|TestProductionRefusesShortSecrets|TestProductionRefusesMissingSecrets|TestProductionRefusesWildcardCORS|TestEveryEscapeHatchIsRefusedInProduction ./internal/config/
+=== RUN   TestProductionRefusesDevSecrets
+=== RUN   TestProductionRefusesDevSecrets/dev
+=== RUN   TestProductionRefusesDevSecrets/devsecret
+=== RUN   TestProductionRefusesDevSecrets/changeme
+=== RUN   TestProductionRefusesDevSecrets/change-me-change-me-change-me-ch
+=== RUN   TestProductionRefusesDevSecrets/insecure-development-session-secret-0123456789
+=== RUN   TestProductionRefusesDevSecrets/vizra-dev-secret-vizra-dev-secret
+=== RUN   TestProductionRefusesDevSecrets/test-test-test-test-test-test-te
+--- PASS: TestProductionRefusesDevSecrets (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/dev (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/devsecret (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/changeme (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/change-me-change-me-change-me-ch (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/insecure-development-session-secret-0123456789 (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/vizra-dev-secret-vizra-dev-secret (0.00s)
+    --- PASS: TestProductionRefusesDevSecrets/test-test-test-test-test-test-te (0.00s)
+=== RUN   TestProductionRefusesShortSecrets
+--- PASS: TestProductionRefusesShortSecrets (0.00s)
+=== RUN   TestProductionRefusesMissingSecrets
+--- PASS: TestProductionRefusesMissingSecrets (0.00s)
+=== RUN   TestProductionRefusesWildcardCORS
+--- PASS: TestProductionRefusesWildcardCORS (0.00s)
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_DISABLE_AUTH
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_ALLOW_ANY_ORIGIN
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_SKIP_MIGRATIONS
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_AUTOLOGIN_USER
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_FAKE_SEARCH
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_INSECURE_COOKIES
+=== RUN   TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_TRUST_ANY_HMAC
+--- PASS: TestEveryEscapeHatchIsRefusedInProduction (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_DISABLE_AUTH (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_ALLOW_ANY_ORIGIN (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_SKIP_MIGRATIONS (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_AUTOLOGIN_USER (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_FAKE_SEARCH (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_INSECURE_COOKIES (0.00s)
+    --- PASS: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_TRUST_ANY_HMAC (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/config	0.954s
+EXIT=0

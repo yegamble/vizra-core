@@ -1,0 +1,3 @@
+$ go test -v -run "TestHMAC" ./internal/search/
+ok  	github.com/yegamble/vizra-core/internal/search	0.296s
+EXIT=0

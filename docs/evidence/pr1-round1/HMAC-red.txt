@@ -1,0 +1,31 @@
+$ go test -run "TestTimestampWindowAcrossTheMagnitudeRange|TestTimestampHeaderMustBeBareDecimalDigits|TestMethodMustAlreadyBeUppercase|TestNonceMustBeLowercaseHex" ./internal/search/
+--- FAIL: TestTimestampWindowAcrossTheMagnitudeRange (0.00s)
+    --- FAIL: TestTimestampWindowAcrossTheMagnitudeRange/just_past_the_Duration_overflow,_ahead (0.00s)
+        search_test.go:487: timestamp 11089000000 was ACCEPTED with a valid signature. The timestamp window is the only replay bound at M0; this request never expires.
+    --- FAIL: TestTimestampWindowAcrossTheMagnitudeRange/far_beyond_the_Duration_overflow (0.00s)
+        search_test.go:487: timestamp 1001789000000 was ACCEPTED with a valid signature. The timestamp window is the only replay bound at M0; this request never expires.
+    --- FAIL: TestTimestampWindowAcrossTheMagnitudeRange/year_10000 (0.00s)
+        search_test.go:487: timestamp 253402300799 was ACCEPTED with a valid signature. The timestamp window is the only replay bound at M0; this request never expires.
+--- FAIL: TestTimestampHeaderMustBeBareDecimalDigits (0.00s)
+    --- FAIL: TestTimestampHeaderMustBeBareDecimalDigits/"+1789000000" (0.00s)
+        search_test.go:537: timestamp header "+1789000000" was accepted; it is not bare decimal digits, so vizra-search and vizra-core would disagree about whether this request is valid
+    --- FAIL: TestTimestampHeaderMustBeBareDecimalDigits/"01789000000" (0.00s)
+        search_test.go:537: timestamp header "01789000000" was accepted; it is not bare decimal digits, so vizra-search and vizra-core would disagree about whether this request is valid
+    --- FAIL: TestTimestampHeaderMustBeBareDecimalDigits/"0001789000000" (0.00s)
+        search_test.go:537: timestamp header "0001789000000" was accepted; it is not bare decimal digits, so vizra-search and vizra-core would disagree about whether this request is valid
+--- FAIL: TestMethodMustAlreadyBeUppercase (0.00s)
+    --- FAIL: TestMethodMustAlreadyBeUppercase/post (0.00s)
+        search_test.go:554: Sign accepted the method "post"; it must be uppercase on the wire
+    --- FAIL: TestMethodMustAlreadyBeUppercase/Post (0.00s)
+        search_test.go:554: Sign accepted the method "Post"; it must be uppercase on the wire
+    --- FAIL: TestMethodMustAlreadyBeUppercase/pOsT (0.00s)
+        search_test.go:554: Sign accepted the method "pOsT"; it must be uppercase on the wire
+--- FAIL: TestNonceMustBeLowercaseHex (0.00s)
+    --- FAIL: TestNonceMustBeLowercaseHex/00112233445566778899AABBCCDDEEFF (0.00s)
+        search_test.go:599: nonce "00112233445566778899AABBCCDDEEFF" was accepted
+    --- FAIL: TestNonceMustBeLowercaseHex/00112233445566778899aabbccddeegg (0.00s)
+        search_test.go:599: nonce "00112233445566778899aabbccddeegg" was accepted
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/search	0.436s
+FAIL
+EXIT=1
