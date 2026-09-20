@@ -1,0 +1,673 @@
+# Vizra core <-> search INTERNAL contract.
+#
+# OWNERSHIP: this file is the canonical copy and lives in `vizra-core`
+# (ADR-002 § Search service and boundary, Q-001: "the internal contract is
+# written in core's canonical OpenAPI and drift-checked in both repos").
+# `vizra-search` implements it and vendors a byte-identical copy at
+# `api/search-internal.openapi.yaml`; both repositories run a drift check, so a
+# change on one side turns the other side red. Change it in core, in a PR that
+# the search repository's drift check then forces to follow.
+#
+# core is the CLIENT of `/internal/v1/*` and never serves those routes, so these
+# operations are deliberately absent from `api/openapi.yaml` and are excluded
+# from core's route<->spec check. `vizra-search` is the server and its own
+# route<->spec check covers them in both directions.
+#
+# These routes are never exposed to the public internet: they are bound to the
+# private compose network, carry no session cookie, and are authenticated only by
+# the HMAC scheme below.
+openapi: 3.0.3
+
+info:
+  title: Vizra internal search contract (core -> search)
+  description: |
+    The complete surface `vizra-search` serves. Three HMAC-authenticated
+    operations under `/internal/v1/`, plus the three operational probes an
+    operator and compose healthcheck need.
+
+    **`not_indexed` is not an error.** Until `vizra-search` owns migrations and
+    has an index, every internal operation answers 200 with
+    `status: not_indexed`. Core treats that as an instruction to fall back to its
+    own `sql` implementation. A transport error, a 5xx, a signature rejection or
+    a timeout is a *fault*: core still serves the request from SQL, but readiness
+    reports `search: degraded` and `vizra doctor` FAILs. Q-001 forbids a silent
+    fallback — the distinction between `not_indexed` and a fault is the whole
+    point of this status field.
+  version: 0.1.0
+
+servers:
+  - url: "{searchBaseURL}"
+    description: Private compose-network address of vizra-search.
+    variables:
+      searchBaseURL:
+        default: http://search:8081
+
+tags:
+  - name: probes
+    description: Unauthenticated operational probes served by vizra-search.
+  - name: internal-search
+    description: HMAC-authenticated internal operations called by vizra-core.
+
+paths:
+  /healthz:
+    get:
+      tags: [probes]
+      operationId: searchGetHealthz
+      summary: Liveness probe
+      description: Liveness only; performs no dependency I/O.
+      security: []
+      responses:
+        "200":
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: The process is draining.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /readyz:
+    get:
+      tags: [probes]
+      operationId: searchGetReadyz
+      summary: Readiness probe
+      description: |
+        PostgreSQL unreachable yields 503. A search service that has no schema
+        yet is *ready*: it answers `status: ok` and reports
+        `search_schema_version: null`, because answering `not_indexed` is its
+        correct M0 behaviour, not a fault.
+      security: []
+      responses:
+        "200":
+          description: Ready. `status` is `ok` or `degraded`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchReadinessResponse"
+        "503":
+          description: Not ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchReadinessResponse"
+
+  /version:
+    get:
+      tags: [probes]
+      operationId: searchGetVersion
+      summary: Build identity
+      security: []
+      responses:
+        "200":
+          description: Build identity of the running vizra-search binary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchVersionResponse"
+
+  /internal/v1/search:
+    post:
+      tags: [internal-search]
+      operationId: internalSearch
+      summary: Permission-aware search
+      description: |
+        The viewer context in the request is authoritative: `vizra-search` must
+        project results for exactly that viewer and must never return an item the
+        viewer may not see (ADR-007 § Frozen surface × visibility matrix, row 9).
+        Unlisted and private items are excluded except in the owner's own library
+        scope; grants never extend to search.
+      security:
+        - hmacSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+      responses:
+        "200":
+          description: |
+            Answered. `status: ok` carries results; `status: not_indexed` means
+            core must fall back to SQL and is not a fault.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/SignatureRejected"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /internal/v1/suggestions:
+    post:
+      tags: [internal-search]
+      operationId: internalSuggestions
+      summary: Permission-aware autosuggest
+      description: |
+        Same viewer projection rule as `/internal/v1/search`. A suggestion must
+        never reveal a term that only appears in items the viewer may not see,
+        and a suggestion count must never include such items (matrix row 5).
+      security:
+        - hmacSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestRequest"
+      responses:
+        "200":
+          description: Answered, or `not_indexed`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuggestResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/SignatureRejected"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /internal/v1/events:
+    post:
+      tags: [internal-search]
+      operationId: internalEvents
+      summary: Deliver an index-event batch
+      description: |
+        Core delivers index events from the durable `jobs` table (ADR-004), so a
+        batch WILL be delivered more than once. Each event carries an
+        `event_id`; `vizra-search` must be idempotent on it and report duplicates
+        rather than failing the batch. A batch is all-or-nothing: on 5xx core
+        retries the whole batch along the retry ladder.
+      security:
+        - hmacSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventBatch"
+      responses:
+        "200":
+          description: |
+            Accepted, or `not_indexed`. `not_indexed` means the events were
+            deliberately discarded because no index exists yet; core marks the
+            job succeeded rather than retrying forever.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAck"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/SignatureRejected"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+components:
+  securitySchemes:
+    hmacSignature:
+      type: apiKey
+      in: header
+      name: X-Vizra-Signature
+      description: |
+        Symmetric HMAC request signing. The shared secret is `SEARCH_HMAC_KEY`,
+        at least 32 bytes, identical in both processes and never logged.
+
+        The signer sends three headers:
+
+        - `X-Vizra-Timestamp` — unix seconds, as decimal digits.
+        - `X-Vizra-Nonce` — at least 16 bytes of randomness, lowercase hex.
+        - `X-Vizra-Signature` — `v1=` followed by the lowercase hex of
+          `HMAC-SHA256(SEARCH_HMAC_KEY, canonical)`.
+
+        `canonical` is these six fields joined by a single `\n`, with no trailing
+        newline:
+
+        ```
+        v1
+        <HTTP method, uppercase>
+        <request path, exactly as sent, no query string>
+        <X-Vizra-Timestamp>
+        <X-Vizra-Nonce>
+        <lowercase hex SHA-256 of the raw request body>
+        ```
+
+        The body hash is over the exact bytes sent, so the verifier must hash the
+        raw body before decoding it. An empty body hashes to the SHA-256 of the
+        empty string.
+
+        The verifier MUST: compare with a constant-time comparison; reject a
+        timestamp more than 300 seconds from its own clock in either direction;
+        reject a body above `MAX_INTERNAL_BODY_BYTES` (default 1 MiB) *before*
+        reading it, with 413; and reject a missing or malformed header with 401.
+        Nonce replay rejection is required once search owns storage; until then
+        the timestamp window is the only replay bound, and this is recorded as a
+        known limitation rather than implied to be covered.
+
+        Rejection is always 401 with body `{"error":{"code":"signature_rejected"}}`
+        and MUST NOT say which of the three headers was wrong.
+
+  responses:
+    BadRequest:
+      description: The request body did not satisfy the schema.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    SignatureRejected:
+      description: HMAC verification failed, or the timestamp was outside the window.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PayloadTooLarge:
+      description: The request body exceeded `MAX_INTERNAL_BODY_BYTES`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: "A fault. Core falls back to SQL and reports `search: degraded`."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unavailable:
+      description: A dependency of vizra-search is unavailable. Treated as a fault, not as `not_indexed`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    IndexStatus:
+      type: string
+      enum: [ok, not_indexed]
+      description: |
+        `not_indexed` is a successful answer meaning "I hold no index for this;
+        use your own SQL path". It is never used to report a fault.
+
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, draining]
+
+    SearchReadinessComponent:
+      type: object
+      additionalProperties: false
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          enum: [database]
+        status:
+          type: string
+          enum: [ok, degraded, unavailable]
+        detail:
+          type: string
+          description: Never contains a DSN or credential.
+
+    SearchReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [status, components, search_schema_version, checked_at]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unavailable]
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchReadinessComponent"
+        search_schema_version:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            Null until `vizra-search` owns migrations (M3). Null is the correct
+            M0 value and is not a fault.
+        checked_at:
+          type: string
+          format: date-time
+
+    SearchVersionResponse:
+      type: object
+      additionalProperties: false
+      required: [release, commit, built_at, go_version, search_schema_version]
+      properties:
+        release:
+          type: string
+        commit:
+          type: string
+        built_at:
+          type: string
+          format: date-time
+        go_version:
+          type: string
+        image_digest:
+          type: string
+          nullable: true
+        search_schema_version:
+          type: integer
+          format: int64
+          nullable: true
+
+    ViewerContext:
+      type: object
+      additionalProperties: false
+      required: [is_anonymous, role]
+      description: |
+        Who is asking. Authoritative for projection: `vizra-search` must not
+        consult any other source of identity, and must not return an item this
+        viewer may not see.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null for an anonymous viewer.
+        is_anonymous:
+          type: boolean
+        role:
+          type: string
+          enum: [anonymous, guest, member, manager, admin, owner]
+          description: Ordered role enum of ADR-003. `anonymous` is not a stored role.
+        scope:
+          type: string
+          enum: [site, own_library]
+          default: site
+          description: |
+            `own_library` is the only scope in which an owner's own unlisted and
+            private items may be returned (matrix row 9). In `site` scope they are
+            excluded even for the owner.
+
+    SiteContext:
+      type: object
+      additionalProperties: false
+      required: [handle]
+      description: Supplied by core's site resolver (ADR-007). One entry in core; the seam exists so tenancy is not precluded.
+      properties:
+        handle:
+          type: string
+          example: default
+        base_url:
+          type: string
+
+    SearchFilters:
+      type: object
+      additionalProperties: false
+      properties:
+        tags:
+          type: array
+          items: { type: string }
+          maxItems: 32
+        categories:
+          type: array
+          items: { type: string }
+          maxItems: 32
+        owner_ids:
+          type: array
+          items: { type: string, format: uuid }
+          maxItems: 32
+        licenses:
+          type: array
+          items: { type: string }
+          maxItems: 32
+        album_id:
+          type: string
+          format: uuid
+          nullable: true
+        camera_make:
+          type: string
+        camera_model:
+          type: string
+        taken_from:
+          type: string
+          format: date-time
+        taken_to:
+          type: string
+          format: date-time
+        safety:
+          type: string
+          enum: [safe, moderate, restricted]
+          description: Safety ceiling; results above it are excluded.
+
+    SearchRequest:
+      type: object
+      additionalProperties: false
+      required: [query, viewer, site]
+      properties:
+        query:
+          type: string
+          minLength: 0
+          maxLength: 512
+        viewer:
+          $ref: "#/components/schemas/ViewerContext"
+        site:
+          $ref: "#/components/schemas/SiteContext"
+        filters:
+          $ref: "#/components/schemas/SearchFilters"
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
+        sort:
+          type: string
+          enum: [relevance, newest, oldest]
+          default: relevance
+        correlation_id:
+          type: string
+          description: Propagated for log correlation. Never an identifier of the viewer.
+
+    SearchHit:
+      type: object
+      additionalProperties: false
+      required: [asset_id, public_key]
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+        public_key:
+          type: string
+          description: The asset's public short id (ADR-007). Never a storage key.
+        score:
+          type: number
+          format: double
+
+    SearchResponse:
+      type: object
+      additionalProperties: false
+      required: [status, results, total]
+      properties:
+        status:
+          $ref: "#/components/schemas/IndexStatus"
+        results:
+          type: array
+          description: Always present; empty when `status` is `not_indexed`.
+          items:
+            $ref: "#/components/schemas/SearchHit"
+        total:
+          type: integer
+          format: int64
+          description: Total matches the viewer may see. 0 when `not_indexed`.
+        took_ms:
+          type: integer
+        search_schema_version:
+          type: integer
+          format: int64
+          nullable: true
+
+    SuggestRequest:
+      type: object
+      additionalProperties: false
+      required: [prefix, viewer, site]
+      properties:
+        prefix:
+          type: string
+          minLength: 1
+          maxLength: 128
+        viewer:
+          $ref: "#/components/schemas/ViewerContext"
+        site:
+          $ref: "#/components/schemas/SiteContext"
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 25
+          default: 10
+        correlation_id:
+          type: string
+
+    Suggestion:
+      type: object
+      additionalProperties: false
+      required: [text, kind]
+      properties:
+        text:
+          type: string
+        kind:
+          type: string
+          enum: [term, tag, category, user, album]
+        count:
+          type: integer
+          format: int64
+          description: Number of matching items THIS viewer may see; never a global count.
+
+    SuggestResponse:
+      type: object
+      additionalProperties: false
+      required: [status, suggestions]
+      properties:
+        status:
+          $ref: "#/components/schemas/IndexStatus"
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Suggestion"
+        took_ms:
+          type: integer
+
+    IndexEvent:
+      type: object
+      additionalProperties: false
+      required: [event_id, kind, occurred_at, subject_type, subject_id]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: |
+            Idempotency key. The same `event_id` may arrive more than once
+            because delivery is a durable job; the second arrival must be a
+            no-op counted in `duplicates`.
+        kind:
+          type: string
+          enum: [upsert, delete, visibility_changed, reindex_request]
+        occurred_at:
+          type: string
+          format: date-time
+        subject_type:
+          type: string
+          enum: [asset, album, user, tag, category]
+        subject_id:
+          type: string
+          format: uuid
+        visibility_version:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            The subject's `visibility_version` at the time of the event
+            (ADR-007). An event carrying a version below one already applied must
+            be ignored, so out-of-order delivery cannot resurrect a stale
+            projection.
+        payload:
+          type: object
+          description: |
+            Projection fields for `upsert`. Deliberately loose in M0: the
+            projection schema is fixed by VZ-SEARCH-001 in M3, in an amendment to
+            this contract.
+          additionalProperties: true
+
+    EventBatch:
+      type: object
+      additionalProperties: false
+      required: [site, events]
+      properties:
+        site:
+          $ref: "#/components/schemas/SiteContext"
+        events:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/IndexEvent"
+        correlation_id:
+          type: string
+
+    EventAck:
+      type: object
+      additionalProperties: false
+      required: [status, accepted, duplicates]
+      properties:
+        status:
+          $ref: "#/components/schemas/IndexStatus"
+        accepted:
+          type: integer
+          description: Events applied. 0 when `not_indexed`.
+        duplicates:
+          type: integer
+          description: Events whose `event_id` had already been applied.
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - bad_request
+                - signature_rejected
+                - payload_too_large
+                - internal_error
+                - unavailable
+            message:
+              type: string
+              description: Never names which signature header was wrong, and never contains a credential.
+            request_id:
+              type: string

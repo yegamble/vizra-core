@@ -1,0 +1,307 @@
+# Vizra core — canonical public API contract.
+#
+# THIS FILE IS THE API SOURCE (ADR-002 § Contracts). Routes are written here
+# first and implemented second. `make openapi-verify` fails in both directions:
+# a route served by cmd/api that has no operation here, and an operation here
+# that cmd/api does not serve.
+#
+# The core<->search INTERNAL contract is NOT in this file. It lives beside it in
+# `api/search-internal.openapi.yaml`, because core is the client of those routes
+# and never serves them, and because `vizra-user` generates its TypeScript client
+# from this file and must never gain internal HMAC operations. See
+# docs/plans/2026-09-20-vizra-core-pr1-foundation.md § "Internal search contract
+# placement".
+openapi: 3.0.3
+
+info:
+  title: Vizra core API
+  description: |
+    Public HTTP API of `vizra-core`. In M0 this contract carries only the four
+    operational probes; product surfaces arrive with their own slices and are
+    added here before they are implemented.
+  version: 0.1.0
+  license:
+    name: See LICENSE in the vizra-core repository
+  contact:
+    name: Vizra
+    url: https://github.com/yegamble/vizra
+
+servers:
+  - url: "{publicOrigin}"
+    description: The configured public origin of the instance.
+    variables:
+      publicOrigin:
+        default: http://localhost:8080
+
+tags:
+  - name: probes
+    description: |
+      Liveness, readiness, build identity and schema state. These operations are
+      unauthenticated by design: they carry no user data, no credentials, no
+      signed URLs and no private metadata (ADR-002 § Logging and redaction).
+
+paths:
+  /healthz:
+    get:
+      tags: [probes]
+      operationId: getHealthz
+      summary: Liveness probe
+      description: |
+        Liveness only. Returns 200 as long as the process is running and has not
+        been asked to drain. It performs no dependency I/O, so it never turns red
+        because PostgreSQL or the cache is down — that is `/readyz`.
+      security: []
+      responses:
+        "200":
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: The process is draining and will stop accepting work.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /readyz:
+    get:
+      tags: [probes]
+      operationId: getReadyz
+      summary: Readiness probe
+      description: |
+        Drain-aware readiness with a 2 second single-flight cache (ADR-002
+        § Probes). PostgreSQL unreachable yields 503 `unavailable`. Every other
+        degraded dependency — cache unreachable, search misconfigured or
+        unreachable (Q-001), oldest queued job above the configured age
+        threshold (Q-028) — yields 200 `degraded` with the component named, so a
+        degraded instance keeps serving reads instead of being pulled out of
+        rotation.
+      security: []
+      responses:
+        "200":
+          description: Ready. `status` is `ok` or `degraded`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: Not ready. PostgreSQL is unreachable, or the process is draining.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+
+  /version:
+    get:
+      tags: [probes]
+      operationId: getVersion
+      summary: Build identity
+      description: |
+        Reports the release tag, commit, build time, Go toolchain, container
+        image digest, the libvips version and loader list recorded at image
+        build time (ADR-001), and the maximum migration version embedded in this
+        binary. The loader list is the only detector for a codec that entered the
+        image silently, so it is served, not merely logged.
+      security: []
+      responses:
+        "200":
+          description: Build identity of the running binary and image.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+
+  /schemaz:
+    get:
+      tags: [probes]
+      operationId: getSchemaz
+      summary: Migration ledger state
+      description: |
+        Always returns 200 (ADR-002 § Probes), including when the ledger is dirty
+        or behind, because `vizra update` and the deploy scripts read this to
+        decide whether an image may be rolled out and must be able to distinguish
+        "behind" from "unreachable". A schema problem is reported in the body,
+        never as a transport error.
+      security: []
+      responses:
+        "200":
+          description: Migration ledger state. Always 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchemaResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, draining]
+          description: "`ok` while serving; `draining` after SIGTERM."
+      example:
+        status: ok
+
+    ComponentStatus:
+      type: string
+      enum: [ok, degraded, unavailable, off]
+      description: |
+        `off` means the component is deliberately not configured (for example
+        `SEARCH_MODE=off`) and is not a fault. A configured-but-unreachable
+        component is `unavailable` or `degraded`, never `off` — Q-001 forbids a
+        silent fallback.
+
+    ReadinessComponent:
+      type: object
+      additionalProperties: false
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          description: Stable component identifier.
+          enum: [database, cache, search, worker, storage]
+        status:
+          $ref: "#/components/schemas/ComponentStatus"
+        detail:
+          type: string
+          description: |
+            Short human-readable reason. Must never contain credentials, DSNs,
+            signed URLs, session ids or API keys (ADR-002 § Logging and
+            redaction).
+
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [status, components, checked_at]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unavailable]
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReadinessComponent"
+        checked_at:
+          type: string
+          format: date-time
+          description: When this result was computed; may be up to 2 s old (single-flight cache).
+      example:
+        status: degraded
+        components:
+          - name: database
+            status: ok
+          - name: cache
+            status: degraded
+            detail: "cache unreachable; using in-process rate limiter"
+          - name: search
+            status: "off"
+          - name: worker
+            status: ok
+        checked_at: "2026-09-20T10:00:00Z"
+
+    LibvipsInfo:
+      type: object
+      additionalProperties: false
+      required: [version, loaders]
+      properties:
+        version:
+          type: string
+          description: libvips version the image was built against (ADR-001).
+          example: 8.18.6
+        loaders:
+          type: array
+          description: |
+            The loader list recorded from `vips -l` at image build time. An
+            unexpected entry here is how a codec that entered the image silently
+            is detected.
+          items:
+            type: string
+
+    VersionResponse:
+      type: object
+      additionalProperties: false
+      required: [release, commit, built_at, go_version, schema_version]
+      properties:
+        release:
+          type: string
+          description: Release tag, or `dev` for an unreleased build.
+          example: dev
+        commit:
+          type: string
+          description: Source commit of this binary.
+        built_at:
+          type: string
+          format: date-time
+        go_version:
+          type: string
+          example: go1.27.1
+        image_digest:
+          type: string
+          nullable: true
+          description: Index digest of the running container image; null outside a container.
+        libvips:
+          allOf:
+            - $ref: "#/components/schemas/LibvipsInfo"
+          nullable: true
+          description: Null in binaries built without the libvips image layer (for example `cmd/api` running from source).
+        schema_version:
+          type: integer
+          format: int64
+          description: Highest migration version embedded in this binary.
+        modules:
+          type: object
+          description: Selected pinned module versions, for operator diagnosis.
+          additionalProperties:
+            type: string
+
+    SchemaResponse:
+      type: object
+      additionalProperties: false
+      required: [applied_version, embedded_version, dirty, state]
+      properties:
+        applied_version:
+          type: integer
+          format: int64
+          description: Highest migration version applied to the connected database. 0 on an empty database.
+        embedded_version:
+          type: integer
+          format: int64
+          description: Highest migration version embedded in this binary.
+        dirty:
+          type: boolean
+          description: True when the migration ledger records a failed migration. Reported, never auto-repaired.
+        state:
+          type: string
+          enum: [current, behind, ahead, dirty, unknown]
+          description: |
+            `behind` — the database is older than this binary, run `vizra migrate`.
+            `ahead` — the database is newer than this binary; `vizra update` refuses
+            to roll this image out (ADR-002 § Rollback floor).
+            `unknown` — the ledger could not be read; still 200.
+        detail:
+          type: string
+          description: Short reason when `state` is `dirty` or `unknown`. Never contains a DSN.
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code.
+            message:
+              type: string
+              description: Human-readable message. Never contains credentials or private metadata.
+            request_id:
+              type: string
