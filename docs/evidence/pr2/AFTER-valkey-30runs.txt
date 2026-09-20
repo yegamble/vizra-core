@@ -1,37 +1,39 @@
-### leg=valkey mode=ordered
+### leg=valkey mode=ordered   (ROUND 1 re-measurement, final head)
+### source SHA: 2f0688c10694cccaea5f6920bffb3a36f24bbe9c  branch: fix/m0-stabilise  tree clean: 1 modified
 ### VIZRA_TEST_DATABASE_URL=postgres://vizra@127.0.0.1:55433/vizra_test?sslmode=disable
 ### VIZRA_TEST_CACHE_URL=redis://127.0.0.1:56380/0  flavour=valkey
-### source SHA: 415a6d19cfc0acedd8ad84c1857c95db0ed63627  branch: fix/m0-stabilise
-### go version go1.27.1 darwin/arm64 / Darwin arm64 / 2026-09-20T21:02:46Z
+### go version go1.27.1 darwin/arm64 / Darwin arm64 / 2026-09-20T23:30:30Z
+### command: go test -race -count=1 [-shuffle=SEED] -tags=integration ./...
+### shuffled runs use an EXPLICIT seed, recorded below, so every permutation is reproducible
 
-run  1 rc=0 ok-packages=13 
-run  2 rc=0 ok-packages=13 
-run  3 rc=0 ok-packages=13 
-run  4 rc=0 ok-packages=13 
-run  5 rc=0 ok-packages=13 
-run  6 rc=0 ok-packages=13 
-run  7 rc=0 ok-packages=13 
-run  8 rc=0 ok-packages=13 
-run  9 rc=0 ok-packages=13 
-run 10 rc=0 ok-packages=13 
-run 11 rc=0 ok-packages=13 
-run 12 rc=0 ok-packages=13 
-run 13 rc=0 ok-packages=13 
-run 14 rc=0 ok-packages=13 
-run 15 rc=0 ok-packages=13 
-run 16 rc=0 ok-packages=13 
-run 17 rc=0 ok-packages=13 
-run 18 rc=0 ok-packages=13 
-run 19 rc=0 ok-packages=13 
-run 20 rc=0 ok-packages=13 
-run 21 rc=0 ok-packages=13 
-run 22 rc=0 ok-packages=13 
-run 23 rc=0 ok-packages=13 
-run 24 rc=0 ok-packages=13 
-run 25 rc=0 ok-packages=13 
-run 26 rc=0 ok-packages=13 
-run 27 rc=0 ok-packages=13 
-run 28 rc=0 ok-packages=13 
-run 29 rc=0 ok-packages=13 
-run 30 rc=0 ok-packages=13 
+run  1 exit=0 ok-packages=13 order=source
+run  2 exit=0 ok-packages=13 order=source
+run  3 exit=0 ok-packages=13 order=source
+run  4 exit=0 ok-packages=13 order=source
+run  5 exit=0 ok-packages=13 order=source
+run  6 exit=0 ok-packages=13 order=source
+run  7 exit=0 ok-packages=13 order=source
+run  8 exit=0 ok-packages=13 order=source
+run  9 exit=0 ok-packages=13 order=source
+run 10 exit=0 ok-packages=13 order=source
+run 11 exit=0 ok-packages=13 order=source
+run 12 exit=0 ok-packages=13 order=source
+run 13 exit=0 ok-packages=13 order=source
+run 14 exit=0 ok-packages=13 order=source
+run 15 exit=0 ok-packages=13 order=source
+run 16 exit=0 ok-packages=13 order=source
+run 17 exit=0 ok-packages=13 order=source
+run 18 exit=0 ok-packages=13 order=source
+run 19 exit=0 ok-packages=13 order=source
+run 20 exit=0 ok-packages=13 order=source
+run 21 exit=0 ok-packages=13 order=source
+run 22 exit=0 ok-packages=13 order=source
+run 23 exit=0 ok-packages=13 order=source
+run 24 exit=0 ok-packages=13 order=source
+run 25 exit=0 ok-packages=13 order=source
+run 26 exit=0 ok-packages=13 order=source
+run 27 exit=0 ok-packages=13 order=source
+run 28 exit=0 ok-packages=13 order=source
+run 29 exit=0 ok-packages=13 order=source
+run 30 exit=0 ok-packages=13 order=source
 TOTAL FAILED RUNS: 0 / 30

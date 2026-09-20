@@ -1,37 +1,39 @@
-### leg=valkey mode=shuffle
+### leg=valkey mode=shuffle   (ROUND 1 re-measurement, final head)
+### source SHA: 2f0688c10694cccaea5f6920bffb3a36f24bbe9c  branch: fix/m0-stabilise  tree clean: 2 modified
 ### VIZRA_TEST_DATABASE_URL=postgres://vizra@127.0.0.1:55433/vizra_test?sslmode=disable
 ### VIZRA_TEST_CACHE_URL=redis://127.0.0.1:56380/0  flavour=valkey
-### source SHA: 4f02e18f555935e4d95c6427a953f4d0362ba899  branch: fix/m0-stabilise
-### go version go1.27.1 darwin/arm64 / Darwin arm64 / 2026-09-20T21:08:31Z
+### go version go1.27.1 darwin/arm64 / Darwin arm64 / 2026-09-20T23:36:03Z
+### command: go test -race -count=1 [-shuffle=SEED] -tags=integration ./...
+### shuffled runs use an EXPLICIT seed, recorded below, so every permutation is reproducible
 
-run  1 rc=0 ok-packages=13 
-run  2 rc=0 ok-packages=13 
-run  3 rc=0 ok-packages=13 
-run  4 rc=0 ok-packages=13 
-run  5 rc=0 ok-packages=13 
-run  6 rc=0 ok-packages=13 
-run  7 rc=0 ok-packages=13 
-run  8 rc=0 ok-packages=13 
-run  9 rc=0 ok-packages=13 
-run 10 rc=0 ok-packages=13 
-run 11 rc=0 ok-packages=13 
-run 12 rc=0 ok-packages=13 
-run 13 rc=0 ok-packages=13 
-run 14 rc=0 ok-packages=13 
-run 15 rc=0 ok-packages=13 
-run 16 rc=0 ok-packages=13 
-run 17 rc=0 ok-packages=13 
-run 18 rc=0 ok-packages=13 
-run 19 rc=0 ok-packages=13 
-run 20 rc=0 ok-packages=13 
-run 21 rc=0 ok-packages=13 
-run 22 rc=0 ok-packages=13 
-run 23 rc=0 ok-packages=13 
-run 24 rc=0 ok-packages=13 
-run 25 rc=0 ok-packages=13 
-run 26 rc=0 ok-packages=13 
-run 27 rc=0 ok-packages=13 
-run 28 rc=0 ok-packages=13 
-run 29 rc=0 ok-packages=13 
-run 30 rc=0 ok-packages=13 
+run  1 exit=0 ok-packages=13 shuffle-seed=402472026573992438
+run  2 exit=0 ok-packages=13 shuffle-seed=1285847831119825964
+run  3 exit=0 ok-packages=13 shuffle-seed=985052080530950727
+run  4 exit=0 ok-packages=13 shuffle-seed=2149571074165324592
+run  5 exit=0 ok-packages=13 shuffle-seed=4325034425180308027
+run  6 exit=0 ok-packages=13 shuffle-seed=3526929602064901663
+run  7 exit=0 ok-packages=13 shuffle-seed=2327100637020624733
+run  8 exit=0 ok-packages=13 shuffle-seed=3549302863293020171
+run  9 exit=0 ok-packages=13 shuffle-seed=1862799934701772756
+run 10 exit=0 ok-packages=13 shuffle-seed=1403003965770845676
+run 11 exit=0 ok-packages=13 shuffle-seed=2924499979726122412
+run 12 exit=0 ok-packages=13 shuffle-seed=3679429940863178109
+run 13 exit=0 ok-packages=13 shuffle-seed=4210740199764225838
+run 14 exit=0 ok-packages=13 shuffle-seed=1809979206522506571
+run 15 exit=0 ok-packages=13 shuffle-seed=1412175841432609910
+run 16 exit=0 ok-packages=13 shuffle-seed=4343231458170599775
+run 17 exit=0 ok-packages=13 shuffle-seed=1753382295737637281
+run 18 exit=0 ok-packages=13 shuffle-seed=3937454153688359596
+run 19 exit=0 ok-packages=13 shuffle-seed=4584510277690175176
+run 20 exit=0 ok-packages=13 shuffle-seed=1810816157211612409
+run 21 exit=0 ok-packages=13 shuffle-seed=412955419137356863
+run 22 exit=0 ok-packages=13 shuffle-seed=2466739727908263171
+run 23 exit=0 ok-packages=13 shuffle-seed=501725369556051910
+run 24 exit=0 ok-packages=13 shuffle-seed=1710870781196495383
+run 25 exit=0 ok-packages=13 shuffle-seed=3174587893702005920
+run 26 exit=0 ok-packages=13 shuffle-seed=4121206155527132815
+run 27 exit=0 ok-packages=13 shuffle-seed=2190325287264878860
+run 28 exit=0 ok-packages=13 shuffle-seed=761275293548772733
+run 29 exit=0 ok-packages=13 shuffle-seed=2707629319595103603
+run 30 exit=0 ok-packages=13 shuffle-seed=1374220970004718696
 TOTAL FAILED RUNS: 0 / 30

@@ -10,6 +10,7 @@ this code has to reproduce it, and `ci-required` has to be green on the verified
 | File | What it shows |
 |---|---|
 | `MECHANISM-v1.md` | the reproduction, the diagnostic output, and why the verifier's inter-test-interference hypothesis is refuted |
+| `ROUND1-wait-on-the-observable.md` | verifier round-1 BLOCKER: RED 3/3 -> GREEN 3/3 under a deterministic diagnostic, plus an audit of every wait this PR added or touched |
 | `BEFORE-valkey-20runs.txt` | the pre-fix failure rate: **3 of 20** full runs red, at `415a6d1` |
 | `AFTER-valkey-30runs.txt` | 30/30 green, valkey, source order |
 | `AFTER-valkey-30runs-shuffle.txt` | 30/30 green, valkey, `-shuffle=on` |
@@ -33,36 +34,23 @@ Containers `vizra-pr2-pg`, `vizra-pr2-valkey`, `vizra-pr2-redis`, removed afterw
 
 ## Test counts
 
-`go test -count=1 -tags=integration -v ./...` — **919 pass, 0 fail, 0 skip.**
-PR #1 ended at 917; the two additions are
-`TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost` and
-`TestAWorkerWithAPlainHandlerLogsNoCredentials`. No test was removed or weakened: the
+`go test -count=1 -tags=integration -v ./...` — **920 pass, 0 fail, 0 skip.**
+PR #1 ended at 917; the three additions are
+`TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost`,
+`TestAWorkerWithAPlainHandlerLogsNoCredentials` and, from verifier round 1,
+`TestEveryErrorLogSiteInTheWorkerIsRedacted`. No test was removed or weakened: the
 only deleted lines in `golden_test.go` are the five leaked
 `go func() { _ = w.Run(ctx) }()` starts, replaced by a `startWorker` helper that waits.
 
-## Provenance of the 30× loops
+## Provenance of the 30x loops
 
-The first loop (`AFTER-valkey-30runs.txt`) records `git rev-parse HEAD` as `415a6d1`
-because the work was not yet committed when it started; the other three record the
-commit `4f02e18`. All four ran against the same working tree. Every **executable** file
-in that tree is byte-identical to the committed blobs:
-
-```
-679752ca4b8c53fb0c03e2f18138d751598edb16  .github/workflows/build-test.yml
-bc7bcb2b217d68081b62d4cb50b01c303160a521  internal/integration/golden_test.go
-22dc8499dbd013a9f7b78bd86bbfb12ad45b1d5c  internal/jobs/jobs.go
-06f73713610fdd1ee7ea29b43fde99c90fc3a95e  internal/jobs/worker.go
-9d1507a456560d0b3ff6df941962fcfbfcde272f  internal/store/sqlcgen/jobs.sql.go
-5f1dd7e88a1022333fbf913f03b3870f406f410c  internal/store/sqlcgen/querier.go
-f94bd97f25a7b27fceb352beca81e09a4f85f49e  store/queries/jobs.sql
-```
-
-Two files were edited after the loops began and therefore differ from the committed
-blobs: `AGENTS.md` and `Makefile`. Both edits are prose/comment only — correcting the
-claim about when `go test` prints the shuffle seed (it prints
-`-test.shuffle <seed>` as the first line of a FAILING package's output, not on a green
-run; verified on go1.27.1). The `test-integration-shuffle` recipe line itself is
-unchanged, and the loops invoked `go test` directly rather than through `make`.
+The four `AFTER-*.txt` transcripts were re-measured from scratch after the round-1 fixes,
+on head `2f0688c10694cccaea5f6920bffb3a36f24bbe9c`. Every **code** file was committed
+before the loops started; the only paths dirty during them were the transcripts being
+written (`git status --porcelain | grep -v docs/evidence/pr2/` is empty). Each shuffled
+run uses an EXPLICIT seed recorded on its own line, so every permutation is reproducible
+with `go test -shuffle=<seed>` rather than depending on `go test` printing a seed only on
+failure.
 
 ## Reported, not fixed here
 
