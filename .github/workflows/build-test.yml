@@ -55,8 +55,11 @@ jobs:
             base_ref="${{ github.event.repository.default_branch }}"
             echo "no base_ref for event '${{ github.event_name }}'; comparing against the default branch '$base_ref'"
           fi
-          git fetch --no-tags --depth=0 origin "$base_ref"
-          base="$(git merge-base "origin/$base_ref" HEAD)"
+          # `--depth=0` is not a thing; actions/checkout with fetch-depth: 0
+          # already has the full history of HEAD, but the BASE branch may have
+          # no local ref, so fetch it explicitly into refs/remotes.
+          git fetch --no-tags origin "+refs/heads/${base_ref}:refs/remotes/origin/${base_ref}"
+          base="$(git merge-base "origin/${base_ref}" HEAD)"
           echo "merge base: $base"
 
           fail=0
