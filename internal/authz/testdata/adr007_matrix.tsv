@@ -1,0 +1,136 @@
+# Frozen surface x visibility matrix — transcribed from
+# vizra/docs/adr/ADR-007-domain-model-assets-albums-privacy-social-site.md
+# § "Frozen surface × visibility matrix" (Accepted by the owner 2026-09-20).
+#
+# THIS FILE IS THE FIXTURE, NOT A MIRROR OF THE CODE. It is transcribed from the
+# ADR table. TestFrozenMatrix drives internal/authz.Evaluator.Decide with every
+# row and compares. A change to the evaluator that is not also a change to the
+# ADR turns this red; a change to the ADR must be transcribed here in the same
+# PR. 21 surfaces x 3 visibilities x 5 viewer classes = 315 expectations.
+#
+# Viewer classes (ADR-007):
+#   A = anonymous
+#   M = signed-in member without a grant
+#   G = holder of a valid grant on the item or on an album containing it
+#   O = owner
+#   S = staff (admin/manager) acting in an AUDITED administration context
+#
+# Conditions held at their base values for this table; each is varied by its own
+# focused test in authz_test.go:
+#   owner download setting = all          (row 2, row 16)
+#   grant carries download                (row 2 private column)
+#   owner has listed the item for IPFS    (row 18)
+#   scope = site, not own_library         (row 9)
+#   staff role = admin, not site owner    (row 19)
+#   site privacy mode = public            (precedence step 1)
+#
+# Row 4 (album page) is governed by ALBUM privacy, not item visibility, so its
+# three columns drive album privacy public / link / private respectively — that
+# is what "same rule (not split by item visibility)" means in the ADR.
+#
+# surface	visibility	A	M	G	O	S
+
+# 1. Item page and API item read: public "all"; unlisted "all, with the URL"; private "O G S"
+item_page	public	allow	allow	allow	allow	allow
+item_page	unlisted	allow	allow	allow	allow	allow
+item_page	private	deny	deny	allow	allow	allow
+
+# 2. Original download: gated by the owner's download setting (here: all), then by visibility
+original_download	public	allow	allow	allow	allow	allow
+original_download	unlisted	allow	allow	allow	allow	allow
+original_download	private	deny	deny	allow	allow	allow
+
+# 3. Derivative URLs: public shared-cacheable; unlisted token-bearing and proxied; private proxied O G S
+derivative_url	public	allow	allow	allow	allow	allow
+derivative_url	unlisted	allow	allow	allow	allow	allow
+derivative_url	private	deny	deny	allow	allow	allow
+
+# 4. Album page: album privacy governs. Columns drive album privacy public / link / private.
+album_page	public	allow	allow	allow	allow	allow
+album_page	unlisted	deny	deny	allow	allow	allow
+album_page	private	deny	deny	allow	allow	allow
+
+# 5. Counts: an unlisted or private item never contributes to a count shown to A or M
+count_contribution	public	allow	allow	allow	allow	allow
+count_contribution	unlisted	deny	deny	allow	allow	allow
+count_contribution	private	deny	deny	allow	allow	allow
+
+# 6. Owner library: O, and S in an audited admin context, at every visibility
+owner_library	public	deny	deny	deny	allow	allow
+owner_library	unlisted	deny	deny	deny	allow	allow
+owner_library	private	deny	deny	deny	allow	allow
+
+# 7. Profile grid of another user: public only
+profile_grid	public	allow	allow	allow	allow	allow
+profile_grid	unlisted	deny	deny	deny	deny	deny
+profile_grid	private	deny	deny	deny	deny	deny
+
+# 8. Explore, random, trending, featured: public only
+explore	public	allow	allow	allow	allow	allow
+explore	unlisted	deny	deny	deny	deny	deny
+explore	private	deny	deny	deny	deny	deny
+
+# 9. Search and suggestions, site scope. Grants do not extend to search.
+search	public	allow	allow	allow	allow	allow
+search	unlisted	deny	deny	deny	deny	deny
+search	private	deny	deny	deny	deny	deny
+
+# 10. Tag and category listings: public only
+tag_category_listing	public	allow	allow	allow	allow	allow
+tag_category_listing	unlisted	deny	deny	deny	deny	deny
+tag_category_listing	private	deny	deny	deny	deny	deny
+
+# 11. Feeds (RSS/Atom, following feed): public only
+feeds	public	allow	allow	allow	allow	allow
+feeds	unlisted	deny	deny	deny	deny	deny
+feeds	private	deny	deny	deny	deny	deny
+
+# 12. Notifications: delivered only to recipients who may see the item
+notifications	public	allow	allow	allow	allow	allow
+notifications	unlisted	allow	allow	allow	allow	allow
+notifications	private	deny	deny	allow	allow	allow
+
+# 13. Favorite count and rating aggregate: private aggregates are visible to O/S only
+favorite_rating	public	allow	allow	allow	allow	allow
+favorite_rating	unlisted	allow	allow	allow	allow	allow
+favorite_rating	private	deny	deny	deny	allow	allow
+
+# 14. oEmbed, Open Graph, embed codes: a private item has none at all
+embed	public	allow	allow	allow	allow	allow
+embed	unlisted	allow	allow	allow	allow	allow
+embed	private	deny	deny	deny	deny	deny
+
+# 15. Sitemap: public only
+sitemap	public	allow	allow	allow	allow	allow
+sitemap	unlisted	deny	deny	deny	deny	deny
+sitemap	private	deny	deny	deny	deny	deny
+
+# 16. Bulk/zip download: only items the viewer may see
+bulk_download	public	allow	allow	allow	allow	allow
+bulk_download	unlisted	allow	allow	allow	allow	allow
+bulk_download	private	deny	deny	allow	allow	allow
+
+# 17. Federation outbound (ActivityPub): never published unless public
+federation_outbound	public	allow	allow	allow	allow	allow
+federation_outbound	unlisted	deny	deny	deny	deny	deny
+federation_outbound	private	deny	deny	deny	deny	deny
+
+# 18. IPFS publication: eligible only with a listed owner, and only when public
+ipfs_publication	public	allow	allow	allow	allow	allow
+ipfs_publication	unlisted	deny	deny	deny	deny	deny
+ipfs_publication	private	deny	deny	deny	deny	deny
+
+# 19. Export: O's own everything; site export by OWNER role (admin is not enough), audited
+export	public	deny	deny	deny	allow	deny
+export	unlisted	deny	deny	deny	allow	deny
+export	private	deny	deny	deny	allow	deny
+
+# 20. Admin console and moderation: S only, with audit, at every visibility
+admin_console	public	deny	deny	deny	deny	allow
+admin_console	unlisted	deny	deny	deny	deny	allow
+admin_console	private	deny	deny	deny	deny	allow
+
+# 21. Caches and CDN: only public derivatives are shared-cacheable
+shared_cache	public	allow	allow	allow	allow	allow
+shared_cache	unlisted	deny	deny	deny	deny	deny
+shared_cache	private	deny	deny	deny	deny	deny

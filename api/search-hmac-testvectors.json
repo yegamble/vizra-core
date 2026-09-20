@@ -1,0 +1,71 @@
+{
+  "_comment": [
+    "Shared HMAC test vectors for the core<->search internal contract.",
+    "Owned by vizra-core; vizra-search vendors a byte-identical copy and tests",
+    "against it. If the two repositories disagree here they would sign",
+    "different bytes and every internal call would 401 in production.",
+    "Scheme: api/search-internal.openapi.yaml, components.securitySchemes.hmacSignature.",
+    "canonical_string joins six fields with a single \\n and has no trailing newline.",
+    "Generated independently of the Go implementation (python hmac/sha256)."
+  ],
+  "scheme": "v1",
+  "key_utf8": "Ar4Lo8Cq2Ei6Uk0Wn3Sv7Yb1Md5Pt9Xz",
+  "max_clock_skew_seconds": 300,
+  "vectors": [
+    {
+      "name": "search-empty-body",
+      "method": "POST",
+      "path": "/internal/v1/search",
+      "timestamp": "1789000000",
+      "nonce": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "body_utf8": "",
+      "body_sha256_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical_string": "v1\nPOST\n/internal/v1/search\n1789000000\n0f1e2d3c4b5a69788796a5b4c3d2e1f0\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "signature": "v1=579115c8052a431ee346af107acb2f06f4393f6e65fd47eab4d108efee10468b"
+    },
+    {
+      "name": "search-simple",
+      "method": "POST",
+      "path": "/internal/v1/search",
+      "timestamp": "1789000000",
+      "nonce": "9a8b7c6d5e4f30211203344556677889",
+      "body_utf8": "{\"query\":\"sunset\",\"viewer\":{\"is_anonymous\":true,\"role\":\"anonymous\"},\"site\":{\"handle\":\"default\"}}",
+      "body_sha256_hex": "33e3cf32c2d0736e8b291b27bfc03ac85b44d7651f9582df23de852a8c5ace82",
+      "canonical_string": "v1\nPOST\n/internal/v1/search\n1789000000\n9a8b7c6d5e4f30211203344556677889\n33e3cf32c2d0736e8b291b27bfc03ac85b44d7651f9582df23de852a8c5ace82",
+      "signature": "v1=08d9cb4a1d81c8a0ac34bb32dc381636c1d6126e3e3ea9e3921d8e22c07e6f23"
+    },
+    {
+      "name": "suggestions",
+      "method": "POST",
+      "path": "/internal/v1/suggestions",
+      "timestamp": "1789000123",
+      "nonce": "00112233445566778899aabbccddeeff",
+      "body_utf8": "{\"prefix\":\"sun\",\"viewer\":{\"is_anonymous\":false,\"role\":\"member\",\"user_id\":\"11111111-1111-7111-8111-111111111111\"},\"site\":{\"handle\":\"default\"}}",
+      "body_sha256_hex": "f698519d4b645f8a4c0dd2c5594429ce18aca68f697fe6a56ec5ce74cbb38a4a",
+      "canonical_string": "v1\nPOST\n/internal/v1/suggestions\n1789000123\n00112233445566778899aabbccddeeff\nf698519d4b645f8a4c0dd2c5594429ce18aca68f697fe6a56ec5ce74cbb38a4a",
+      "signature": "v1=4685b9464bfd8c6a6ca95cce62d511102ad6e21b776048544bde53f187eaa7fb"
+    },
+    {
+      "name": "events-batch",
+      "method": "POST",
+      "path": "/internal/v1/events",
+      "timestamp": "1789000456",
+      "nonce": "ffeeddccbbaa99887766554433221100",
+      "body_utf8": "{\"site\":{\"handle\":\"default\"},\"events\":[{\"event_id\":\"aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa\",\"kind\":\"upsert\",\"occurred_at\":\"2026-09-20T10:00:00Z\",\"subject_type\":\"asset\",\"subject_id\":\"bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb\"}]}",
+      "body_sha256_hex": "c952e09f93ab572ee35de3945f7350ddb5dcb2a2d70c450a1cbdd02f85d5f933",
+      "canonical_string": "v1\nPOST\n/internal/v1/events\n1789000456\nffeeddccbbaa99887766554433221100\nc952e09f93ab572ee35de3945f7350ddb5dcb2a2d70c450a1cbdd02f85d5f933",
+      "signature": "v1=226da590b3220e49d4fe12d233a9d32e60ef7d993b173fddbbde8a93ef0e13aa"
+    },
+    {
+      "name": "unicode-body",
+      "method": "POST",
+      "path": "/internal/v1/search",
+      "timestamp": "1789000789",
+      "nonce": "deadbeefdeadbeefdeadbeefdeadbeef",
+      "body_utf8": "{\"query\":\"café 山\"}",
+      "body_sha256_hex": "8b0bb0b8a85b3cae05053bb0079bd1d24dbd8b3556bfbdb2711c6e391c667212",
+      "canonical_string": "v1\nPOST\n/internal/v1/search\n1789000789\ndeadbeefdeadbeefdeadbeefdeadbeef\n8b0bb0b8a85b3cae05053bb0079bd1d24dbd8b3556bfbdb2711c6e391c667212",
+      "signature": "v1=f361660e306ec1c0d50f246b338e0486ae878f821b284882f78dbd35f54b1a68"
+    }
+  ]
+}

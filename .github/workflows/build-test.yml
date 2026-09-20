@@ -1,0 +1,178 @@
+# build-test — the unit gate. Named in .github/required-checks.txt and in the
+# FLOOR_LANES of scripts/ci-required-guard.sh, so it cannot be removed by the
+# pull request it gates.
+name: build-test
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test
+    # GitHub-hosted ubuntu-24.04 is the clean target (ADR-009). The owner's
+    # machine is arm64 and is not a substitute.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        # postgres:18, digest resolved 2026-09-20 (ADR-001).
+        image: postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+        env:
+          POSTGRES_USER: vizra
+          POSTGRES_PASSWORD: vizra
+          POSTGRES_DB: vizra_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vizra -d vizra_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+
+      # The toolchain go.mod pins must be the toolchain that actually runs, or
+      # the lane proves nothing about the pinned build.
+      - name: Assert the pinned toolchain
+        run: |
+          set -euo pipefail
+          want="$(grep -E '^toolchain ' go.mod | awk '{print $2}')"
+          got="$(go version | awk '{print $3}')"
+          echo "go.mod pins $want; this runner has $got"
+          [ "$want" = "$got" ] || { echo "::error::toolchain mismatch: go.mod pins $want but the runner has $got"; exit 1; }
+
+      - name: Install sqlc
+        run: |
+          set -euo pipefail
+          # ADR-001 pins sqlc 1.31.1. Installed from source at that exact tag so
+          # the lane cannot drift onto a newer generator.
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          sqlc version
+
+      - name: go.mod and go.sum are tidy
+        run: make tidy-check
+
+      - name: make ci
+        run: make ci
+
+      - name: ci-required guard
+        run: ./scripts/ci-required-guard.sh
+
+      - name: Build all three entry points
+        run: make build
+
+      - name: vizra version
+        run: ./bin/vizra version
+
+      # A migration-lane that never touched a database would be a lie. This runs
+      # the embedded migrator against real PostgreSQL 18 on an EMPTY database
+      # (VZ-FOUND-003 success case).
+      - name: Integration tests (PostgreSQL 18 + Valkey)
+        env:
+          VIZRA_TEST_DATABASE_URL: postgres://vizra:vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+          VIZRA_TEST_CACHE_FLAVOUR: valkey
+        run: |
+          set -euo pipefail
+          # Valkey 9.1.2, digest resolved 2026-09-20 (ADR-001). Run here rather
+          # than as a service container so the two-image matrix below can reuse
+          # the same step shape.
+          docker run -d --name vizra-cache -p 6379:6379 \
+            valkey/valkey@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d \
+            valkey-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save ''
+          for i in $(seq 30); do
+            docker exec vizra-cache valkey-cli ping 2>/dev/null | grep -q PONG && break
+            sleep 1
+          done
+          docker exec vizra-cache valkey-cli ping | grep -q PONG
+          make test-integration
+
+      - name: Upload the test log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-test-logs
+          path: |
+            bin/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ADR-001 Q-004: go-redis publishes no Valkey support statement and Valkey
+  # publishes no formal protocol-compatibility guarantee, so the cache lane is a
+  # PERMANENT two-image matrix — pinned Valkey and Redis 7.2.x — from the first
+  # Redis-using code, for the life of the project.
+  cache-matrix:
+    name: cache-matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # valkey/valkey:9.1.2, digest resolved 2026-09-20.
+          - flavour: valkey
+            image: valkey/valkey@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d
+            server: valkey-server
+            cli: valkey-cli
+          # redis:7.2, digest resolved 2026-09-20. Redis 7.2 is the last BSD-3
+          # line and still receives OSS security releases; this leg switches to
+          # Redis 8 if 7.2 stops receiving fixes (ADR-001).
+          - flavour: redis
+            image: redis@sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c
+            server: redis-server
+            cli: redis-cli
+
+    services:
+      postgres:
+        image: postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+        env:
+          POSTGRES_USER: vizra
+          POSTGRES_PASSWORD: vizra
+          POSTGRES_DB: vizra_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vizra -d vizra_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Start ${{ matrix.flavour }}
+        run: |
+          set -euo pipefail
+          docker run -d --name cache -p 6379:6379 ${{ matrix.image }} \
+            ${{ matrix.server }} --maxmemory 128mb --maxmemory-policy allkeys-lru --save ''
+          for i in $(seq 30); do
+            docker exec cache ${{ matrix.cli }} ping 2>/dev/null | grep -q PONG && break
+            sleep 1
+          done
+          docker exec cache ${{ matrix.cli }} ping | grep -q PONG
+          docker exec cache ${{ matrix.cli }} info server | grep -Ei 'version|server_name' || true
+
+      - name: Integration tests against ${{ matrix.flavour }}
+        env:
+          VIZRA_TEST_DATABASE_URL: postgres://vizra:vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+          VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
+        run: make test-integration

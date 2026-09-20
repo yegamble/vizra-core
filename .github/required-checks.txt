@@ -1,0 +1,20 @@
+# required-checks.txt — the manifest `ci-required` reads (ADR-002 § CI fan-in).
+#
+# One check name per line. `ci-required` collects the result of every name here
+# and FAILS on anything other than success: failure, cancellation, timeout,
+# SKIP, or never having run. A skipped required lane is not a pass
+# (AGENTS.md).
+#
+# This file and the workflows are CODEOWNERS-protected: a PR that edits the gate
+# it is gated by needs owner review (ADR-002 § Branch protection, item 7).
+#
+# scripts/ci-required-guard.sh additionally enforces a FLOOR: the lanes listed
+# in its FLOOR_LANES array must be present here and must not be marked optional.
+# Deleting a required line therefore turns the guard red with a named error,
+# rather than quietly shrinking the gate — see
+# docs/evidence/warroom/2026-09-20-vizra-user-pr1-skeleton-SECURITY.md Finding 2.
+
+build-test
+cache-matrix
+govulncheck
+docker-build

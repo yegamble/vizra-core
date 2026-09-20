@@ -1,0 +1,40 @@
+Vizra core
+Copyright (c) 2026 Yosef Gamble and the Vizra contributors
+
+This product includes software developed by third parties. Their licences and
+notices are preserved in the release image under /usr/share/vizra/licenses and
+/usr/share/vizra/build (docs/DEFINITION_OF_DONE.md requires the notices
+preserved; ADR-001 carries the licence table).
+
+The pinned set for this milestone, with the licence each carries upstream. SPDX
+identifiers are re-read from each upstream LICENSE file when a pin changes; the
+"verified" column records where that was done.
+
+  github.com/labstack/echo/v5            v5.3.1     MIT
+  github.com/labstack/echo-contrib/v5    v5.0.1     MIT              (not yet linked)
+  github.com/jackc/pgx/v5                v5.11.0    MIT
+  github.com/golang-migrate/migrate/v4   v4.20.1    MIT
+  github.com/redis/go-redis/v9           v9.22.0    BSD-2-Clause
+  github.com/google/uuid                 v1.6.0     BSD-3-Clause
+  github.com/prometheus/client_golang    v1.24.1    Apache-2.0
+  go.opentelemetry.io/otel               v1.46.0    Apache-2.0
+  go.opentelemetry.io/contrib/.../otelhttp v0.71.0  Apache-2.0
+  golang.org/x/crypto                    v0.57.0    BSD-3-Clause
+  github.com/getkin/kin-openapi          v0.149.0   MIT              (test only)
+  github.com/stretchr/testify            v1.12.1    MIT              (test only)
+
+  libvips                                8.18.6     LGPL-2.1-or-later
+      Built from the upstream source tarball into the release image. The LGPL
+      relink and source offer are honoured: the exact tarball and its sha256 are
+      recorded in the Dockerfile, and the resolved library versions of each build
+      are written to /usr/share/vizra/build/apt-versions.txt in the image.
+
+  Debian 13 base                         digest-pinned  per-package
+      Per-package copyright files remain in the image under
+      /usr/share/doc/*/copyright.
+
+x265 is NEVER included in any Vizra image (GPL-2+, ADR-001). The loader-list
+assertion in .github/workflows/docker-build.yml is the detector.
+
+libheif and libde265 (LGPL-3.0-or-later) exist only in the HEIC option image,
+which is a separate build and a separate licence review (VZ-MEDIA-010, M3).

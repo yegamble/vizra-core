@@ -1,0 +1,26 @@
+# sqlc 1.31.1 (ADR-001). Generated output is COMMITTED and guarded by
+# `sqlc diff` in `make sqlc-verify`; hand-editing internal/store/sqlcgen fails CI.
+version: "2"
+sql:
+  - engine: postgresql
+    schema: migrations
+    queries: store/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/store/sqlcgen
+        sql_package: pgx/v5
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_interface: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
