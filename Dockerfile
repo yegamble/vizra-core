@@ -64,8 +64,9 @@ RUN set -eux; \
     mkdir -p /out; \
     vips --version > /out/libvips-version.txt; \
     vips -l > /out/libvips-loaders-full.txt; \
-    vips -l | sed -n 's/^ *\([A-Za-z0-9_]*\(load\|save\)[A-Za-z0-9_]*\).*/\1/p' \
-      | sort -u | paste -sd, - > /out/libvips-loaders.txt; \
+    vips -l | sed -n 's/^[[:space:]]*Vips[A-Za-z0-9]*[[:space:]]*(\([a-z0-9_]*\)).*/\1/p' \
+      | grep -E '(load|save)' | sort -u | paste -sd, - > /out/libvips-loaders.txt; \
+    test -s /out/libvips-loaders.txt; \
     dpkg-query -W -f='${binary:Package}=${Version}\n' > /out/apt-versions.txt; \
     echo "--- loaders ---"; cat /out/libvips-loaders.txt; \
     if vips -l | grep -qi 'x265\|heif\|heic'; then \
