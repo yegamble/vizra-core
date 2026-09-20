@@ -30,10 +30,13 @@ jobs:
         image: postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
         env:
           POSTGRES_USER: vizra
-          # Per-run and ephemeral, so there is no committed database password
-          # for a secret scanner to flag and no static value to reuse. The
-          # container is destroyed with the job.
-          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          # NO PASSWORD AT ALL, rather than a committed one or a per-run one.
+          # This container exists for the lifetime of one job, is reachable only
+          # on the runner's loopback, and holds nothing but a freshly migrated
+          # empty schema. A password here would be a credential-shaped string in
+          # a public file that protects nothing — and a secret scanner is right
+          # to flag those, so the answer is to not have one.
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: vizra_test
         ports: ['5432:5432']
         options: >-
@@ -89,7 +92,7 @@ jobs:
       # (VZ-FOUND-003 success case).
       - name: Integration tests (PostgreSQL 18 + Valkey)
         env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
           VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
           VIZRA_TEST_CACHE_FLAVOUR: valkey
         run: |
@@ -147,10 +150,13 @@ jobs:
         image: postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
         env:
           POSTGRES_USER: vizra
-          # Per-run and ephemeral, so there is no committed database password
-          # for a secret scanner to flag and no static value to reuse. The
-          # container is destroyed with the job.
-          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          # NO PASSWORD AT ALL, rather than a committed one or a per-run one.
+          # This container exists for the lifetime of one job, is reachable only
+          # on the runner's loopback, and holds nothing but a freshly migrated
+          # empty schema. A password here would be a credential-shaped string in
+          # a public file that protects nothing — and a secret scanner is right
+          # to flag those, so the answer is to not have one.
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: vizra_test
         ports: ['5432:5432']
         options: >-
@@ -178,7 +184,7 @@ jobs:
 
       - name: Integration tests against ${{ matrix.flavour }}
         env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/vizra_test?sslmode=disable
+          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
           VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
           VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration
