@@ -1,0 +1,80 @@
+# D8 — .github/required-checks.txt, FLOOR_LANES and the workflows stay in agreement.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c
+
+## This slice ADDS AND RENAMES NO REQUIRED LANE. Proof, against main:
+  required-checks.txt active lines, diff vs 5eb2829:
+    (identical)
+  FLOOR_LANES, diff vs 5eb2829:
+    (identical)
+  the whole diff of required-checks.txt:
+    (empty)
+
+## They agree, and the guard says so:
+  manifest   : ['append-only', 'build-test', 'cache-matrix', 'fixtures', 'govulncheck', 'docker-build']
+  FLOOR_LANES: ['append-only', 'build-test', 'cache-matrix', 'fixtures', 'govulncheck', 'docker-build']
+  equal as sets: True
+    ok    all 6 floor lane(s) are present and non-optional
+
+## A mutation where they DISAGREE is red, both ways:
+==============================================================
+MUTATION: D8: a floor lane removed from the manifest
+  file:   .github/required-checks.txt
+  mutate: python3 -c "import io;p='.github/required-checks.txt';s=io.open(p).read();io.open(p,'w').write(s.replace('\ndocker-build\n','\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL' | head -3; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 3e41729104c09fa0052485e5824cf7c30ecdda38dc21034f330f8bb261343d39
+  sha256 AFTER:  40e6084d38f731efe0e7ed123c442cc3dc0bc74d1fc3789e4ccdd3b2d6a69862
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  required lane 'docker-build' is MISSING from required-checks.txt.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 3e41729104c09fa0052485e5824cf7c30ecdda38dc21034f330f8bb261343d39
+  restore byte-identical: yes
+  RESULT: D8: a floor lane removed from the manifest -> exit 1
+
+==============================================================
+MUTATION: D8: a floor lane COMMENTED OUT in the manifest
+  file:   .github/required-checks.txt
+  mutate: python3 -c "import io;p='.github/required-checks.txt';s=io.open(p).read();io.open(p,'w').write(s.replace('\nfixtures\n','\n# fixtures\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL' | head -3; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 3e41729104c09fa0052485e5824cf7c30ecdda38dc21034f330f8bb261343d39
+  sha256 AFTER:  6a95855539516ef83d88ec940211d79ccd8135e1b0f767c2ed9c46cdfa482c9f
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  required lane 'fixtures' is COMMENTED OUT in required-checks.txt.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 3e41729104c09fa0052485e5824cf7c30ecdda38dc21034f330f8bb261343d39
+  restore byte-identical: yes
+  RESULT: D8: a floor lane COMMENTED OUT in the manifest -> exit 1
+
+==============================================================
+MUTATION: D8: FLOOR_LANES names a lane the manifest and the workflows do not have
+  file:   scripts/ci-required-guard.py
+  mutate: python3 -c "import io;p='scripts/ci-required-guard.py';s=io.open(p).read();io.open(p,'w').write(s.replace('\"docker-build\"]','\"docker-build\", \"invented-lane\"]'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL' | head -3; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: daa86c01ecb00cb74aa38dbc6930854bc52a2fc2d15daa242e5713ce6d080b6b
+  sha256 AFTER:  42bcea7b26d74416a6680d35f79164517ab4ca1bca09d3182c7965e63c333207
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  required lane 'invented-lane' is MISSING from required-checks.txt.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: daa86c01ecb00cb74aa38dbc6930854bc52a2fc2d15daa242e5713ce6d080b6b
+  restore byte-identical: yes
+  RESULT: D8: FLOOR_LANES names a lane the manifest and the workflows do not have -> exit 1
+
+
+## And a guard fixture that no test names is red, so a check cannot be dropped by orphaning it:
+scripts/testdata/guard/orphaned-demo
+scripts/testdata/guard/orphaned-demo/workflows
+  --- FAIL: TestEveryGuardFixtureIsExercised (0.00s)
+      scripts_test.go:396: scripts/testdata/guard/orphaned-demo is a fixture no test case names, so whatever it exists to prove is not being proved
+  FAIL
+  FAIL	github.com/yegamble/vizra-core/scripts	0.208s
+  FAIL
+  restored: ok  	github.com/yegamble/vizra-core/scripts	0.217s
+git status --porcelain (scripts/, .github/): [ M scripts/assert-runtime-image.sh]

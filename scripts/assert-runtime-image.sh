@@ -67,9 +67,14 @@ run_or_die() {
 if [ ! -f "$denylist" ]; then
   die "$denylist does not exist; there is no toolchain list to check against."
 fi
-tools="$(grep -v '^#' "$denylist" | grep -v '^$' | tr '\n' ' ')"
+# `|| true` on the EXTRACTION only: grep exits 1 on an empty or comments-only
+# file, and under `set -e` that killed the script before `die` could say why.
+# A red with no reason is its own defect. The emptiness test below is what
+# refuses the vacuous list, and it says so.
+tools="$(grep -v '^#' "$denylist" 2>/dev/null | grep -v '^$' | tr '\n' ' ' || true)"
 if [ -z "${tools// /}" ]; then
-  die "$denylist lists no tools; the toolchain assertion would pass vacuously."
+  die "$denylist lists no tool names; the toolchain assertion would check nothing and pass." \
+      "An empty or comments-only denylist is a vacuous assertion, not a clean image."
 fi
 
 echo "checking for: $tools"

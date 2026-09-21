@@ -1,0 +1,23 @@
+# D2 — item 2: checks 3, 4, 8, 8b and 10 run over set(FLOOR_LANES) | set(required).
+# Same construction as B0-baseline-items-2-3-5-7.txt, where this exited 0 and the ONLY
+# line mentioning the lane was 'ok required check extra-lane resolves to a job'.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c
+
+/private/tmp/claude-501/-Users-yosefgamble-github-vizra/7321b930-95d2-4a95-ba2e-61ef2ce3c13c/scratchpad/vzb1.z3WW6vGn/d2
+/private/tmp/claude-501/-Users-yosefgamble-github-vizra/7321b930-95d2-4a95-ba2e-61ef2ce3c13c/scratchpad/vzb1.z3WW6vGn/d2/workflows
+the verifier's extra-lane, verbatim: required but not on the floor, continue-on-error,
+an unanchored 'make -i ci', no pull_request trigger, no provenance step.
+
+ci-required-guard EXIT=1  (baseline at 5eb2829: 0)
+
+every line mentioning extra-lane:
+      FAIL  checked lane 'extra-lane' (extra.yml) is not triggered on pull_request.
+      FAIL  checked lane 'extra-lane' (extra.yml) invokes `make` (step 'step 1') with NO make-integrity-guard step before it.
+      FAIL  checked lane 'extra-lane' (extra.yml) step 'step 1' no-ops `make` from the WORKFLOW LINE:
+      FAIL  checked lane 'extra-lane' (extra.yml) checks the repository out and has NO scripts/provenance.sh step.
+      FAIL  checked lane 'extra-lane' (extra.yml) carries continue-on-error:
+      ok    required check 'extra-lane' resolves to a job
+      ok    checked set is floor ∪ required (7 lanes); beyond the floor: ['extra-lane']
+
+== control: the same guard over the REAL manifest and workflows ==
+EXIT=0 (expect 0)

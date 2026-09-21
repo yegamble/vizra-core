@@ -1,0 +1,74 @@
+# D6 — item 6: docker-build's image assertions cannot pass on a `docker run` FAILURE.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c
+
+## The shape at main (PR#7 VERIFY FINDING 1), reproduced verbatim:
+
+          - name: Assert the toolchain is absent from the runtime image
+            run: |
+              set -euo pipefail
+              # The list is scripts/runtime-toolchain-denylist.txt; that file says
+              # why it is a file and not an inline list.
+              tools=$(grep -v '^#' scripts/runtime-toolchain-denylist.txt | grep -v '^$' | tr '\n' ' ')
+              echo "checking for: $tools"
+              present=$(docker run --rm -e TOOLS="$tools" vizra-core:ci sh -c '
+                for t in $TOOLS; do
+                  command -v "$t" >/dev/null 2>&1 && echo "$t"
+                done
+                true') || true
+              if [ -n "$present" ]; then
+                echo "::error::the runtime image carries build tooling:"
+                printf '%s\n' "$present"
+                exit 1
+              fi
+              echo "no build tooling on PATH"
+    
+              devpkgs=$(docker run --rm vizra-core:ci sh -c "dpkg-query -W -f='\${binary:Package}\n' 2>/dev/null | grep -- '-dev$' || true")
+              if [ -n "$devpkgs" ]; then
+                echo "::error::the runtime image carries -dev packages:"
+                printf '%s\n' "$devpkgs"
+                exit 1
+              fi
+              echo "no -dev packages installed"
+    
+              if docker run --rm vizra-core:ci test -e /src; then
+                echo "::error::the libvips source tree is still in the runtime image"
+                exit 1
+              fi
+              echo "no /src"
+    
+
+## Why it passed on a docker failure — measured, using the same shell:
+
+docker: Error response from daemon: no such image
+    no build tooling on PATH
+docker: Error response from daemon: no such image
+    no /src
+    OLD SHAPE EXIT=0   <-- 0. Both assertions PASSED against a daemon that ran nothing.
+
+## The new script, same stub:
+  clean          EXIT=0  assert-runtime-image: ok — vizra-core:ci carries no toolchain, no -dev packages and no source tree
+  broken         EXIT=1  ::error::assert-runtime-image: the container did not run while checking the build toolchain (docker exited 125).
+  has-toolchain  EXIT=1  ::error::assert-runtime-image: the runtime image carries build tooling:
+  has-src        EXIT=1  ::error::assert-runtime-image: the libvips source tree is still in the runtime image (/src exists)
+  weird-exit     EXIT=1  ::error::assert-runtime-image: the container did not run while checking /src (docker exited 7).
+
+  'broken' is the FINDING 1 case: a daemon that cannot run anything. The old shape
+  printed 'no build tooling on PATH' and passed; the new one is RED and says so.
+
+## And the assertion cannot pass on a vacuous denylist:
+
+  empty.txt      EXIT=1  ::error::assert-runtime-image: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp62azmoi0/empty.txt lists no tool names; the toolchain assertion would check nothing and pass.
+  comments.txt   EXIT=1  ::error::assert-runtime-image: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp62azmoi0/comments.txt lists no tool names; the toolchain assertion would check nothing and pass.
+  absent.txt     EXIT=1  ::error::assert-runtime-image: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp62azmoi0/absent.txt does not exist; there is no toolchain list to check against.
+
+## The named tests that keep this true, in the required `scripts` package:
+  === RUN   TestAssertRuntimeImageFixtures
+  === RUN   TestAssertRuntimeImageFixtures/clean
+  === RUN   TestAssertRuntimeImageFixtures/broken
+  === RUN   TestAssertRuntimeImageFixtures/has-toolchain
+  === RUN   TestAssertRuntimeImageFixtures/has-src
+  === RUN   TestAssertRuntimeImageFixtures/weird-exit
+  --- PASS: TestAssertRuntimeImageFixtures (0.12s)
+  === RUN   TestAssertRuntimeImageRefusesAVacuousDenylist
+  --- PASS: TestAssertRuntimeImageRefusesAVacuousDenylist (0.02s)
+  ok  	github.com/yegamble/vizra-core/scripts	0.593s

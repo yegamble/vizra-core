@@ -1,0 +1,77 @@
+# D3 — item 3: the direct lane FAILS when zero tests ran, and CI can corroborate the counts.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c
+# The commands below are EXACTLY what .github/workflows/build-test.yml runs.
+
+== GREEN: the unmutated tree ==
+go test (unit) exited 0
+go-test-report: suite 'unit' from vzb1-u.json
+  packages ok:              14
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1047  (floor: 900)
+    top-level:              194
+    passed:                 1047
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+go-test-report: ok — 1047 test(s) executed across 14 package(s), 0 unexpected skips, floor 900 met
+report EXIT=0
+
+== RED: every *_test.go moved aside (the controlled mutation) ==
+moving 23 *_test.go files aside
+file-list sha256 BEFORE: a494d4bc8a22e7a213a0b7c40265ffd9391e678272b4e75915433604f15d0c21
+go test (unit) exited 0   <-- 0. This is the defect: the lane succeeded having run nothing.
+go-test-report: suite 'unit' from vzb1-z.json
+  packages ok:              0
+  packages failed:          0
+  packages [no test files]: 22
+  tests executed:           0  (floor: 900)
+    top-level:              0
+    passed:                 0
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+::error::go-test-report: only 0 test(s) executed; the recorded floor for 'unit' is 900.
+         A suite that ran nothing exits 0 on its own: `go test ./...` with every *_test.go
+         moved aside reports `[no test files]` and succeeds. This floor is what makes that red.
+         If the suite legitimately shrank, move the floor in test-floors.json in a reviewed diff.
+go-test-report: FAILED (1 problem(s))
+report EXIT=1   <-- the step is now RED
+file-list sha256 RESTORED: a494d4bc8a22e7a213a0b7c40265ffd9391e678272b4e75915433604f15d0c21
+restore byte-identical: yes
+git status --porcelain (excluding the transcript being written): [ M docs/evidence/hardening-b1/D1-workflow-line.txt
+?? docs/evidence/hardening-b1/D2-required-not-floor.txt]
+
+== RED: one test made to SKIP (a skip is not a pass, and no lane could see one before) ==
+==============================================================
+MUTATION: D3: TestTheProbeReadsTheSameAddressKeysTheServicesRead made to t.Skip — the REAL lane command, the REAL floors
+  file:   internal/healthcheck/healthcheck_test.go
+  mutate: python3 -c "import io;p='internal/healthcheck/healthcheck_test.go';s=io.open(p).read();i=s.index('func TestTheProbeReadsTheSameAddressKeysTheServicesRead(t *testing.T) {')+len('func TestTheProbeReadsTheSameAddressKeysTheServicesRead(t *testing.T) {');io.open(p,'w').write(s[:i]+'\n\tt.Skip(\"planted skip\")'+s[i:])"
+  check:  rc=0; go test -race -count=1 -json ./... > /tmp/vzb1-s.json || rc=$?; echo $rc > /tmp/vzb1-s.txt; echo "go test (unit) exited $rc  <-- 0: a non-verbose go test prints NOTHING for a skip"; python3 scripts/go-test-report.py --events /tmp/vzb1-s.json --suite unit --floors scripts/test-floors.json --go-exit-file /tmp/vzb1-s.txt
+--------------------------------------------------------------
+  sha256 BEFORE: 5a0deaf945a570499d97271f36958b03b947df05c5b95c384cc4fa1f7ebae625
+  sha256 AFTER:  505ec0de9dd09c56fe37151433e532376321182f8a5fa74e05ba9fbfe4cb92da
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+go test (unit) exited 0  <-- 0: a non-verbose go test prints NOTHING for a skip
+go-test-report: suite 'unit' from vzb1-s.json
+  packages ok:              14
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1047  (floor: 900)
+    top-level:              194
+    passed:                 1046
+    failed:                 0
+    skipped:                1
+  `go test` exit code:      0
+::error::go-test-report: SKIPPED: github.com/yegamble/vizra-core/internal/healthcheck.TestTheProbeReadsTheSameAddressKeysTheServicesRead
+         A required test that is skipped is not a pass (AGENTS.md). If this skip is
+         deliberate, name it in test-floors.json under suites.unit.allowed_skips
+         with the reason — a reviewer then sees it in the diff.
+go-test-report: FAILED (1 problem(s))
+------------------------------------
+  sha256 RESTORED: 5a0deaf945a570499d97271f36958b03b947df05c5b95c384cc4fa1f7ebae625
+  restore byte-identical: yes
+  RESULT: D3: TestTheProbeReadsTheSameAddressKeysTheServicesRead made to t.Skip — the REAL lane command, the REAL floors -> exit 1
+
+git status --porcelain for the mutated file: []
