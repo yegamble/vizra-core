@@ -74,6 +74,9 @@ func testServer(t *testing.T) *Server {
 		Config:                cfg,
 		Resolver:              site.NewResolver(cfg),
 		EmbeddedSchemaVersion: 4,
+		// A claimed instance: this test enumerates the ROUTE TABLE against the
+		// contract, which the unclaimed guard would otherwise mask.
+		InstanceClaimed: func(context.Context) (bool, error) { return true, nil },
 	})
 }
 
@@ -142,17 +145,32 @@ func TestSpecOperationIDsAreUniqueAndPresent(t *testing.T) {
 	}
 }
 
-// The M0 contract is exactly the four probes. This pins the scope so a later
-// slice cannot quietly widen the public surface without the ledger noticing.
-func TestM0ContractIsTheFourProbes(t *testing.T) {
-	want := []string{"GET /healthz", "GET /readyz", "GET /schemaz", "GET /version"}
+// The public contract is an EXHAUSTIVE enumeration, so a later slice cannot
+// quietly widen the surface without the ledger noticing.
+//
+// Amended in M1-A (VZ-INSTALL-003) from "the four probes" to "the four probes
+// plus the two setup operations". The assertion is not weakened: it is still a
+// complete list compared for exact equality, and adding any further operation
+// without editing this list turns it red. The two additions are the owner-claim
+// surfaces named in VZ-INSTALL-003 `surfaces.api` (plus the claim-status read
+// the approved "already claimed" screen requires, which the chair is recording
+// on that ledger row).
+func TestPublicContractIsTheProbesPlusTheSetupOperations(t *testing.T) {
+	want := []string{
+		"GET /api/v1/setup/claim-status",
+		"GET /healthz",
+		"GET /readyz",
+		"GET /schemaz",
+		"GET /version",
+		"POST /api/v1/setup/claim-owner",
+	}
 	var got []string
 	for op := range specOperations(loadSpec(t, specPath)) {
 		got = append(got, op)
 	}
 	sort.Strings(got)
 	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("the M0 public contract is\n  %v\nwant\n  %v", got, want)
+		t.Fatalf("the public contract is\n  %v\nwant\n  %v", got, want)
 	}
 }
 

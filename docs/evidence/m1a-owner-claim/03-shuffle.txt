@@ -1,0 +1,27 @@
+==> test-integration-shuffle
+ok  	github.com/yegamble/vizra-core/cmd/api	2.116s
+?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
+?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
+ok  	github.com/yegamble/vizra-core/cmd/vizra	2.525s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/audit	1.347s
+ok  	github.com/yegamble/vizra-core/internal/authz	2.778s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/cache	1.708s
+ok  	github.com/yegamble/vizra-core/internal/config	2.860s
+ok  	github.com/yegamble/vizra-core/internal/credential	6.898s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.695s
+ok  	github.com/yegamble/vizra-core/internal/fixtures	121.902s
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	2.945s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	3.282s
+ok  	github.com/yegamble/vizra-core/internal/integration	50.056s
+ok  	github.com/yegamble/vizra-core/internal/jobs	8.589s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/obs	3.284s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.033s
+ok  	github.com/yegamble/vizra-core/internal/search	2.484s
+ok  	github.com/yegamble/vizra-core/internal/site	1.994s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+ok  	github.com/yegamble/vizra-core/scripts	12.449s

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,8 +16,10 @@ import (
 	"github.com/yegamble/vizra-core/internal/db"
 	"github.com/yegamble/vizra-core/internal/doctor"
 	"github.com/yegamble/vizra-core/internal/migrate"
+	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/search"
 	"github.com/yegamble/vizra-core/internal/site"
+	"github.com/yegamble/vizra-core/internal/store/sqlcgen"
 )
 
 // This file is deliberately thin: it does the I/O — opening pools, running
@@ -43,6 +46,7 @@ type probes struct {
 	schema          func(context.Context, pooler) (migrate.Status, error)
 	openCache       func(*config.Config) (cacher, error)
 	searchReachable func(context.Context, *config.Config) bool
+	ownerClaim      func(context.Context, pooler) doctor.OwnerClaimState
 }
 
 // pooler and cacher are the narrow views collect() needs, so a fake is three
@@ -112,6 +116,7 @@ func realProbes(envFile string) probes {
 			}
 			return c, nil
 		},
+		ownerClaim: realOwnerClaim,
 		searchReachable: func(ctx context.Context, cfg *config.Config) bool {
 			if cfg.SearchMode == config.SearchOff {
 				return false
@@ -119,6 +124,30 @@ func realProbes(envFile string) probes {
 			remote := search.NewRemote(cfg.SearchURL, []byte(cfg.SearchHMACKey), cfg.SearchTimeout)
 			return search.NewService(search.NewSQL(), remote, nil).Health(ctx) == search.HealthOK
 		},
+	}
+}
+
+// ownerClaim reads the first-run state. It is a REAL check: it queries the
+// database, and reports FAIL when it cannot — doctor never reports OK for
+// something it did not test.
+func realOwnerClaim(ctx context.Context, pool pooler) doctor.OwnerClaimState {
+	raw, ok := pool.(poolAdapter)
+	if !ok {
+		return doctor.OwnerClaimState{LookupErr: errors.New("no database pool")}
+	}
+	q := sqlcgen.New(raw.pools.Default())
+	claimed, err := q.AnyUserExists(ctx)
+	if err != nil {
+		return doctor.OwnerClaimState{LookupErr: err}
+	}
+	state, err := ownerclaim.State(ctx, q)
+	if err != nil {
+		return doctor.OwnerClaimState{LookupErr: err}
+	}
+	return doctor.OwnerClaimState{
+		Claimed:    claimed,
+		TokenLive:  state.Live,
+		Generation: state.Generation,
 	}
 }
 
@@ -166,6 +195,15 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 				results = append(results, doctor.Result{Name: "schema", Status: doctor.StatusFail, Detail: serr.Error()})
 			} else {
 				results = append(results, doctor.CheckSchema(st))
+			}
+			// A probe a test did not wire reports SKIP rather than OK: doctor
+			// never claims to have checked something it did not.
+			// TestRealProbesWiresEveryCheck asserts production wires this one.
+			if p.ownerClaim == nil {
+				results = append(results, doctor.Result{Name: "owner claim",
+					Status: doctor.StatusSkip, Detail: "no owner-claim probe was configured"})
+			} else {
+				results = append(results, doctor.CheckOwnerClaim(p.ownerClaim(ctx, pool)))
 			}
 		}
 	}

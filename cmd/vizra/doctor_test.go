@@ -30,6 +30,7 @@ var everyCheckDoctorMustReport = []string{
 	"database",
 	"database version",
 	"schema",
+	"owner claim",
 	"cache",
 	"cache version floor",
 	"search",
@@ -87,6 +88,9 @@ func healthyProbes(t *testing.T) probes {
 			return fakeCache{info: cache.ServerInfo{Flavour: cache.FlavourValkey, Version: "9.1.2"}}, nil
 		},
 		searchReachable: func(context.Context, *config.Config) bool { return false },
+		ownerClaim: func(context.Context, pooler) doctor.OwnerClaimState {
+			return doctor.OwnerClaimState{Claimed: true}
+		},
 	}
 }
 
@@ -254,5 +258,18 @@ func TestDoctorStopsEarlyOnAnUnloadableConfigButStillFails(t *testing.T) {
 		if r.Name == "database" || r.Name == "schema" {
 			t.Errorf("doctor reported %q without a configuration to connect with", r.Name)
 		}
+	}
+}
+
+// TestRealProbesWiresEveryCheck is the converse of collect()'s nil guards: the
+// guards keep a test fake from panicking, and this keeps that leniency from
+// hiding a production check that nobody wired.
+func TestRealProbesWiresEveryCheck(t *testing.T) {
+	p := realProbes("")
+	if p.ownerClaim == nil {
+		t.Error("realProbes does not wire ownerClaim, so `vizra doctor` would SKIP the owner-claim check in production")
+	}
+	if p.loadConfig == nil || p.openPools == nil || p.schema == nil || p.openCache == nil || p.searchReachable == nil {
+		t.Error("realProbes left a probe unwired")
 	}
 }

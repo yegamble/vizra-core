@@ -166,6 +166,15 @@ decision it protects.
 | A requeue of a dead or exhausted job must reset `attempts` | the contract comment on `SweepExpiredLeases` (`store/queries/jobs.sql`), carried into the generated doc comment |
 | The internal search client never follows a redirect | `internal/search`, `TestARedirectIsNeverFollowedAndNoSignatureLeaks` |
 | Every route, including the 404 path, carries the hardening headers | `internal/httpapi`, `TestEveryRouteCarriesHardeningHeaders` |
+| At most one LIVE owner exists, and a tombstoned owner does not brick the instance | `users_one_owner` (partial unique index, migration 0005); `TestASecondLiveOwnerIsRefusedByTheDatabase`, `TestATombstonedOwnerDoesNotPermanentlyBlockOwnership` |
+| While an instance is unclaimed, only an explicit allowlist is reachable — every other route, including the 404 path, is 403 | `internal/httpapi`, `requireClaimedMiddleware` + `TestEveryRouteIsEitherUnclaimedAllowlistedOrGuarded` (a route in neither classification set fails the build) |
+| The owner-claim token is stored only as a SHA-256 digest and never reaches a response, a header or a log line | `TestClaimTokenIsStoredOnlyAsASHA256Digest`, `TestOwnerClaimTokenNeverReachesTheStructuredLogOrAResponse` (driven with a PLAIN slog handler, so redaction cannot hide a leak) |
+| No argon2id derivation happens before the claim token has verified | `internal/credential` (injectable hasher with a derivation counter), `TestNoPasswordHashingOccursWithoutAValidToken` |
+| `audit_events` refuses UPDATE, DELETE **and** TRUNCATE; a user named by an audit row cannot be deleted | migration 0005 triggers + `audit_events_actor_user_fk ON DELETE RESTRICT`; `TestAuditEventsCannotBeUpdatedOrDeleted`, `TestAuditEventsCannotBeTruncated`, `TestAUserWithAuditRowsCannotBeDeleted` |
+| The `ip_prefix` writer is TOTAL against the frozen 0003 grammar, so an audit row can never abort the transaction it belongs to | `internal/audit`, `TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck` (compiles the grammar from the migration's own bytes) |
+| A rate-limited claim writes no audit row, so an anonymous flood is not an unbounded writer into an undeletable table | `TestARateLimitedClaimWritesNoAuditRow` |
+| A request carrying the VALID claim token is never answered 429 by the failure limiter | `TestAValidTokenIsNeverRateLimitedByTheFailureLimiter` |
+| The claim transaction pins READ COMMITTED explicitly, so the race holds whatever `default_transaction_isolation` the server is set to | `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation` (32 claimants × 3 server defaults) |
 | The fixture corpus reproduces byte-identically from the pinned generator, and each fixture really carries the property it exists for | `make fixtures-verify` + the `fixtures` CI lane; `internal/fixtures`, `TestRemovingThePropertyAFixtureExistsForIsCaught` and `TestManifestDetectsEveryClassOfDrift` |
 | A fixture is never a downloaded photograph: every byte is synthesised | `NOTICE`, `TestCommittedCodecSourceIsGeneratorOutput`, and the "No image is fetched" step in `.github/workflows/fixtures.yml` |
 
@@ -356,8 +365,17 @@ an assertion, delete a case, or narrow scope to turn CI green.
 
 Saying this plainly so nobody reads an absence as an oversight:
 
-- No auth endpoints, no sessions, no API keys. `internal/authz` exists and is
-  tested against the frozen matrix; the routes that call it arrive in M1.
+- No sessions, no sign-in, no API keys. M1-A (VZ-INSTALL-003) adds the owner
+  claim and its two setup operations, and NOTHING else: claiming does **not**
+  establish a session, because sessions arrive with VZ-AUTH-001 (M1-B) and
+  faking one would be mock data in a production path. A client sends the new
+  owner to the sign-in page; `Set-Cookie` is added to the same operation by that
+  slice, which is a backward-compatible change.
+- **`VIZRA_TRUSTED_PROXIES` does not exist yet.** Behind a reverse proxy,
+  `ip_prefix` is therefore NULL and the per-origin rate-limit bucket is inert —
+  the global bucket and the hard ceiling still apply. This is deliberate: writing
+  the proxy's own address as if it were the client would put a false attribution
+  in an immutable table and collapse every caller into one bucket. M1-B owns it.
 - No media tables, no upload, no derivatives. `storage_locations` exists because
   migrations are append-only and `asset_files.storage_location_id` must be able
   to reference it from its first day.

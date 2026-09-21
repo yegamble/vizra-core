@@ -309,3 +309,46 @@ func Report(w io.Writer, results []Result) error {
 	}
 	return nil
 }
+
+// ---------------------------------------------------------------------------
+// Owner claim (VZ-INSTALL-003)
+// ---------------------------------------------------------------------------
+
+// OwnerClaimState is what the caller observed about the first-run bootstrap.
+// It carries no secret: the generation is an ordinal, never the token or its
+// digest, and doctor must never be a way to read a credential back out.
+type OwnerClaimState struct {
+	// LookupErr is set when the state could not be read at all.
+	LookupErr error
+	// Claimed reports whether any account exists.
+	Claimed bool
+	// TokenLive reports whether a redeemable token is currently minted.
+	TokenLive bool
+	// Generation is the current token's ordinal, 0 when none was ever minted.
+	Generation int64
+}
+
+// CheckOwnerClaim tells an operator whether they can still get into their own
+// instance, and exactly what to run.
+//
+// An unclaimed instance is NOT a failure — it is the normal state of a freshly
+// installed one — so it reports WARN with the command rather than FAIL. What is
+// a failure is being unable to read the state at all, because then the operator
+// cannot tell an unclaimed instance from a broken one.
+func CheckOwnerClaim(st OwnerClaimState) Result {
+	const name = "owner claim"
+	switch {
+	case st.LookupErr != nil:
+		return Result{Name: name, Status: StatusFail,
+			Detail: "could not read the owner-claim state; the database may be unreachable or the schema may be behind (`vizra migrate`)"}
+	case st.Claimed:
+		return Result{Name: name, Status: StatusOK, Detail: "this instance has an owner"}
+	case st.TokenLive:
+		return Result{Name: name, Status: StatusWarn,
+			Detail: fmt.Sprintf("unclaimed; a claim token is live (generation %d). "+
+				"`vizra claim-token` mints a new one and invalidates it", st.Generation)}
+	default:
+		return Result{Name: name, Status: StatusWarn,
+			Detail: "unclaimed and no token is live; run `vizra claim-token` to mint one"}
+	}
+}
