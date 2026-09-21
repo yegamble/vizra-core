@@ -1,0 +1,17 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-09-21T00:00:00Z",
+  "ArtifactName": "vizra-core:scan",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": {
+      "Family": "debian",
+      "Name": "13.1"
+    },
+    "ImageID": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "RepoTags": [
+      "vizra-core:scan"
+    ]
+  },
+  "Results": null
+}

@@ -1,0 +1,482 @@
+==============================================================
+MUTATION: M3 — PostgreSQL is assumed reachable instead of pinged
+target:   internal/jobs/health.go
+date:     2026-09-21T07:38:27Z
+branch:   feat/m0-healthcheck-runtime-image  HEAD=4a80a1e
+==============================================================
+-- digest BEFORE mutation: f04e36c2a2792b711aef136b408123884909e5490738513d220b2c0b8e4c07e9
+-- digest AFTER  mutation: 8eb546d668d7c098ca5edef48a430bb744405bbfe8795826bd9e4e7e88f9af6c
+-- the mutation APPLIED (digest changed)
+
+----- diff -----
+----------------
+
+##### RED RUN: go test -count=1 -v -tags=integration ./internal/jobs/ ./internal/integration/ -run Unreachable|Database|Health|Worker|Ready|Credential|Hanging|Site #####
+=== RUN   TestAWorkerWhoseClaimLoopNeverStartedIsNotReady
+--- PASS: TestAWorkerWhoseClaimLoopNeverStartedIsNotReady (0.00s)
+=== RUN   TestAClaimLoopStalledPastTheBoundIsNotReady
+--- PASS: TestAClaimLoopStalledPastTheBoundIsNotReady (0.00s)
+=== RUN   TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun
+--- PASS: TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun (0.00s)
+=== RUN   TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick
+    health_test.go:130: an unreachable database reported READY
+--- FAIL: TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick (0.00s)
+=== RUN   TestAMissingPingerIsNotReadyRatherThanAssumedHealthy
+--- PASS: TestAMissingPingerIsNotReadyRatherThanAssumedHealthy (0.00s)
+=== RUN   TestEverySiteMustBeReadyForTheWorkerToBeReady
+    health_test.go:158: one healthy site out of two reported the whole worker READY
+--- FAIL: TestEverySiteMustBeReadyForTheWorkerToBeReady (0.00s)
+=== RUN   TestTheReportNeverCarriesACredential
+--- PASS: TestTheReportNeverCarriesACredential (0.00s)
+=== RUN   TestTheHandlerAnswers503WhenTheWorkerIsNotReady
+--- PASS: TestTheHandlerAnswers503WhenTheWorkerIsNotReady (0.00s)
+=== RUN   TestTheHandlerBoundsAHangingPing
+    health_test.go:249: HTTP 200, want 503 — a database that never answers is not reachable
+--- FAIL: TestTheHandlerBoundsAHangingPing (0.00s)
+=== RUN   TestEveryErrorLogSiteInTheWorkerIsRedacted
+    logsites_test.go:88: 11 error log sites in worker.go, all going through safeError
+--- PASS: TestEveryErrorLogSiteInTheWorkerIsRedacted (0.00s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/jobs	0.283s
+=== RUN   TestMigrateUpOnEmptyDatabase
+--- PASS: TestMigrateUpOnEmptyDatabase (0.04s)
+=== RUN   TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost
+--- PASS: TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost (0.03s)
+=== RUN   TestWorkerRunsAndCompletesAJob
+--- PASS: TestWorkerRunsAndCompletesAJob (0.04s)
+=== RUN   TestReadinessDegradesWhenTheCacheIsUnreachable
+redis: 2026/09/21 03:38:30 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 03:38:30 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 03:38:30 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+--- PASS: TestReadinessDegradesWhenTheCacheIsUnreachable (1.32s)
+=== RUN   TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
+2026/09/21 03:38:31 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
+2026/09/21 03:38:31 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+--- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.44s)
+=== RUN   TestSitesIsASingleton
+--- PASS: TestSitesIsASingleton (0.04s)
+=== RUN   TestAWorkerWithAPlainHandlerLogsNoCredentials
+    golden_test.go:1685: 1664 log bytes across three branches, all seven credential classes absent
+--- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.13s)
+=== RUN   TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 1 in 336ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:49793/readyz, 1ms)
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 1 in 6ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:49793/readyz, 0s)
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 0 in 43ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 24ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 20ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 24ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 13ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 20ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 17ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 23ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 23ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49793/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 1 in 23ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — HTTP 503 unavailable (127.0.0.1:49793/readyz, 4ms)
+--- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops (9.18s)
+=== RUN   TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent
+    healthcheck_test.go:365: vizra healthcheck api [--timeout=2s] -> exit 1 in 17ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:49818/readyz, 0s)
+--- PASS: TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent (0.02s)
+=== RUN   TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 12ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:49823/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 13ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:49823/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 0 in 26ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 3ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 17ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 15ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 15ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 14ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 14ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 16ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 15ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 14ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 14ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 13ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 16ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 7ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 16ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 8ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 20ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 15ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 19ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 17ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 7ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 18ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 7ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 11ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 23ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 8ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 7ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 7ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 19ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 25ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 20ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 22ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 2ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 21ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 27ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 2ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 0 in 24ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49823/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:403: worker still reported READY 20s after the service was broken. A probe that cannot fail while the service is broken is the defect this exists to close.
+    healthcheck_test.go:273: vizra-worker log:
+        time=2026-09-21T03:38:41.190-04:00 level=INFO msg="vizra-worker starting" release=dev commit=unknown concurrency=4 lease=1m0s
+        time=2026-09-21T03:38:41.191-04:00 level=INFO msg="vizra-worker running" kinds=[noop]
+        time=2026-09-21T03:38:42.203-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:43.205-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:44.207-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:45.209-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:46.212-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:47.215-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:48.217-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:49.220-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:50.223-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:51.224-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:52.226-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:53.229-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:54.232-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:55.233-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:56.236-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:57.240-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:58.240-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:38:59.241-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:39:00.244-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+        time=2026-09-21T03:39:01.247-04:00 level=WARN msg="jobs: claim failed" site=default worker=Yosefs-MacBook-Air.local-92513-b0f6 error="failed to connect to `user=vizra database=vizra_test`: 127.0.0.1:49822 (127.0.0.1): dial error: dial tcp 127.0.0.1:49822: connect: connection refused"
+--- FAIL: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops (20.67s)
+=== RUN   TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine
+    healthcheck_test.go:447: vizra healthcheck worker [] -> exit 0 in 15ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49938/readyz, 1ms)
+          stderr: 
+2026/09/21 03:39:01 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+2026/09/21 03:39:01 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+    healthcheck_test.go:467: vizra healthcheck worker [] -> exit 1 in 22ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:49938/readyz, 1ms)
+--- PASS: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine (2.08s)
+=== RUN   TestHealthcheckUsageErrorsAreDistinctFromAVerdict
+--- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict (0.03s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	34.383s
+FAIL
+##### RED RUN exit code: 1 #####
+
+-- digest AFTER restore:  f04e36c2a2792b711aef136b408123884909e5490738513d220b2c0b8e4c07e9
+-- restored exactly
+
+##### GREEN RUN: go test -count=1 -v -tags=integration ./internal/jobs/ ./internal/integration/ -run Unreachable|Database|Health|Worker|Ready|Credential|Hanging|Site #####
+=== RUN   TestAWorkerWhoseClaimLoopNeverStartedIsNotReady
+--- PASS: TestAWorkerWhoseClaimLoopNeverStartedIsNotReady (0.00s)
+=== RUN   TestAClaimLoopStalledPastTheBoundIsNotReady
+--- PASS: TestAClaimLoopStalledPastTheBoundIsNotReady (0.00s)
+=== RUN   TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun
+--- PASS: TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun (0.00s)
+=== RUN   TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick
+--- PASS: TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick (0.00s)
+=== RUN   TestAMissingPingerIsNotReadyRatherThanAssumedHealthy
+--- PASS: TestAMissingPingerIsNotReadyRatherThanAssumedHealthy (0.00s)
+=== RUN   TestEverySiteMustBeReadyForTheWorkerToBeReady
+--- PASS: TestEverySiteMustBeReadyForTheWorkerToBeReady (0.00s)
+=== RUN   TestTheReportNeverCarriesACredential
+--- PASS: TestTheReportNeverCarriesACredential (0.00s)
+=== RUN   TestTheHandlerAnswers503WhenTheWorkerIsNotReady
+--- PASS: TestTheHandlerAnswers503WhenTheWorkerIsNotReady (0.00s)
+=== RUN   TestTheHandlerBoundsAHangingPing
+--- PASS: TestTheHandlerBoundsAHangingPing (1.50s)
+=== RUN   TestEveryErrorLogSiteInTheWorkerIsRedacted
+    logsites_test.go:88: 11 error log sites in worker.go, all going through safeError
+--- PASS: TestEveryErrorLogSiteInTheWorkerIsRedacted (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/jobs	1.792s
+=== RUN   TestMigrateUpOnEmptyDatabase
+--- PASS: TestMigrateUpOnEmptyDatabase (0.06s)
+=== RUN   TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost
+--- PASS: TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost (0.03s)
+=== RUN   TestWorkerRunsAndCompletesAJob
+2026/09/21 03:39:05 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+--- PASS: TestWorkerRunsAndCompletesAJob (0.03s)
+=== RUN   TestReadinessDegradesWhenTheCacheIsUnreachable
+redis: 2026/09/21 03:39:05 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 03:39:06 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 03:39:06 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+--- PASS: TestReadinessDegradesWhenTheCacheIsUnreachable (1.31s)
+=== RUN   TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
+2026/09/21 03:39:07 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
+2026/09/21 03:39:07 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+2026/09/21 03:39:07 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+2026/09/21 03:39:07 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+2026/09/21 03:39:07 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+--- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.47s)
+=== RUN   TestSitesIsASingleton
+--- PASS: TestSitesIsASingleton (0.06s)
+=== RUN   TestAWorkerWithAPlainHandlerLogsNoCredentials
+    golden_test.go:1685: 1664 log bytes across three branches, all seven credential classes absent
+--- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.14s)
+=== RUN   TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 0 in 756ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 18ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 17ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 22ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 21ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 7ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 17ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 19ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 21ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 21ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49994/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 1 in 17ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — HTTP 503 unavailable (127.0.0.1:49994/readyz, 2ms)
+--- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops (8.36s)
+=== RUN   TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent
+    healthcheck_test.go:365: vizra healthcheck api [--timeout=2s] -> exit 1 in 15ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:50014/readyz, 0s)
+--- PASS: TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent (0.02s)
+=== RUN   TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 13ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:50019/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 20ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:50019/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 0 in 24ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:50019/readyz, 4ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 1 in 19ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:50019/readyz, 1ms)
+--- PASS: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops (0.64s)
+=== RUN   TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine
+    healthcheck_test.go:447: vizra healthcheck worker [] -> exit 0 in 8ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:50031/readyz, 1ms)
+          stderr: 
+2026/09/21 03:39:16 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+    healthcheck_test.go:467: vizra healthcheck worker [] -> exit 1 in 9ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:50031/readyz, 2ms)
+--- PASS: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine (2.07s)
+=== RUN   TestHealthcheckUsageErrorsAreDistinctFromAVerdict
+--- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict (0.01s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	13.759s
+##### GREEN RUN exit code: 0 #####
+
+VERDICT: red under mutation (exit 1), green when restored (exit 0).

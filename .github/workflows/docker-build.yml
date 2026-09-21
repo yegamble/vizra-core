@@ -97,12 +97,130 @@ jobs:
           echo "--- libvips version recorded at build ---"
           docker run --rm vizra-core:ci cat /usr/share/vizra/build/libvips-version.txt
 
+      # The runtime image reports the SAME loader surface the build recorded.
+      #
+      # This is strictly stronger than reading `vizra version` alone, which
+      # prints a string baked in at link time and would keep printing it if the
+      # shared libraries were missing from the runtime image entirely. Running
+      # `vips -l` LOADS them: it is the only check in this lane that can tell
+      # the difference between "the image records a JPEG loader" and "the image
+      # can load a JPEG". It is the check that keeps the clean-base runtime
+      # stage honest.
+      - name: Assert the shipped libvips really loads, and matches what was recorded
+        run: |
+          set -euo pipefail
+          runtime=$(docker run --rm vizra-core:ci sh -c \
+            "vips -l | sed -n 's/^[[:space:]]*Vips[A-Za-z0-9]*[[:space:]]*(\([a-z0-9_]*\)).*/\1/p' | grep -E '(load|save)' | sort -u | paste -sd, -")
+          baked=$(docker run --rm vizra-core:ci /usr/local/bin/vizra version --json | jq -r '.libvips.loaders | join(",")')
+          [ -n "$runtime" ] || { echo "::error::the shipped libvips reports no loaders"; exit 1; }
+          if [ "$runtime" != "$baked" ]; then
+            echo "::error::the loader list the RUNTIME image produces differs from the one recorded at build time."
+            echo "runtime: $runtime"
+            echo "baked:   $baked"
+            exit 1
+          fi
+          echo "the runtime loader list matches the recorded one ($(printf '%s' "$runtime" | tr ',' '\n' | wc -l) entries)"
+
       - name: Assert the image does not run as root
         run: |
           set -euo pipefail
           uid=$(docker run --rm vizra-core:ci id -u)
           echo "image uid: $uid"
           [ "$uid" != "0" ] || { echo "::error::the release image runs as root"; exit 1; }
+
+      # FINDING 5, meta PR #4 `vizra-infrastructure` seat. The compose tree
+      # mounts a volume at /var/lib/vizra/media. Docker creates a mountpoint
+      # that is ABSENT from the image as root:root, so the first upload as uid
+      # 10001 fails with EACCES on a fresh host, on first boot, in front of the
+      # owner. The seat marked its own claim UNVERIFIED and asked for the proof
+      # here: this WRITES as the image's default user rather than reading an
+      # `ls -l`, because the permission bits are not the claim — being able to
+      # write is.
+      - name: Assert the media directory is writable by the image's default user
+        run: |
+          set -euo pipefail
+          out=$(docker run --rm vizra-core:ci sh -c \
+            'printf vizra-media-probe > /var/lib/vizra/media/probe.txt && cat /var/lib/vizra/media/probe.txt')
+          [ "$out" = "vizra-media-probe" ] || {
+            echo "::error::could not write and read back /var/lib/vizra/media as the default user (got: $out)"
+            exit 1
+          }
+          echo "wrote and read back /var/lib/vizra/media as $(docker run --rm vizra-core:ci id -un)"
+          docker run --rm vizra-core:ci sh -c 'ls -ld /var/lib/vizra/media'
+
+      - name: Assert the three entry points ship and the probe runs
+        run: |
+          set -euo pipefail
+          for b in vizra vizra-api vizra-worker; do
+            docker run --rm vizra-core:ci test -x "/usr/local/bin/$b" \
+              || { echo "::error::/usr/local/bin/$b is missing from the image"; exit 1; }
+            echo "  ok   /usr/local/bin/$b"
+          done
+          # The container HEALTHCHECK is `vizra healthcheck api`. A probe whose
+          # binary cannot even print its own usage inside the image would report
+          # every container unhealthy for a reason no health log explains.
+          docker run --rm vizra-core:ci /usr/local/bin/vizra healthcheck --help > /tmp/hc-help.txt
+          grep -q 'Exit codes' /tmp/hc-help.txt \
+            || { echo "::error::vizra healthcheck --help did not run inside the image"; cat /tmp/hc-help.txt; exit 1; }
+          head -4 /tmp/hc-help.txt
+          # And it must FAIL when nothing is listening, inside the image, with
+          # no network service at all. A probe that cannot fail is the defect
+          # this whole slice exists to close.
+          rc=0
+          docker run --rm vizra-core:ci /usr/local/bin/vizra healthcheck api --timeout=1s || rc=$?
+          [ "$rc" -ne 0 ] || { echo "::error::the healthcheck exited 0 with nothing listening"; exit 1; }
+          echo "  ok   healthcheck exits $rc with no listener"
+
+      # The runtime stage is built FROM a clean digest-pinned base, not from the
+      # stage that compiled libvips. A purge cannot deliver this: a file removed
+      # in a later layer still ships its bytes in the earlier one, so `docker
+      # save` and every registry copy carried the compiler regardless.
+      - name: Assert the toolchain is absent from the runtime image
+        run: |
+          set -euo pipefail
+          # The list is scripts/runtime-toolchain-denylist.txt; that file says
+          # why it is a file and not an inline list.
+          tools=$(grep -v '^#' scripts/runtime-toolchain-denylist.txt | grep -v '^$' | tr '\n' ' ')
+          echo "checking for: $tools"
+          present=$(docker run --rm -e TOOLS="$tools" vizra-core:ci sh -c '
+            for t in $TOOLS; do
+              command -v "$t" >/dev/null 2>&1 && echo "$t"
+            done
+            true') || true
+          if [ -n "$present" ]; then
+            echo "::error::the runtime image carries build tooling:"
+            printf '%s\n' "$present"
+            exit 1
+          fi
+          echo "no build tooling on PATH"
+
+          devpkgs=$(docker run --rm vizra-core:ci sh -c "dpkg-query -W -f='\${binary:Package}\n' 2>/dev/null | grep -- '-dev$' || true")
+          if [ -n "$devpkgs" ]; then
+            echo "::error::the runtime image carries -dev packages:"
+            printf '%s\n' "$devpkgs"
+            exit 1
+          fi
+          echo "no -dev packages installed"
+
+          if docker run --rm vizra-core:ci test -e /src; then
+            echo "::error::the libvips source tree is still in the runtime image"
+            exit 1
+          fi
+          echo "no /src"
+
+      - name: Record the image size
+        run: |
+          set -euo pipefail
+          bytes=$(docker image inspect vizra-core:ci --format '{{.Size}}')
+          echo "vizra-core:ci — $bytes bytes ($((bytes / 1024 / 1024)) MiB), linux/amd64"
+          {
+            echo "### Release image"
+            echo ""
+            echo "| metric | value |"
+            echo "| --- | --- |"
+            echo "| size | $((bytes / 1024 / 1024)) MiB ($bytes bytes) |"
+            echo "| platform | linux/amd64 |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # ADR-001: the libvips layer sits BELOW the Go binary layer, so a Go
       # change never rebuilds libvips and the codec surface of a tag is stable

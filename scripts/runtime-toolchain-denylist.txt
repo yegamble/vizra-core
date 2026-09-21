@@ -1,0 +1,33 @@
+# Commands that must NOT be on PATH in the release runtime image.
+#
+# The runtime stage is built FROM a clean digest-pinned base rather than from
+# the stage that compiled libvips, so none of these was ever installed there.
+# This file is what `docker-build` asserts against, one name per line.
+#
+# It lives in a file rather than inline in the workflow for a mechanical reason
+# worth stating: `scripts/ci-required-guard.py`'s ANCHOR check treats a bare
+# `make` token anywhere in a floor lane's `run:` as a make invocation and
+# demands the make-integrity anchor before it. That heuristic fails CLOSED and
+# is right to; a denylist that merely MENTIONS `make` should not have to argue
+# with it.
+#
+# Not listed, deliberately: `tar` and `dpkg` ship in the Debian base and are not
+# build tooling. `sh` is the image's shell and several assertions need it.
+gcc
+cc
+g++
+cpp
+ld
+as
+ar
+make
+cmake
+meson
+ninja
+pkg-config
+pkgconf
+curl
+wget
+xz
+go
+git

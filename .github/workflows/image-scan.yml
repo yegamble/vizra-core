@@ -1,0 +1,139 @@
+# image-scan — known vulnerabilities in the image that actually ships.
+#
+# `govulncheck` covers the Go dependency set. It says nothing about the Debian
+# packages the runtime image installs, which is most of the image's attack
+# surface and all of libvips's. This lane is that half.
+#
+# WHY IT IS NOT IN `.github/required-checks.txt`, AND WHY THAT IS NOT A DODGE.
+# `ci-required-guard.py` forbids `continue-on-error` on a floor lane, on
+# purpose: a lane that hides its own failures is worse than no lane. But a scan
+# lane's result depends on the WORLD — a CVE published against an unfixed Debian
+# package turns it red with no change to this repository — and a required lane
+# that goes red on its own is how a team learns to merge past red. So this lane
+# runs on every pull request, fails loudly, publishes its report, and is read by
+# a human. Promotion to the required set is an owner-reviewed change to the
+# manifest AND to FLOOR_LANES, and the PR that proposes it should carry two
+# things: a baseline that has been clean for a sustained period, and an agreed
+# route for an unfixed upstream CVE — a reviewed, expiring `.trivyignore.yaml`
+# entry — so that "red for reasons outside the repository" has an answer that is
+# not `continue-on-error`. (Same reasoning, same words, as vizra-user's.)
+#
+# WHAT THIS LANE DOES DIFFERENTLY FROM AN ORDINARY TRIVY STEP.
+# A scan is the one lane whose GREEN is indistinguishable from its NOT HAVING
+# RUN: `trivy image` exits 0 with a perfectly-formed report when it could not
+# identify the operating system, when its results are empty, or when the file on
+# disk describes some other image. And a scanner that FAILS — a database
+# download that 429s, a daemon it cannot reach — exits non-zero with no
+# findings, which any `|| true` turns into "clean".
+#
+# So: the scanner runs as a digest-pinned container, its exit code is captured
+# into a file DELIBERATELY (`|| rc=$?`) rather than discarded, and
+# scripts/image-scan-verdict.py must then judge that exit code along with the
+# report's provenance before it is allowed to count anything. Its refusals have
+# their own exit code (3, "there was no valid scan") so nobody reads them as
+# "nothing was found", and each refusal has a fixture and a named test under
+# scripts/testdata/imagescan/.
+name: image-scan
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so a CVE disclosed after a merge is still found.
+    - cron: '41 6 * * 2'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image-scan:
+    name: image-scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Provenance — which tree this lane tested
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/provenance.sh
+
+      # The same image docker-build builds, on the acceptance platform
+      # (ADR-009: ubuntu-24.04, linux/amd64). Built here rather than shared
+      # between jobs so this lane is readable on its own.
+      - name: Build the release image (linux/amd64)
+        run: docker build --tag vizra-core:scan .
+
+      # An image reference that does not resolve is one of the ways a scan
+      # passes vacuously, so the thing being scanned is identified BEFORE the
+      # scanner is asked about it.
+      - name: Identify the image under scan
+        run: |
+          set -euo pipefail
+          docker image inspect vizra-core:scan --format 'id: {{.Id}}  size: {{.Size}} bytes'
+
+      # Trivy 0.70.0, digest resolved from registry-1.docker.io on 2026-09-21
+      # (`docker manifest inspect aquasec/trivy@sha256:be1190…` → a manifest
+      # list carrying linux/amd64 sha256:85e87be1a96459c38a4eea47dc64eb2d342bb14cd4b4cef96adcf6ff03378b7c).
+      #
+      # A digest-pinned CONTAINER rather than the action, for one reason: the
+      # scanner's exit code has to be an input this lane judges, and running it
+      # directly is the only way to be sure nothing between here and the verdict
+      # swallowed it. The engine version is pinned because a scan whose engine
+      # moves under it cannot be compared with last week's baseline.
+      - name: Scan the image, recording the scanner's own exit code
+        run: |
+          set -euo pipefail
+          rc=0
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/work" -w /work \
+            -v trivy-db-cache:/root/.cache/trivy \
+            aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e \
+            image \
+              --format json \
+              --output trivy-image.json \
+              --scanners vuln \
+              --pkg-types os,library \
+              --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+              --ignore-unfixed=false \
+              vizra-core:scan || rc=$?
+          # Captured, not discarded. The next step REFUSES to judge findings
+          # until it has read this, and fails if it is missing or non-zero.
+          printf '%s\n' "$rc" > trivy-exit-code.txt
+          echo "trivy exit code: $rc"
+
+      # `set -o pipefail` is NOT optional here. GitHub's default shell is
+      # `bash -e`, which does not set it, so `verdict | tee` would report the
+      # exit status of `tee` — zero, always — and this lane would go green on
+      # every finding and every refusal. That is the same class of defect this
+      # whole lane exists to refuse, one step further out.
+      - name: Verdict — a valid scan, then the findings
+        run: |
+          set -euo pipefail
+          python3 scripts/image-scan-verdict.py \
+            --report trivy-image.json \
+            --scanner-exit-code-file trivy-exit-code.txt \
+            --image-ref vizra-core:scan \
+            --fail-on HIGH,CRITICAL \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the scan report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trivy-image-${{ github.sha }}
+          path: |
+            trivy-image.json
+            trivy-exit-code.txt
+          if-no-files-found: error
+          retention-days: 30
