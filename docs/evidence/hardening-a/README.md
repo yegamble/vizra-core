@@ -24,7 +24,7 @@ native arm64 image, not an emulated amd64 one.
 | `03-manifest-repin.txt` | the fixtures manifest re-pin: all twelve fixture entries byte-identical, only `generator.source_sha256` moved |
 | `D1-retired-name.txt` | the production refusal of a leftover `VIZRA_SEARCH_HMAC_KEY`, red against a controlled mutation |
 | `D2-fixtures-verify.txt` | verifier findings V-2 and V-3 reproduced through the CLI, red, and the dotfile exemption shown still green |
-| `D3-make-integrity.txt` | six Makefile mutations and six workflow mutations, each with a real failing test underneath |
+| `D3-make-integrity.txt` | six Makefile mutations and six workflow mutations against a clean CLONE, each with a real failing test planted underneath. Ends with a note on exactly what line (a) shows for each mutation — `make ci` exits 0 for M1–M3 and 2 for M4–M6, for different reasons, and the difference matters |
 | `D4-provenance.txt` | the merge-ref provenance step across depth-1, depth-2, pinned-to-head, mismatched-head, `merge_group` and `push` |
 
 **How to read a demonstration.** Every mutation prints the short sha256 of each

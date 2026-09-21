@@ -1,0 +1,312 @@
+# D3 — a make-driven gate cannot be turned into a no-op
+Date: 2026-09-21T05:41:28Z   Host: Darwin/arm64
+make: GNU Make 3.81   go: go1.27.1   git: git version 2.50.1 (Apple Git-155)
+Clone of: 2ceac77e4cbb30e964335a7adc6cee550fa65485   branch: chore/m0-hardening-a
+Working dir: /private/tmp/claude-501/-Users-yosefgamble-github-vizra/7321b930-95d2-4a95-ba2e-61ef2ce3c13c/scratchpad/democlone
+
+Baseline digests (short sha256):
+      e7cc357cd09a6fc7  Makefile
+      3421fd3e75d321b7  scripts/make-integrity-guard.py
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+
+############################################################################
+# PART 1 — Makefile mutations.
+#   Each is applied to the REAL Makefile of this clone, with a REAL failing
+#   test planted underneath, and each lane is run the way CI runs it.
+############################################################################
+
+== STEP 0 — the canary, with an UNMUTATED Makefile ==
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+   Every reading must be RED here except the guard, which has nothing to object to.
+    make ci                                      exit=2   lint-imports: passed
+    go test ./internal/buildinfo/ (DIRECT, no make) exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+    ./scripts/make-integrity-guard.sh            exit=0   make-integrity-guard: passed (8 gate target(s))
+
+==========================================================================
+== M1  SHELL := /usr/bin/true
+==========================================================================
+  BEFORE:
+      e7cc357cd09a6fc7  Makefile
+  AFTER:
+      6fad0d8dc00bc134  Makefile   (was e7cc357cd09a6fc7 — mutation applied)
+  the planted failing test, unchanged:
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+  the mutated line(s):
+        -SHELL := /usr/bin/env bash
+        +SHELL := /usr/bin/true
+
+  (a) what the NEUTERED make does with the gate — the defect itself:
+    make ci                                      exit=0   
+  (b) LAYER 1 — the out-of-make anchor (a CI step, BEFORE any make):
+    ./scripts/make-integrity-guard.sh            exit=1  
+          FAIL  Makefile:11 sets SHELL to something other than the approved value: `SHELL := /usr/bin/true`
+          FAIL  the root Makefile does not carry BOTH approved assignments.
+          FAIL  make resolves SHELL to '/usr/bin/true' while resolving `ci`, not '/usr/bin/env bash'.
+  (c) LAYER 2 — the required lane that runs go test DIRECTLY, no make:
+    go test -count=1 ./internal/buildinfo/       exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+  (d) READING 3 — the guard run from the ordinary suite, which (c) invokes:
+    go test -count=1 -run TestMakeIntegrityGuardPasses ./scripts/ exit=1   --- FAIL: TestMakeIntegrityGuardPassesOnTheRealMakefile (0.39s)
+
+==========================================================================
+== M2  MAKEFLAGS += -i
+==========================================================================
+  BEFORE:
+      e7cc357cd09a6fc7  Makefile
+  AFTER:
+      7d911be419867b83  Makefile   (was e7cc357cd09a6fc7 — mutation applied)
+  the planted failing test, unchanged:
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+  the mutated line(s):
+        +MAKEFLAGS += -i
+
+  (a) what the NEUTERED make does with the gate — the defect itself:
+    make ci                                      exit=0   lint-imports: passed
+  (b) LAYER 1 — the out-of-make anchor (a CI step, BEFORE any make):
+    ./scripts/make-integrity-guard.sh            exit=1  
+          FAIL  Makefile:11 assigns MAKEFLAGS: `MAKEFLAGS += -i`
+          FAIL  make resolves MAKEFLAGS to 'pni' while resolving `ci`.
+          FAIL  make resolves MAKEFLAGS to 'pni' while resolving `tidy-check`.
+  (c) LAYER 2 — the required lane that runs go test DIRECTLY, no make:
+    go test -count=1 ./internal/buildinfo/       exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+  (d) READING 3 — the guard run from the ordinary suite, which (c) invokes:
+    go test -count=1 -run TestMakeIntegrityGuardPasses ./scripts/ exit=1   --- FAIL: TestMakeIntegrityGuardPassesOnTheRealMakefile (0.66s)
+
+==========================================================================
+== M3  an INCLUDED makefile carrying MAKEFLAGS += -i
+==========================================================================
+  BEFORE:
+      e7cc357cd09a6fc7  Makefile
+  AFTER:
+      d24b0768d8462029  Makefile   (was e7cc357cd09a6fc7 — mutation applied)
+  included file:
+      fb8251fe13d70cff  hardening-a-inc.mk
+  the planted failing test, unchanged:
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+  the mutated line(s):
+        +include hardening-a-inc.mk
+        [inc] MAKEFLAGS += -i
+
+  (a) what the NEUTERED make does with the gate — the defect itself:
+    make ci                                      exit=0   lint-imports: passed
+  (b) LAYER 1 — the out-of-make anchor (a CI step, BEFORE any make):
+    ./scripts/make-integrity-guard.sh            exit=1  
+          FAIL  hardening-a-inc.mk:1 assigns MAKEFLAGS: `MAKEFLAGS += -i`
+          FAIL  make resolves MAKEFLAGS to 'pni' while resolving `ci`.
+          FAIL  make resolves MAKEFLAGS to 'pni' while resolving `tidy-check`.
+  (c) LAYER 2 — the required lane that runs go test DIRECTLY, no make:
+    go test -count=1 ./internal/buildinfo/       exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+  (d) READING 3 — the guard run from the ordinary suite, which (c) invokes:
+    go test -count=1 -run TestMakeIntegrityGuardPasses ./scripts/ exit=1   --- FAIL: TestMakeIntegrityGuardPassesOnTheRealMakefile (0.66s)
+
+==========================================================================
+== M4  a '-' prefix on test-race's go test line
+==========================================================================
+  BEFORE:
+      e7cc357cd09a6fc7  Makefile
+  AFTER:
+      897157f0d70531d2  Makefile   (was e7cc357cd09a6fc7 — mutation applied)
+  the planted failing test, unchanged:
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+  the mutated line(s):
+        -	@$(GO) test -race -count=1 $(PKGS)
+        +	@-$(GO) test -race -count=1 $(PKGS)
+
+  (a) what the NEUTERED make does with the gate — the defect itself:
+    make ci                                      exit=2   lint-imports: passed
+  (b) LAYER 1 — the out-of-make anchor (a CI step, BEFORE any make):
+    ./scripts/make-integrity-guard.sh            exit=1  
+          FAIL  Makefile:159 — gate target `test-race` has a recipe line prefixed `-`: `@-$(GO) test -race -count=1 $(PKGS)`
+  (c) LAYER 2 — the required lane that runs go test DIRECTLY, no make:
+    go test -count=1 ./internal/buildinfo/       exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+  (d) READING 3 — the guard run from the ordinary suite, which (c) invokes:
+    go test -count=1 -run TestMakeIntegrityGuardPasses ./scripts/ exit=1   --- FAIL: TestMakeIntegrityGuardPassesOnTheRealMakefile (0.72s)
+
+==========================================================================
+== M5  '|| true' on test-race's go test line
+==========================================================================
+  BEFORE:
+      e7cc357cd09a6fc7  Makefile
+  AFTER:
+      1ee344a088c0c03e  Makefile   (was e7cc357cd09a6fc7 — mutation applied)
+  the planted failing test, unchanged:
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+  the mutated line(s):
+        -	@$(GO) test -race -count=1 $(PKGS)
+        +	@$(GO) test -race -count=1 $(PKGS) || true
+
+  (a) what the NEUTERED make does with the gate — the defect itself:
+    make ci                                      exit=2   lint-imports: passed
+  (b) LAYER 1 — the out-of-make anchor (a CI step, BEFORE any make):
+    ./scripts/make-integrity-guard.sh            exit=1  
+          FAIL  Makefile:159 — gate target `test-race` has a recipe line ending `|| true`: `$(GO) test -race -count=1 $(PKGS) || true`
+  (c) LAYER 2 — the required lane that runs go test DIRECTLY, no make:
+    go test -count=1 ./internal/buildinfo/       exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+  (d) READING 3 — the guard run from the ordinary suite, which (c) invokes:
+    go test -count=1 -run TestMakeIntegrityGuardPasses ./scripts/ exit=1   --- FAIL: TestMakeIntegrityGuardPassesOnTheRealMakefile (0.65s)
+
+==========================================================================
+== M6  a duplicate 'ci:' target that replaces the recipe
+==========================================================================
+  BEFORE:
+      e7cc357cd09a6fc7  Makefile
+  AFTER:
+      9962272eb00c44c7  Makefile   (was e7cc357cd09a6fc7 — mutation applied)
+  the planted failing test, unchanged:
+      29b625bdfcf365eb  internal/buildinfo/hardening_a_canary_test.go
+  the mutated line(s):
+        +.PHONY: ci
+        +ci:
+        +	@echo "ci: replaced — nothing runs"
+
+  (a) what the NEUTERED make does with the gate — the defect itself:
+    make ci                                      exit=2   lint-imports: passed
+  (b) LAYER 1 — the out-of-make anchor (a CI step, BEFORE any make):
+    ./scripts/make-integrity-guard.sh            exit=1  
+          FAIL  gate target `ci` is defined 2 times: Makefile:38, Makefile:215
+          FAIL  make reports a DUPLICATE definition while resolving `ci`:
+          FAIL  make reports a DUPLICATE definition while resolving `tidy-check`:
+  (c) LAYER 2 — the required lane that runs go test DIRECTLY, no make:
+    go test -count=1 ./internal/buildinfo/       exit=1   --- FAIL: TestHardeningACanaryMustFail (0.00s)
+  (d) READING 3 — the guard run from the ordinary suite, which (c) invokes:
+    go test -count=1 -run TestMakeIntegrityGuardPasses ./scripts/ exit=1   --- FAIL: TestMakeIntegrityGuardPassesOnTheRealMakefile (1.18s)
+
+== RESTORE ==
+  Makefile restored:
+      e7cc357cd09a6fc7  Makefile
+  (baseline was e7cc357cd09a6fc7)
+  canary removed: yes
+    ./scripts/make-integrity-guard.sh            exit=0   make-integrity-guard: passed (8 gate target(s))
+    go test -count=1 ./scripts/ ./internal/buildinfo/ exit=0   ok  	github.com/yegamble/vizra-core/scripts	8.429s
+
+############################################################################
+# PART 2 — WORKFLOW mutations: removing the anchor itself.
+#   The control for these is scripts/ci-required-guard.sh, which the
+#   ci-required lane runs as its own step (outside make).
+############################################################################
+==========================================================================
+== WA  A  the anchor step DELETED
+==========================================================================
+  BEFORE:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  AFTER:
+      861e73ca0c9d4fe3  .github/workflows/build-test.yml   (was c9768a93cb99f64f — mutation applied)
+        -      - name: Refuse a neutered Makefile
+        -        run: ./scripts/make-integrity-guard.sh
+    ./scripts/ci-required-guard.sh               exit=1  
+          FAIL  floor lane 'build-test' (build-test.yml) invokes `make` (step 'go.mod and go.sum are tidy') with NO make-integrity-guard step before it.
+
+==========================================================================
+== WB  B  the anchor step made CONDITIONAL (if:)
+==========================================================================
+  BEFORE:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  AFTER:
+      c0c4bfbaee6188a4  .github/workflows/build-test.yml   (was c9768a93cb99f64f — mutation applied)
+        +        if: ${{ github.event_name == 'push' }}
+    ./scripts/ci-required-guard.sh               exit=1  
+          FAIL  floor lane 'build-test' (build-test.yml) makes the make-integrity-guard step CONDITIONAL (if: "${{ github.event_name == 'push' }}").
+
+==========================================================================
+== WC  C  the anchor step MOVED to after 'make tidy-check'
+==========================================================================
+  BEFORE:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  AFTER:
+      b5c5c5df08fd345a  .github/workflows/build-test.yml   (was c9768a93cb99f64f — mutation applied)
+        +      - name: go.mod and go.sum are tidy
+        +        run: make tidy-check
+        -      - name: go.mod and go.sum are tidy
+        -        run: make tidy-check
+    ./scripts/ci-required-guard.sh               exit=1  
+          FAIL  floor lane 'build-test' (build-test.yml) runs the make-integrity-guard step at position 6, AFTER `make` at position 5 ('go.mod and go.sum are tidy').
+
+==========================================================================
+== WD  D  the anchor step marked continue-on-error
+==========================================================================
+  BEFORE:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  AFTER:
+      30435f0e6751e5f4  .github/workflows/build-test.yml   (was c9768a93cb99f64f — mutation applied)
+        +        continue-on-error: true
+    ./scripts/ci-required-guard.sh               exit=1  
+          FAIL  floor lane 'build-test' (build-test.yml) marks the make-integrity-guard step continue-on-error: True.
+          FAIL  floor lane 'build-test' (build-test.yml) carries continue-on-error:
+
+==========================================================================
+== WE  E  the direct 'go test ./...' lane DELETED
+==========================================================================
+  BEFORE:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  AFTER:
+      82f5278c879fd083  .github/workflows/build-test.yml   (was c9768a93cb99f64f — mutation applied)
+        -      - name: Unit suite, invoked directly (no make)
+        -        run: go test -race -count=1 ./...
+    ./scripts/ci-required-guard.sh               exit=1  
+          FAIL  no required lane runs `go test ./...` directly; every test invocation goes through `make`.
+
+==========================================================================
+== WF  F  workflow-level defaults.run.shell: /usr/bin/true  (the Actions analogue)
+==========================================================================
+  BEFORE:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  AFTER:
+      5701222b67fb085d  .github/workflows/build-test.yml   (was c9768a93cb99f64f — mutation applied)
+        +defaults:
+        +  run:
+        +    shell: /usr/bin/true {0}
+    ./scripts/ci-required-guard.sh               exit=1  
+          FAIL  floor lane 'build-test' (build-test.yml) sets a workflow-level defaults.run.shell: '/usr/bin/true {0}'.
+          FAIL  floor lane 'cache-matrix -> needs:cache-matrix-leg' (build-test.yml) sets a workflow-level defaults.run.shell: '/usr/bin/true {0}'.
+
+== RESTORE ==
+  workflow restored:
+      c9768a93cb99f64f  .github/workflows/build-test.yml
+  (baseline was c9768a93cb99f64f)
+    ./scripts/ci-required-guard.sh               exit=0   ci-required-guard: passed (6 required check(s))
+
+== FINAL: the clone is byte-identical to its checkout ==
+    (empty above = nothing left mutated)
+DEMO_EXIT=0
+
+############################################################################
+# HOW TO READ line (a), exactly
+############################################################################
+
+Line (a) is `make ci` on the mutated tree. It does NOT say the same thing for
+every mutation, and the difference is the whole point:
+
+  M1  SHELL := /usr/bin/true            make ci exit=0
+  M2  MAKEFLAGS += -i                   make ci exit=0
+  M3  included MAKEFLAGS += -i          make ci exit=0
+
+      These three neuter the SHELL or make's error handling, so every recipe in
+      the file is disarmed at once — INCLUDING the `ci-guard` recipe's own
+      invocation of this guard. `make ci` reports success with a failing test
+      suite underneath it. That is the defect, reproduced. The only readings
+      that go red are the out-of-make anchor (b) and the direct `go test` (c).
+
+  M4  a '-' prefix on test-race          make ci exit=2
+  M5  '|| true' on test-race             make ci exit=2
+  M6  a duplicate 'ci:' target           make ci exit=2
+
+      These disarm one recipe line or one target and leave the shell intact, so
+      the in-recipe guard still runs and `make ci` goes red AT ci-guard — not
+      because it noticed the failing test. Measured directly on this clone:
+
+          ==> ci-guard
+            FAIL  Makefile:159 — gate target `test-race` has a recipe line
+                  prefixed `-`: `@-$(GO) test -race -count=1 $(PKGS)`
+          make-integrity-guard: FAILED
+          make: *** [ci-guard] Error 1
+
+      So for M4-M6 `make ci` is red for the right reason, but through the
+      in-recipe invocation — which a seventh mutation (deleting that one line
+      from the `ci-guard` recipe) would remove. The out-of-make anchor (b) does
+      not depend on it, which is why the anchor is the control and the
+      in-recipe invocation is documented in the Makefile as local parity only.
+
+WHAT LINE (a) DOES NOT SHOW, said plainly: at the BASE commit, before this PR,
+M4/M5/M6 would have left `make ci` exiting 0 with the test failure swallowed
+(there was no guard to catch them). That counterfactual was not re-measured
+here; what was measured is that at THIS commit all three are red by name at
+three independent readings.
