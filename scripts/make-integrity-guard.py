@@ -70,44 +70,35 @@ here is a defect in this docstring, not a detail.
 
   * **This guard never reads the workflow's own `make` invocation.** It checks
     the Makefile, everything it includes, and its OWN environment. It cannot
-    see the argv or the step-level `env:` of a DIFFERENT workflow step, and
-    `ci-required-guard.py` checks a make step's presence, position, `if:` and
-    `continue-on-error` — never the TEXT of its `run:`. So ONE WORD on a
-    workflow line still no-ops every make-driven lane while BOTH guards exit 0.
-    Four spellings, each measured green at f56dc03 on an unmodified Makefile
-    with a real failing test planted:
+    see the argv or the `env:` of a DIFFERENT workflow step — it runs its own
+    `make -pn` in its own process. That gap is now closed by the OTHER guard,
+    not by this one: `ci-required-guard.py` check 8b reads a checked lane's
+    make step `run:` as shell text and refuses a no-op flag, a `VAR=value`
+    override and a MAKEFLAGS-family `env:` at step, job or workflow level
+    (sweep B1). The four spellings measured green at f56dc03 —
+    `make -i ci`, `make SHELL=/usr/bin/true ci`, `make MAKEFLAGS=-i ci` and a
+    step-level `env: MAKEFLAGS: -i` — are each refused by name, with a fixture
+    under `scripts/testdata/guard/`. Read the limits of THAT check in its own
+    docstring; the ones that remain are repeated below.
 
-        run: make -i ci
-        run: make SHELL=/usr/bin/true ci
-        run: make MAKEFLAGS=-i ci
-        a step-level `env: MAKEFLAGS: -i` on an ordinary `run: make ci` step
+  * **A wrapper script that calls make is read by neither guard.** A step that
+    runs `./scripts/x.sh`, where `x.sh` runs `make -i ci`, carries no `make`
+    token on the workflow line: check 8b never sees the flags and check 8 never
+    demands the anchor. The same is true of a `uses:` composite action that
+    invokes make, and of a reusable workflow (`jobs.<id>.uses:`), whose steps
+    are not in this repository's workflow files at all. REVIEW-ONLY, and the
+    only residual of the original one-word evasion.
 
-    Blast radius: everything make-driven goes silent — fmt-check, vet,
-    lint-imports, migrate-lint, config-template-check, openapi-verify,
-    sqlc-verify, ci-guard, fixtures-verify, tidy-check, build, and BOTH
-    integration lanes including both cache-matrix legs. Only the unit suite
-    survives, via the direct `go test ./...` step in build-test.
+  * **This guard cannot see a `run:` that is not shell.** A step-level
+    `shell: python` on a make step makes the `run:` text something else
+    entirely. Check 8b still tokenises it and check 8 still demands the anchor,
+    so this fails closed toward refusing.
 
-    Closing it — refusing flag and `VAR=value` overrides on a floor lane's make
-    step `run:`, and a MAKEFLAGS/GNUMAKEFLAGS/MFLAGS step-level `env:` — is
-    QUEUED FOR CORE HARDENING SWEEP B and is deliberately not implemented here.
-
-  * **The direct `go test` lane covers the UNIT suite only.** It carries no
-    `-tags=integration`, and every integration invocation in this repository
-    goes through make. Under the evasion above, a failing INTEGRATION test is
-    silent rather than red. Queued for sweep B.
-
-  * **The direct `go test` lane does not fail when ZERO tests run.**
-    `go test -race -count=1 ./...` with every `*_test.go` moved aside exits 0,
-    reporting `[no test files]` for each package (measured at f56dc03). It is a
-    control against make being neutered, not against the suite being EMPTIED.
-    Queued for sweep B.
-
-  * **`append-only` is a required floor lane with no provenance step.** It
-    checks out with `fetch-depth: 0`, computes a merge base and echoes that SHA
-    without saying which tree it is standing in. `provenance.sh` runs in every
-    required workflow FILE, which is not the same as every required JOB.
-    Queued.
+  * **Neither guard asserts the suites PASSED with a non-empty selection.**
+    That is `scripts/go-test-report.py`, which judges `go test -json` events
+    against a committed floor in `scripts/test-floors.json` and a named skip
+    allowlist. It is the step's own assertion, not a guard's, and it is itself
+    editable in the pull request like everything else here.
 
   * **This file is editable in the same pull request.** Deleting or weakening it
     is a second diff in a reviewed file; `scripts/ci-required-guard.py` asserts
@@ -122,9 +113,10 @@ here is a defect in this docstring, not a detail.
     ruleset that would make that review mandatory returns 403 on the owner's
     plan, so CODEOWNERS is advisory today. It is not a backstop; it is a label.
   * It says nothing about whether the lanes TEST the right things — only that
-    make will really run them. The direct `go test ./...` step in `build-test`
-    is the separate control for "a neutered make cannot make the UNIT suite
-    silent", with the two limits noted above.
+    make will really run them. The direct `go test` steps in `build-test` are
+    the separate control for "a neutered make cannot make a suite silent"; from
+    sweep B1 they cover the INTEGRATION suite as well as the unit suite, and
+    `go-test-report.py` is what makes an EMPTY suite red.
   * It does not sandbox make. A recipe that runs a wrapper script which
     itself lies is out of scope here.
 

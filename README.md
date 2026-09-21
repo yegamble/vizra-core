@@ -54,6 +54,34 @@ VIZRA_TEST_CACHE_URL='redis://127.0.0.1:56379/0' \
   make test-integration
 ```
 
+### Reproducing what CI asserts about the suites
+
+CI does not run `make test-integration` in `build-test`: it invokes both suites
+directly, with no make, and then judges the machine-readable results — because
+`go test ./...` exits 0 having run nothing, and a non-verbose `go test` prints
+nothing at all for a skipped test. To reproduce that locally:
+
+```sh
+go test -race -count=1 -json ./... > unit-events.json; echo $? > unit-exit.txt
+python3 scripts/go-test-report.py --events unit-events.json --suite unit \
+  --floors scripts/test-floors.json --go-exit-file unit-exit.txt
+```
+
+It prints the executed/passed/failed/skipped counts, names every failure and
+every skip, and fails below the floor recorded in `scripts/test-floors.json`.
+Use `--suite integration` with `-tags=integration` for the other suite.
+
+The two out-of-make guards, which CI runs as their own steps before any `make`:
+
+```sh
+./scripts/make-integrity-guard.sh   # the Makefile and everything it includes
+./scripts/ci-required-guard.sh      # the manifest, the workflows, and each make step's own argv
+```
+
+`scripts/assert-runtime-image.sh <image>` is the image assertion `docker-build`
+runs; it reads `$DOCKER`, so `scripts/testdata/fakedocker/` can drive it with no
+daemon.
+
 ## Contributing
 
 `AGENTS.md` is the engineering contract: what the gate checks, which rules are

@@ -1,0 +1,256 @@
+# D1 — item 1: a floor lane's make step cannot be no-opped from the workflow line.
+# Each mutation is applied to the REAL .github/workflows/build-test.yml at the head of
+# chore/m0-hardening-b1. The harness aborts unless the digest moved and the restore is
+# byte-identical. Compare with B0-baseline-four-spellings.txt, where all four exited 0.
+# tree: 5eb2829eb4f830206029f8e2a836f93a44a93a02  (working tree, uncommitted)
+
+== control: the unmodified tree ==
+ci-required-guard.sh      EXIT=0 (expect 0)
+make-integrity-guard.sh   EXIT=0 (expect 0)
+
+==============================================================
+MUTATION: D1: run: make -i ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -i ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: b905949aa625bfc32929aa883bb35e8bbee965ee7cabbd94fed7d72cb9bdcbce
+  sha256 AFTER:  836e06fdc0d77c0e7f7e7da921570f478354868e27e814010768c1bf82ee5b77
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  ABORT: restore is NOT byte-identical. Working tree is dirty.
+==============================================================
+MUTATION: D1: run: make SHELL=/usr/bin/true ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make SHELL=/usr/bin/true ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  189159bad2ec342245b2f03da3c493001832e057301a6292487323e0510a71c8
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make SHELL=/usr/bin/true ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make MAKEFLAGS=-i ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make MAKEFLAGS=-i ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  ad85c3b6c149b3c64d3c90134421f467fa2b6eac1d85477e63071750136e854b
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make MAKEFLAGS=-i ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make ci SHELL=/usr/bin/true
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make ci SHELL=/usr/bin/true\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  27ac4f2d6879ca4bfa4c8f25be8e207eb59012240c87071431a09c8e17df2b0d
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make ci SHELL=/usr/bin/true -> exit 1
+
+==============================================================
+MUTATION: D1: run: make --ign ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make --ign ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  651bb8736adb61ad263a76baebb8ed3699c0d2aaaf659cd096ddf36f2f1bb030
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make --ign ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make -srik ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -srik ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  9b94359bc501c7bc398a0ae57848dc7c0ea449c01cc878bffbd814aa30a15544
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make -srik ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make -f build/other.mk ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -f build/other.mk ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  66cafcc6f19e17b989432e2817e77944fad77ede52ebd96d34f3aad418ed13be
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make -f build/other.mk ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make -C build ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -C build ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  b12de44e5ff99d3191b46fe7b9b956189d5870f62b8d03cc4cc4c29af9c4cc3f
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: make -C build ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: bash -c \"make -i ci\"
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: bash -c \"make -i ci\"\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  61838d14131e0ca519e4520c33841ba096f3a9ad3ad5949d38bd1130b435996d
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: bash -c \"make -i ci\" -> exit 1
+
+==============================================================
+MUTATION: D1: run: env MAKEFLAGS=-i make ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: env MAKEFLAGS=-i make ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  c8703d142d82acdb42e0771e9c9d81d5438f07b57d63ee99c5e4c20d8082524e
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: run: env MAKEFLAGS=-i make ci -> exit 1
+
+==============================================================
+MUTATION: D1: step-level env: MAKEFLAGS: -i
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='      - name: make ci\n        run: make ci\n';new='      - name: make ci\n        env:\n          MAKEFLAGS: -i\n        run: make ci\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  e7948138e26b25de95c12a0a9bd5a997921e57945eb5566bcab6485d7f89b359
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' env sets MAKEFLAGS: '-i' on a `make` step.
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: step-level env: MAKEFLAGS: -i -> exit 1
+
+==============================================================
+MUTATION: D1: job-level env: GNUMAKEFLAGS: --ignore-errors
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='  build-test:\n    name: build-test\n';new='  build-test:\n    name: build-test\n    env:\n      GNUMAKEFLAGS: --ignore-errors\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  78bc0e2d161cdcfed4365e5f3b9f705c5a6680c8bdf97efe9a92834a700f5897
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) job-level env sets GNUMAKEFLAGS: '--ignore-errors', and this job invokes `make`.
+        A job- or workflow-level env reaches every step, so it no-ops the make steps
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: job-level env: GNUMAKEFLAGS: --ignore-errors -> exit 1
+
+==============================================================
+MUTATION: D1: workflow-level env: MAKEFILES: build/extra.mk
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='permissions:\n  contents: read\n';new='permissions:\n  contents: read\nenv:\n  MAKEFILES: build/extra.mk\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|sets MAKEFLAGS|sets GNUMAKEFLAGS' | head -6; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  5209b63e2c76f5b563873ede010ff515188e3f6c8f593fb2c251bd40f8affd6b
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+  FAIL  checked lane 'build-test' (build-test.yml) workflow-level env sets MAKEFILES: 'build/extra.mk', and this job invokes `make`.
+        A job- or workflow-level env reaches every step, so it no-ops the make steps
+  FAIL  checked lane 'cache-matrix -> needs:cache-matrix-leg' (build-test.yml) workflow-level env sets MAKEFILES: 'build/extra.mk', and this job invokes `make`.
+        A job- or workflow-level env reaches every step, so it no-ops the make steps
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: D1: workflow-level env: MAKEFILES: build/extra.mk -> exit 1
+

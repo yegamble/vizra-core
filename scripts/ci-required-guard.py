@@ -23,59 +23,147 @@ reviewer found:
 
 So: parse the YAML, and read the Makefile the lanes actually run.
 
+THE CHECKED SET (sweep B1). Checks 3, 4, 8, 8b and 10 run over
+`set(FLOOR_LANES) | set(required)` — not over FLOOR_LANES alone. FLOOR_LANES is
+the floor that cannot be REMOVED; it is not also the ceiling on what gets
+checked. Before B1 a lane that was REQUIRED but not on the floor got exactly one
+line of attention — "ok … resolves to a job" — while carrying
+`continue-on-error: true` and an unanchored `make -i ci`
+(docs/evidence/warroom/2026-09-21-vizra-core-pr6-hardening-a-VERIFY.md,
+FINDING 6). Widening the gate by adding a manifest line looks virtuous and was
+the likeliest way to introduce an unchecked lane.
+
 Checks, all of which must pass:
 
   1. FLOOR        every lane in FLOOR_LANES is present and not commented out.
   2. RESOLVABLE   every manifest name maps to a real job.
-  3. TRIGGERED    every floor lane's workflow runs on `pull_request`.
+  3. TRIGGERED    every checked lane's workflow runs on `pull_request`.
   4. NO OPT-OUT   `continue-on-error` is absent AT ALL — any value, any
-                  spelling — from a floor lane's job and from all of its steps.
+                  spelling — from a checked lane's job and from all of its steps.
   5. SELECTION    the Makefile lanes select a non-empty set: test-race covers
                   ./... and every -run pattern is non-empty.
   6. RUNNER       every job runs on GitHub-hosted ubuntu-24.04.
   7. PINNED       every action is pinned to a 40-character commit SHA.
-  8. ANCHOR       every floor-lane job that invokes `make` runs
+  8. ANCHOR       every checked-lane job that invokes `make` runs
                   scripts/make-integrity-guard.sh FIRST, as its own step,
                   unconditionally and without continue-on-error — and neither
                   the workflow nor the job overrides `defaults.run.shell`, which
                   is the Actions analogue of `SHELL := /usr/bin/true`.
-  9. DIRECT       at least one floor lane runs `go test` over `./...` WITHOUT
-                  make, so a no-opped Makefile cannot make the UNIT suite
-                  silent. UNIT only: that lane carries no `-tags=integration`,
-                  and every integration invocation here goes through make.
+  8b. ARGV        a checked lane's `make` step may not carry, ON THE WORKFLOW
+                  LINE, a flag or variable override that no-ops the recipes, and
+                  neither the step, the job nor the workflow may set a
+                  MAKEFLAGS-family `env:`. See "CHECK 8b" below.
+  9. DIRECT       a required lane runs the UNIT suite and the INTEGRATION suite
+                  over `./...` WITHOUT make, so a no-opped Makefile cannot make
+                  either silent.
+  10. PROVENANCE  every checked-lane job that checks the repository out also
+                  runs scripts/provenance.sh, unconditionally. A lane that
+                  prints a SHA without saying which tree it stood in is the
+                  shape of meta-PR3 FINDING 5.
 
-Checks 8 and 9 exist because every required lane here runs through `make`, and a
-verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true` or
-`MAKEFLAGS += -i` — makes every recipe exit 0 without running
+Checks 8, 8b and 9 exist because every required lane here runs through `make`,
+and a verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true`
+or `MAKEFLAGS += -i` — makes every recipe exit 0 without running
 (docs/evidence/warroom/2026-09-20-vizra-search-pr2-revendor-VERIFY.md, FINDING
-8). No check written inside a Makefile can prevent that; these two say the
-out-of-make controls are present and armed.
+8), and that ONE WORD on a workflow line did the same with both guards green
+(PR#6 VERIFY, FINDING 1). No check written inside a Makefile can prevent
+either; these say the out-of-make controls are present and armed.
 
-What checks 8 and 9 do NOT cover, stated so nobody infers it:
+CHECK 8b — HOW A `run:` IS READ, AND WHAT IS REFUSED
+----------------------------------------------------
+The anchor (check 8) runs `make -pn` in its OWN process and reads its OWN
+environment. It cannot see the argv or the `env:` of a DIFFERENT workflow step.
+So this check reads the step's `run:` text itself.
 
-  * Neither check reads the TEXT of a make step's `run:`, nor its step-level
-    `env:`. `run: make -i ci`, `run: make SHELL=/usr/bin/true ci`,
-    `run: make MAKEFLAGS=-i ci` and `env: MAKEFLAGS: -i` all leave BOTH guards
-    exiting 0 while every make-driven lane goes silent (measured at f56dc03).
-    Everything but the unit suite is in the blast radius, both integration
-    lanes and both cache-matrix legs included. Queued for core hardening
-    sweep B.
-  * Check 9 does not assert that any test EXECUTED: with every `*_test.go`
-    moved aside the lane exits 0 on `[no test files]`. Queued for sweep B.
-  * `append-only` is a floor lane that prints a merge-base SHA and has no
-    provenance step. Queued.
+It is read as SHELL TEXT, not grepped:
+
+  * line continuations (`\` + newline) are joined first;
+  * each line is tokenised with `shlex` (POSIX mode, `#` comments stripped,
+    quotes honoured) and split on `;`, `&&`, `||`, `|`, `(`, `)`;
+  * in each command, the first token that IS `make` (or `gmake`, or a path
+    ending `/make`) starts the make argv;
+  * a token before it of the form `VAR=value` is a shell environment prefix —
+    refused only for the MAKEFLAGS family, because `CGO_ENABLED=1 make build`
+    is legitimate and `MAKEFLAGS=-i make ci` is not. `env VAR=… make` and
+    `command make` land on the same rule, since the assignment is still a token
+    before `make`;
+  * a token in the make argv of the form `VAR=value` is a make VARIABLE
+    OVERRIDE and is refused whatever its name and WHEREVER it sits, before or
+    after the target — `make SHELL=/usr/bin/true ci` and `make ci SHELL=…` are
+    the same thing to make;
+  * short flags are read as CLUSTERS (`-ik`, `-kn`), with the GNU
+    argument-taking letters (`CfIjloWE`) consuming their argument;
+  * long options are matched BY PREFIX, because GNU make accepts any
+    unambiguous abbreviation: `--ign`, `--dry` and `--touch` are all refused;
+  * a quoted token that itself contains a make command is re-read, so
+    `bash -c "make -i ci"` and `sh -c 'make MAKEFLAGS=-i ci'` are refused too
+    (three levels deep, then it is reported rather than parsed).
+
+Refused flags, each because it makes the recipes stop being the gate:
+`-i`/`--ignore-errors`, `-k`/`--keep-going`, `-t`/`--touch`,
+`-q`/`--question`, `-n`/`--dry-run`/`--just-print`/`--recon`,
+`-e`/`--environment-overrides`, `-f`/`--file`/`--makefile`, `-C`/`--directory`,
+`-o`/`--old-file`/`--assume-old`, `-W`/`--what-if`/`--new-file`/`--assume-new`.
+`-j`, `-s`, `-B`, `-r`, `-R`, `--no-print-directory` and `--warn-undefined-
+variables` are NOT refused: none of them stops a recipe failing.
+
+Refused `env:` names, at step, job and workflow level, on a job that invokes
+make: MAKEFLAGS, GNUMAKEFLAGS, MFLAGS, MAKEFILES, SHELL. MAKEFILES makes make
+read extra makefiles the integrity guard never saw. SHELL is refused belt-and-
+braces: GNU make does not import SHELL from the environment (it is the one
+variable that is never taken from it), so this one is defence in depth rather
+than a live hole, and it is listed here so nobody later reads its presence as
+evidence that the hole exists.
+
+The ANCHOR heuristic stays FAIL-CLOSED and is deliberately WIDER than the
+tokeniser: a bare `make` token anywhere in a `run:` — a comment included —
+makes the step count as a make step that needs an anchor. When the regex says
+"make step" and the tokeniser finds no make COMMAND, the step is reported as
+parsed-but-not-a-command rather than passed silently. If a `run:` cannot be
+tokenised at all (unbalanced quotes), that is a FAILURE, not a skip.
+
+WHAT CHECKS 8, 8b, 9 AND 10 DO NOT GIVE YOU
+--------------------------------------------
+This list is meant to be EXHAUSTIVE. If you find something that belongs on it
+and is not here, that is a defect in this docstring, not a detail.
+
+  * **A wrapper script that calls make is not read.** `run: ./scripts/x.sh`
+    where `x.sh` runs `make -i ci` carries no `make` token, so it is not even
+    classified as a make step: no anchor is demanded and no argv is checked.
+    REVIEW-ONLY. The same is true of a `Makefile` recipe that shells out.
+  * **`uses:` is not read.** A step that runs a composite action — including a
+    local `./.github/actions/…` — can invoke make with any flags. Its argv is
+    in the action's own `action.yml`, which this guard does not open.
+    REVIEW-ONLY.
+  * **A reusable workflow (`jobs.<id>.uses:`) is not followed.** Such a job has
+    no `steps:` here at all, so checks 4, 8, 8b and 10 have nothing to read; it
+    would still have to resolve to a check name (check 2) and would be reported
+    as having no steps. REVIEW-ONLY.
+  * **`defaults.run.shell` is refused, but `shell:` on an individual step is
+    not** — a step-level `shell: python` on a make step would make the `run:`
+    text not a shell script at all. It is still tokenised and still anchored, so
+    this fails closed toward refusing, not toward passing.
+  * **Check 9 asserts a lane INVOKES the suites, not that they passed with a
+    non-empty selection.** The executed-test floor and the skip allowlist live
+    in `scripts/go-test-report.py`, which is the step's own assertion, not this
+    guard's.
+  * The guard, the workflows, `scripts/go-test-report.py` and this file are all
+    checked out from the pull request under test and can be edited in it — every
+    such edit is visible in the diff, and CODEOWNERS is **advisory only** until
+    the owner's ruleset exists (it currently returns 403 on their plan).
 
 Usage:
     ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE]
 
-scripts/guard_test.go drives it against scripts/testdata/, which holds one
-crafted workflow per evasion, so the guard has negative cases of its own.
+scripts/scripts_test.go drives it against scripts/testdata/guard/, which holds
+one crafted workflow per evasion, so the guard has negative cases of its own.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -189,7 +277,13 @@ def continue_on_error_sites(job: dict) -> list[str]:
 
 MAKE_INTEGRITY_GUARD = "make-integrity-guard"
 # `make` as a command, not as a word inside one (`cmake`, `makefile`, `make-up`).
-MAKE_INVOCATION = re.compile(r"(?:^|[\s;&|(])make(?=\s|$)", re.M)
+#
+# The leading class includes the QUOTE characters from sweep B1: without them
+# `run: bash -c "make -i ci"` was not classified as a make step at all, so it
+# needed no anchor and its argv was never read. This heuristic is deliberately
+# WIDER than the tokeniser — a bare `make` token in a comment counts — because
+# its job is to demand the anchor, and over-demanding fails closed.
+MAKE_INVOCATION = re.compile(r"""(?:^|[\s;&|("'`])make(?=\s|$)""", re.M)
 
 
 def step_runs_make(step: dict) -> bool:
@@ -202,6 +296,294 @@ def step_is_the_anchor(step: dict) -> bool:
     return isinstance(run, str) and MAKE_INTEGRITY_GUARD in run and not MAKE_INVOCATION.search(run)
 
 
+# ---------------------------------------------------------------------------
+# CHECK 8b: the make step's own command line and environment.
+#
+# The anchor cannot see either — it runs `make -pn` in its own process and reads
+# its own environment. Everything below is about the WORKFLOW LINE.
+# ---------------------------------------------------------------------------
+
+# Short flags that stop the recipes being the gate. The reason is printed, so a
+# red names what the flag does rather than only that it is on a list.
+DANGEROUS_SHORT = {
+    "i": "-i/--ignore-errors: every recipe's failure is ignored and make exits 0",
+    "k": "-k/--keep-going: make carries on past a failed target instead of stopping at it",
+    "t": "-t/--touch: targets are TOUCHED, the recipes never run",
+    "q": "-q/--question: no recipe runs at all; make only reports whether a target is up to date",
+    "n": "-n/--dry-run: recipes are printed, not executed",
+    "e": "-e/--environment-overrides: the environment beats the makefile's own assignments",
+    "f": "-f/--file: make reads a DIFFERENT makefile from the one make-integrity-guard read",
+    "C": "-C/--directory: make changes directory first, so it reads a different makefile",
+    "o": "-o/--old-file: the named file is treated as old, so what depends on it is never remade",
+    "W": "-W/--what-if: the named file is treated as new, which rewrites what make decides to do",
+}
+
+# GNU make short options that consume an argument. In a cluster the letter takes
+# the rest of the token (`-fMakefile`) or the next token (`-f Makefile`).
+SHORT_TAKES_ARG = set("CfIjloWE")
+
+DANGEROUS_LONG = {
+    "--ignore-errors": DANGEROUS_SHORT["i"],
+    "--keep-going": DANGEROUS_SHORT["k"],
+    "--touch": DANGEROUS_SHORT["t"],
+    "--question": DANGEROUS_SHORT["q"],
+    "--dry-run": DANGEROUS_SHORT["n"],
+    "--just-print": DANGEROUS_SHORT["n"],
+    "--recon": DANGEROUS_SHORT["n"],
+    "--environment-overrides": DANGEROUS_SHORT["e"],
+    "--file": DANGEROUS_SHORT["f"],
+    "--makefile": DANGEROUS_SHORT["f"],
+    "--directory": DANGEROUS_SHORT["C"],
+    "--old-file": DANGEROUS_SHORT["o"],
+    "--assume-old": DANGEROUS_SHORT["o"],
+    "--what-if": DANGEROUS_SHORT["W"],
+    "--new-file": DANGEROUS_SHORT["W"],
+    "--assume-new": DANGEROUS_SHORT["W"],
+}
+
+# Environment names that reach INTO make. MAKEFLAGS/GNUMAKEFLAGS/MFLAGS are read
+# by make as if they had been typed on the command line; MAKEFILES makes it read
+# extra makefiles nothing scanned. SHELL is belt-and-braces — see the docstring.
+MAKE_ENV_NAMES = {"MAKEFLAGS", "GNUMAKEFLAGS", "MFLAGS", "MAKEFILES", "SHELL"}
+
+SHELL_SEPARATORS = {";", "&&", "||", "|", "(", ")", "&", "|&"}
+
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*=")
+MAKE_COMMAND = re.compile(r"^(?:.*/)?g?make$")
+
+
+class TokeniseError(Exception):
+    """A `run:` this guard could not read as shell. Fail closed, never skip."""
+
+
+def _commands(run: str) -> list[list[str]]:
+    """Split a `run:` block into command token lists.
+
+    Line continuations are joined, each line is tokenised with quotes honoured
+    and `#` comments stripped, and the tokens are split on shell separators.
+    """
+    joined = re.sub(r"\\\n\s*", " ", run)
+    out: list[list[str]] = []
+    for line in joined.splitlines():
+        if not line.strip():
+            continue
+        lex = shlex.shlex(line, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        lex.commenters = "#"
+        try:
+            tokens = list(lex)
+        except ValueError as exc:  # unbalanced quote, unterminated string
+            raise TokeniseError(f"{exc} (line: {line.strip()!r})") from exc
+        current: list[str] = []
+        for tok in tokens:
+            if tok in SHELL_SEPARATORS:
+                if current:
+                    out.append(current)
+                current = []
+                continue
+            current.append(tok)
+        if current:
+            out.append(current)
+    return out
+
+
+def _scan_make_argv(argv: list[str]) -> list[str]:
+    """Problems in the arguments make itself would receive. `argv` excludes `make`."""
+    problems: list[str] = []
+    i = 0
+    end_of_options = False
+    while i < len(argv):
+        tok = argv[i]
+        i += 1
+        if end_of_options:
+            if ASSIGNMENT.match(tok):
+                problems.append(f"the variable override {tok!r} (after `--`)")
+            continue
+        if tok == "--":
+            end_of_options = True
+            continue
+        if tok.startswith("--"):
+            name = tok.split("=", 1)[0]
+            for full, why in DANGEROUS_LONG.items():
+                # GNU make accepts any unambiguous abbreviation of a long
+                # option, so a PREFIX match is the honest test: `--ign` is
+                # `--ignore-errors`.
+                if len(name) > 2 and full.startswith(name):
+                    problems.append(f"{tok!r} — {why}")
+                    break
+            continue
+        if tok.startswith("-") and len(tok) > 1:
+            for pos, ch in enumerate(tok[1:], start=1):
+                if ch in DANGEROUS_SHORT:
+                    problems.append(f"{tok!r} carries -{ch} — {DANGEROUS_SHORT[ch]}")
+                if ch in SHORT_TAKES_ARG:
+                    # This letter eats the rest of the token, or the next one.
+                    if pos == len(tok) - 1 and i < len(argv):
+                        i += 1
+                    break
+            continue
+        if ASSIGNMENT.match(tok):
+            problems.append(
+                f"the variable override {tok!r} — make applies a command-line override "
+                f"over the makefile's own value, wherever it sits relative to the target"
+            )
+    return problems
+
+
+def make_command_line_problems(run: str, depth: int = 0) -> tuple[list[str], int]:
+    """Every refusal in a `run:` block, plus how many make COMMANDS were found.
+
+    A count of 0 while MAKE_INVOCATION matched means the `make` token is in a
+    comment or inside a word — reported, never silently passed.
+    """
+    problems: list[str] = []
+    found = 0
+    for argv in _commands(run):
+        make_at = next((n for n, t in enumerate(argv) if MAKE_COMMAND.match(t)), None)
+        if make_at is None:
+            # `bash -c "make -i ci"` — the make command is inside a quoted word.
+            if depth < 3:
+                for tok in argv:
+                    if (" " in tok or "\n" in tok) and MAKE_INVOCATION.search(tok):
+                        sub, subfound = make_command_line_problems(tok, depth + 1)
+                        problems.extend(f"inside the quoted script {tok!r}: {p}" for p in sub)
+                        found += subfound
+            continue
+        found += 1
+        for tok in argv[:make_at]:
+            if ASSIGNMENT.match(tok):
+                name = tok.split("=", 1)[0]
+                if name.upper() in MAKE_ENV_NAMES:
+                    problems.append(
+                        f"the environment prefix {tok!r} before `make` — make reads "
+                        f"{name} as if it had been typed on the command line"
+                    )
+        problems.extend(_scan_make_argv(argv[make_at + 1:]))
+    return problems, found
+
+
+def env_problems(scope: str, env) -> list[str]:
+    if not isinstance(env, dict):
+        return []
+    out = []
+    for key, value in env.items():
+        if str(key).strip().upper() in MAKE_ENV_NAMES:
+            out.append(f"{scope} env sets {key}: {value!r}")
+    return out
+
+
+def check_make_command_lines(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
+    """Check 8b: the make step's own argv and environment.
+
+    Only a job that actually invokes make is judged: a lane with no make step
+    has no MAKEFLAGS hazard, and refusing its `env:` would be noise.
+    """
+    steps = [s for s in (job.get("steps") or []) if isinstance(s, dict)]
+    make_steps = [(i, s) for i, s in enumerate(steps) if step_runs_make(s)]
+    if not make_steps:
+        return
+
+    failed_here = False
+    for i, step in make_steps:
+        label = step.get("name") or f"step {i}"
+        run = step.get("run") or ""
+        try:
+            problems, found = make_command_line_problems(run)
+        except TokeniseError as exc:
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) has a `make` step {label!r} whose `run:` "
+                f"cannot be tokenised as shell: {exc}",
+                "This guard must read a make step's command line. A `run:` it cannot parse is a",
+                "FAILURE, not a skip — otherwise unbalanced quotes would be a way to hide the argv.",
+            )
+            failed_here = True
+            continue
+        if problems:
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) step {label!r} no-ops `make` from the "
+                f"WORKFLOW LINE:",
+                *problems,
+                "The make-integrity anchor cannot see this: it runs its own `make -pn` and reads its",
+                "own environment, never another step's argv. One word here silences every",
+                "make-driven lane while both guards exit 0 (PR#6 VERIFY, FINDING 1).",
+            )
+            failed_here = True
+        elif found == 0:
+            g.ok(
+                f"checked lane {lane!r} step {label!r}: `make` appears only in a comment or inside "
+                f"a word, not as a command — the anchor is still required (fail-closed)"
+            )
+
+        for problem in env_problems(f"step {label!r}", step.get("env")):
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) {problem} on a `make` step.",
+                "make reads MAKEFLAGS/GNUMAKEFLAGS/MFLAGS from the environment as if they had been",
+                "typed on the command line, and MAKEFILES makes it read makefiles nothing scanned.",
+            )
+            failed_here = True
+
+    for scope, holder in (("workflow-level", doc or {}), ("job-level", job)):
+        for problem in env_problems(scope, (holder or {}).get("env")):
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) {problem}, and this job invokes `make`.",
+                "A job- or workflow-level env reaches every step, so it no-ops the make steps",
+                "without appearing on any of their lines.",
+            )
+            failed_here = True
+
+    if not failed_here:
+        g.ok(
+            f"checked lane {lane!r}: {len(make_steps)} `make` step(s) carry no no-op flag, no "
+            f"variable override and no MAKEFLAGS-family env"
+        )
+
+
+PROVENANCE = "provenance.sh"
+
+
+def check_provenance(g: Guard, lane: str, path: Path, job: dict) -> None:
+    """Check 10: a lane that checks the repository out says which tree it stood in.
+
+    meta-PR3 FINDING 5 was a step whose whole job was to record provenance
+    printing a SHA that was not the tree it described. `append-only` was the
+    last required lane with that shape (PR#6 VERIFY, FINDING 4): it checks out
+    with full history, computes a merge base and echoes it, with no statement of
+    which tree it is standing in.
+    """
+    steps = [s for s in (job.get("steps") or []) if isinstance(s, dict)]
+    checkouts = [s for s in steps if "actions/checkout" in str(s.get("uses") or "")]
+    if not checkouts:
+        g.ok(f"checked lane {lane!r} performs no checkout, so it needs no provenance step")
+        return
+
+    prov = next((s for s in steps if PROVENANCE in str(s.get("run") or "")), None)
+    if prov is None:
+        g.fail(
+            f"checked lane {lane!r} ({path.name}) checks the repository out and has NO "
+            f"scripts/{PROVENANCE} step.",
+            "On a pull_request the checked-out tree is refs/pull/N/merge — neither the head SHA nor",
+            "the base SHA — and it moves whenever the base branch moves. A lane that prints a SHA",
+            "without saying which tree it stood in is meta-PR3 FINDING 5.",
+        )
+        return
+    if "if" in prov:
+        g.fail(
+            f"checked lane {lane!r} ({path.name}) makes the provenance step CONDITIONAL "
+            f"(if: {prov['if']!r}).",
+            "A skipped step records nothing, and this guard cannot evaluate an Actions expression.",
+        )
+        return
+    for key in prov:
+        if str(key).strip().lower().replace("_", "-") == "continue-on-error":
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) marks the provenance step "
+                f"{key}: {prov[key]!r}.",
+                "Its cross-check — HEAD^2 == the PR head SHA — would then be discarded.",
+            )
+            return
+    g.ok(f"checked lane {lane!r} runs scripts/{PROVENANCE} after checking out, unconditionally")
+
+
 def check_anchor(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
     """Check 8: the out-of-make guard runs before make, and can actually fail.
 
@@ -212,14 +594,14 @@ def check_anchor(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
     steps = [s for s in (job.get("steps") or []) if isinstance(s, dict)]
     make_at = next((i for i, s in enumerate(steps) if step_runs_make(s)), None)
     if make_at is None:
-        g.ok(f"floor lane {lane!r} invokes no `make`, so it needs no make-integrity anchor")
+        g.ok(f"checked lane {lane!r} invokes no `make`, so it needs no make-integrity anchor")
         return
 
     anchor_at = next((i for i, s in enumerate(steps) if step_is_the_anchor(s)), None)
     label = steps[make_at].get("name") or f"step {make_at}"
     if anchor_at is None:
         g.fail(
-            f"floor lane {lane!r} ({path.name}) invokes `make` (step {label!r}) with NO "
+            f"checked lane {lane!r} ({path.name}) invokes `make` (step {label!r}) with NO "
             f"{MAKE_INTEGRITY_GUARD} step before it.",
             "One line in the Makefile — `SHELL := /usr/bin/true` or `MAKEFLAGS += -i` — makes every",
             "recipe exit 0 without running, and no check inside a Makefile can stop that, because the",
@@ -228,7 +610,7 @@ def check_anchor(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
         return
     if anchor_at > make_at:
         g.fail(
-            f"floor lane {lane!r} ({path.name}) runs the {MAKE_INTEGRITY_GUARD} step at position "
+            f"checked lane {lane!r} ({path.name}) runs the {MAKE_INTEGRITY_GUARD} step at position "
             f"{anchor_at}, AFTER `make` at position {make_at} ({label!r}).",
             "A neutered `make` step would already have reported success by then.",
         )
@@ -237,14 +619,14 @@ def check_anchor(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
     anchor = steps[anchor_at]
     if "if" in anchor:
         g.fail(
-            f"floor lane {lane!r} ({path.name}) makes the {MAKE_INTEGRITY_GUARD} step CONDITIONAL "
+            f"checked lane {lane!r} ({path.name}) makes the {MAKE_INTEGRITY_GUARD} step CONDITIONAL "
             f"(if: {anchor['if']!r}).",
             "A skipped step is not a control, and this guard cannot evaluate an Actions expression.",
         )
     for key in anchor:
         if str(key).strip().lower().replace("_", "-") == "continue-on-error":
             g.fail(
-                f"floor lane {lane!r} ({path.name}) marks the {MAKE_INTEGRITY_GUARD} step "
+                f"checked lane {lane!r} ({path.name}) marks the {MAKE_INTEGRITY_GUARD} step "
                 f"{key}: {anchor[key]!r}.",
                 "Its failure would be discarded. Present at all is the rule, whatever the value.",
             )
@@ -255,13 +637,13 @@ def check_anchor(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
         shell = ((holder.get("defaults") or {}).get("run") or {}).get("shell")
         if shell is not None:
             g.fail(
-                f"floor lane {lane!r} ({path.name}) sets a {scope}-level defaults.run.shell: {shell!r}.",
+                f"checked lane {lane!r} ({path.name}) sets a {scope}-level defaults.run.shell: {shell!r}.",
                 "It replaces the shell EVERY `run:` step uses, so it no-ops the anchor and every make",
                 "step at once — the Actions analogue of `SHELL := /usr/bin/true`.",
             )
 
     if not g.failed:
-        g.ok(f"floor lane {lane!r} runs the {MAKE_INTEGRITY_GUARD} anchor (step {anchor_at}) before "
+        g.ok(f"checked lane {lane!r} runs the {MAKE_INTEGRITY_GUARD} anchor (step {anchor_at}) before "
              f"`make` (step {make_at}), unconditionally and without continue-on-error")
 
 
@@ -295,19 +677,27 @@ def _needs_of(job: dict) -> list[str]:
     return []
 
 
+INTEGRATION_TAG = "-tags=integration"
+
+
 def check_direct_test_lane(g: Guard, required: list[str], jobs: dict) -> None:
-    """Check 9: at least one required lane runs the UNIT suite without make.
+    """Check 9: a required lane runs BOTH suites over ./... without make.
 
     The anchor refuses a neutered Makefile BY NAME. This is the separate control
-    for what the anchor cannot cover: whatever make did, a real failing UNIT test
-    must still fail a required lane. Every other test invocation here goes
-    through a make recipe.
+    for what the anchor cannot cover: whatever make did, a real failing test must
+    still fail a required lane.
 
-    Scope, because the name of this check is broader than what it enforces: it
-    accepts a `go test` over `./...` with no make. It does NOT require
-    `-tags=integration` (so the integration suite is not covered), and it does
-    not assert that any test actually ran. Both are queued for sweep B.
+    Before sweep B1 this asked only for a `go test ./...` with no make, which the
+    UNIT lane satisfied — so under any make evasion a failing INTEGRATION test
+    (the migrator against real PostgreSQL 18, the permanent Valkey/Redis-7.2
+    matrix ADR-001 Q-004 exists for) was silent, not red (PR#6 VERIFY, FINDING
+    2). Both suites are now required to have a make-free invocation.
+
+    Scope: this asserts the lane INVOKES each suite. The executed-test floor and
+    the skip allowlist are asserted by scripts/go-test-report.py, which is the
+    step's own assertion, not this guard's.
     """
+    found: dict[str, str] = {}
     for name in required:
         entry = jobs.get(name)
         if entry is None:
@@ -325,13 +715,20 @@ def check_direct_test_lane(g: Guard, required: list[str], jobs: dict) -> None:
                 continue
             if "if" in step:
                 continue  # a conditional lane is not a floor
-            g.ok(f"required lane {name!r} runs the suite directly, without make: {run.strip()!r}")
-            return
-    g.fail(
-        "no required lane runs `go test ./...` directly; every test invocation goes through `make`.",
-        "A Makefile turned into a no-op would then make the whole suite SILENT rather than red, and",
-        "`ci-required` would be green with nothing tested. One lane must invoke `go test` itself.",
-    )
+            kind = "integration" if INTEGRATION_TAG in run else "unit"
+            found.setdefault(kind, f"{name!r}: {' '.join(run.split())[:110]!r}")
+
+    for kind in ("unit", "integration"):
+        if kind in found:
+            g.ok(f"the {kind} suite runs directly, without make, in required lane {found[kind]}")
+        else:
+            g.fail(
+                f"no required lane runs the {kind.upper()} suite directly; every {kind} test "
+                f"invocation goes through `make`.",
+                "A Makefile turned into a no-op would then make that suite SILENT rather than red,",
+                "and `ci-required` would be green with nothing tested. One lane must invoke",
+                f"`go test{' ' + INTEGRATION_TAG if kind == 'integration' else ''} ./...` itself.",
+            )
 
 
 def check_makefile_selection(g: Guard, makefile: Path) -> None:
@@ -451,39 +848,54 @@ def main() -> int:
                 "ci-required would wait forever for a check nothing produces.",
             )
 
-    # --- 3 and 4. floor lanes: triggered, and no opt-out --------------------
-    for lane in FLOOR_LANES:
+    # --- 3, 4, 8, 8b and 10: over the CHECKED SET ---------------------------
+    #
+    # floor ∪ required, not FLOOR_LANES alone. FLOOR_LANES is the floor that
+    # cannot be REMOVED; it must not also be the ceiling on what gets checked.
+    # Before sweep B1 a lane that was required but not on the floor got one line
+    # — "ok … resolves to a job" — while carrying continue-on-error and an
+    # unanchored `make -i ci` (PR#6 VERIFY, FINDING 6): the guard printed a
+    # reassuring ok for something it had not looked at, which is the exact
+    # false-positive CI this program's opening paragraph exists to prevent.
+    checked = sorted(set(FLOOR_LANES) | set(required))
+    extra = [c for c in checked if c not in FLOOR_LANES]
+    if extra:
+        g.ok(f"checked set is floor ∪ required ({len(checked)} lanes); beyond the floor: {extra}")
+
+    for lane in checked:
         entry = jobs.get(lane)
         if entry is None:
-            continue  # already reported
+            continue  # already reported by check 2
         path, doc, job = entry
 
         if "pull_request" not in triggers(doc):
             g.fail(
-                f"floor lane {lane!r} ({path.name}) is not triggered on pull_request.",
+                f"checked lane {lane!r} ({path.name}) is not triggered on pull_request.",
                 "It would never run on a PR, so the fan-in would block until it timed out — "
                 "fails closed, but it is not a gate.",
             )
         else:
-            g.ok(f"floor lane {lane!r} runs on pull_request")
+            g.ok(f"checked lane {lane!r} runs on pull_request")
 
-        # A floor lane is often an AGGREGATE whose `needs:` leg does the work —
+        # A lane is often an AGGREGATE whose `needs:` leg does the work —
         # `cache-matrix` needs `cache-matrix-leg`, and it is the LEG that runs
         # `make test-integration`. Checking only the named job would leave the
         # job that actually invokes make unanchored while this printed ok.
         for label, entry2 in expand_needs(lane, path, doc, job, jobs_by_key):
             check_anchor(g, label, entry2[0], entry2[1], entry2[2])
+            check_make_command_lines(g, label, entry2[0], entry2[1], entry2[2])
+            check_provenance(g, label, entry2[0], entry2[2])
 
         sites = continue_on_error_sites(job)
         if sites:
             g.fail(
-                f"floor lane {lane!r} ({path.name}) carries continue-on-error:",
+                f"checked lane {lane!r} ({path.name}) carries continue-on-error:",
                 *sites,
                 "Present at all is the rule, whatever the value: a required lane that cannot "
                 "fail is not a gate, and an expression form cannot be evaluated here.",
             )
         else:
-            g.ok(f"floor lane {lane!r} carries no continue-on-error")
+            g.ok(f"checked lane {lane!r} carries no continue-on-error")
 
     # --- 9. one required lane that does not go through make -----------------
     check_direct_test_lane(g, required, jobs)

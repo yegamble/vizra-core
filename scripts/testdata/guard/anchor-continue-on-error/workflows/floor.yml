@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # A lane that checks out says which tree it stood in (check 10).
+      - name: Provenance
+        run: ./scripts/provenance.sh
       - name: Refuse a neutered Makefile
         continue-on-error: true
         run: ./scripts/make-integrity-guard.sh
@@ -22,6 +25,10 @@ jobs:
       # The direct lane: a no-opped Makefile cannot make the suite silent.
       - name: Unit suite, invoked directly (no make)
         run: go test -race -count=1 ./...
+      # The integration suite, also without make: before sweep B1 every
+      # integration invocation went through a make recipe (PR#6 VERIFY, FINDING 2).
+      - name: Integration suite, invoked directly (no make)
+        run: go test -race -count=1 -tags=integration ./...
   cache-matrix:
     name: cache-matrix
     runs-on: ubuntu-24.04

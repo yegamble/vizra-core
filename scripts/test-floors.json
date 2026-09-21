@@ -1,0 +1,37 @@
+{
+  "_why": [
+    "`go test ./...` exits 0 when it ran nothing. Measured at 5eb2829: with all 23",
+    "*_test.go files moved aside, the direct required lane exited 0 with 22 packages",
+    "reporting `[no test files]` (PR#6 VERIFY, FINDING 3). These floors are what make",
+    "that red. They are a FLOOR, not an expected count: they exist to catch a suite",
+    "being emptied or a package disappearing, not to pin an exact number.",
+    "",
+    "Measured on 5eb2829 + this branch, go1.27.1, darwin/arm64, `go test -count=1 -json`:",
+    "  unit         (./...)                      1001 tests executed, 0 skips",
+    "  integration  (-tags=integration ./...)    1046 tests executed, 0 skips",
+    "  of which internal/integration               45 tests (31 top-level + 14 subtests)",
+    "",
+    "The integration suite is a SUPERSET of the unit suite — the build tag only ADDS",
+    "files — so its whole-suite floor says little about the integration tests",
+    "themselves. min_package_tests is what makes internal/integration's absence red:",
+    "emptying it costs ~4% of the total and would clear a suite floor comfortably.",
+    "",
+    "Lowering a floor, or adding an allowed_skips entry, is a REVIEWED diff. An empty",
+    "allowed_skips is the correct state: a required test that is skipped is not a pass",
+    "(AGENTS.md). Both suites have zero skips today, and `make test-integration` FAILS",
+    "rather than skipping when its services are absent, so there is nothing to allow."
+  ],
+  "suites": {
+    "unit": {
+      "min_tests": 900,
+      "allowed_skips": {}
+    },
+    "integration": {
+      "min_tests": 940,
+      "min_package_tests": {
+        "github.com/yegamble/vizra-core/internal/integration": 40
+      },
+      "allowed_skips": {}
+    }
+  }
+}

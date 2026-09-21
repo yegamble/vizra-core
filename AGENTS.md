@@ -35,7 +35,9 @@ guard needs.
 `SHELL := /usr/bin/true`, or `MAKEFLAGS += -i` — makes every recipe in this
 repository exit 0 without running (measured on GNU Make 3.81 and 4.3). No check
 written inside a Makefile can prevent it, because the neutering disarms that
-check too. Two out-of-make controls close it:
+check too. And ONE WORD on a workflow line — `make -i ci` — did the same with
+both of the original controls exiting 0 (PR#6 VERIFY, FINDING 1). Four
+out-of-make controls close it; 2 and 4 are new in hardening sweep B1:
 
 1. **`scripts/make-integrity-guard.sh`** runs as its own workflow step, BEFORE
    any `make` line, in every required lane that invokes make. It refuses a
@@ -43,54 +45,67 @@ check too. Two out-of-make controls close it:
    override, a `-`/`@-` prefix or `|| true` suffix on a gate recipe, and a
    duplicate gate target — in the Makefile **and everything it includes**, with
    the include list taken from make's own `MAKEFILE_LIST`.
-2. **`build-test` runs `go test -race -count=1 ./...` directly**, with no make,
-   so whatever `make ci` did, a real failing **unit** test still fails a
-   required lane. It carries no `-tags=integration`, so it is the UNIT suite
-   only — see the residual list below.
+2. **`ci-required-guard.py` check 8b reads the make step's own workflow line.**
+   The anchor above runs its own `make -pn` in its own process; it cannot see
+   another step's argv or `env:`, and one word there no-opped every make-driven
+   lane with both guards green. Check 8b tokenises a checked lane's make step
+   `run:` as shell — line continuations joined, quotes honoured, `&&` chains and
+   quoted sub-shells followed — and refuses `-i`, `-k`, `-t`, `-q`, `-n`, `-e`,
+   `-f`, `-C`, `-o`, `-W`, every long form and every unambiguous abbreviation of
+   them, any `VAR=value` override wherever it sits relative to the target, a
+   MAKEFLAGS-family shell prefix, and a MAKEFLAGS / GNUMAKEFLAGS / MFLAGS /
+   MAKEFILES / SHELL `env:` at step, job or workflow level.
+3. **`build-test` runs BOTH suites directly**, with no make — the unit suite and
+   `-tags=integration ./...`, the same package set, flags and services as the
+   recipes. So whatever `make ci` did, a real failing test still fails a
+   required lane.
+4. **`scripts/go-test-report.py` makes an EMPTY suite red.** Control 3 alone
+   exits 0 having run nothing. The direct steps emit `go test -json`, and the
+   report judges `go test`'s own exit code, names every failure and every skip,
+   fails on any skip not allowlisted BY TEST NAME WITH A REASON in
+   `scripts/test-floors.json`, fails below a recorded floor of executed tests
+   (whole-suite, plus per-package so emptying `internal/integration` cannot hide
+   inside the superset), and prints the counts into the job log.
 
-`ci-required-guard.py` asserts both are present and armed.
+`ci-required-guard.py` asserts 1 and 3 are present and armed, and IS 2, over
+`set(FLOOR_LANES) | set(required)` — the floor is not also the ceiling on what
+gets checked. It also asserts (check 10) that every checked lane which checks
+the repository out runs `scripts/provenance.sh`.
 
-#### What these two controls do NOT give you
+#### What these controls do NOT give you
 
 This list is meant to be exhaustive. If you find something that belongs on it
 and is not here, that is a defect in this section, not a detail.
 
-- **The guard never reads the workflow's own `make` invocation.** It checks the
-  Makefile, its includes, and its OWN environment — it cannot see the argv or
-  the step-level `env:` of a different workflow step, and `ci-required-guard.py`
-  checks a make step's presence, position, `if:` and `continue-on-error` but
-  never the TEXT of its `run:`. So **one word on a workflow line** still
-  no-ops every make-driven lane with both guards exiting 0. Four spellings,
-  all measured green at `f56dc03`: `run: make -i ci`,
-  `run: make SHELL=/usr/bin/true ci`, `run: make MAKEFLAGS=-i ci`, and a
-  step-level `env: MAKEFLAGS: -i` on an otherwise ordinary make step.
-  Blast radius: everything make-driven goes silent — `fmt-check`, `vet`,
-  `lint-imports`, `migrate-lint`, `config-template-check`, `openapi-verify`,
-  `sqlc-verify`, `ci-guard`, `fixtures-verify`, `tidy-check`, `build`, and
-  **both integration lanes, including both `cache-matrix` legs**. Only the unit
-  suite survives, through control 2. Closing it — the guard refusing
-  flag/variable overrides on a make step's `run:` and a `MAKEFLAGS`-family
-  step-level `env:` — is queued for **core hardening sweep B**; it is
-  deliberately not implemented here.
-- **Control 2 covers the UNIT suite only.** Every integration invocation in this
-  repository goes through make (`make test-integration`,
-  `make test-integration-shuffle`, in `build-test` and in both `cache-matrix`
-  legs). Under the evasion above, a failing INTEGRATION test — the migrator
-  against real PostgreSQL 18, the permanent Valkey/Redis-7.2 matrix that
-  ADR-001 Q-004 exists for — is silent, not red.
-- **Control 2 does not fail when zero tests run.** `go test ./...` with every
-  `*_test.go` moved aside exits 0, reporting `[no test files]` per package
-  (measured at `f56dc03`). It is a control against make being neutered, not
-  against the suite being EMPTIED. Queued for sweep B.
-- **`append-only` is a required floor lane with no provenance step.** It checks
-  out with `fetch-depth: 0`, computes a merge base and echoes that SHA, without
-  saying which tree it is standing in — the shape meta-PR3 FINDING 5 is about.
-  `provenance.sh` runs in every required workflow FILE, which is not the same as
-  every required JOB. Queued.
-- The guard, the workflows and `ci-required-guard.py` are all checked out from
-  the pull request under test and can be edited in it — every such edit is
-  visible in the diff, and CODEOWNERS is **advisory only** until the owner's
-  ruleset exists (it currently returns 403 on their plan).
+- **A wrapper script that calls make is read by neither guard.** A step that
+  runs `./scripts/x.sh`, where `x.sh` runs `make -i ci`, carries no `make` token
+  on the workflow line: check 8b never sees the flags and check 8 never demands
+  the anchor. The same holds for a `uses:` composite action that invokes make —
+  its argv lives in that action's own `action.yml` — and for a reusable workflow
+  (`jobs.<id>.uses:`), whose steps are not in these files at all. **REVIEW-ONLY.
+  This is the whole remaining residual of the one-word evasion**, and it is
+  louder in a diff than the four spellings were: it needs a new script or action
+  as well as the workflow edit.
+- **A `run:` this guard cannot tokenise is a FAILURE, not a skip** — an
+  unbalanced quote turns the lane red rather than hiding the argv. And the
+  ANCHOR heuristic is deliberately WIDER than the tokeniser: a bare `make` token
+  anywhere in a `run:`, a comment included, makes the step count as a make step
+  that needs an anchor. Over-demanding the anchor fails closed.
+- **The floors and the skip allowlist are committed files.** Lowering a floor or
+  adding an allowed skip is a visible, reviewed diff in
+  `scripts/test-floors.json` — it is not prevented, it is made visible. The
+  allowlist is empty today and both suites have zero skips.
+- **A skip count is corroborated by CI only for the two DIRECT steps.**
+  `make ci`'s own `test-race` and both `cache-matrix` legs still run a
+  non-verbose `go test`, which prints nothing for a skipped test. Those lanes'
+  skip counts remain unreadable from their logs; the direct steps cover the same
+  package set, so nothing is unmeasured, but the corroboration comes from the
+  direct steps and not from every lane.
+- The guards, the workflows, `go-test-report.py`, `test-floors.json` and this
+  file are all checked out from the pull request under test and can be edited in
+  it — every such edit is visible in the diff, and CODEOWNERS is **advisory
+  only** until the owner's ruleset exists (it currently returns 403 on their
+  plan).
 
 Read the guarantee at exactly that strength; the guard's own docstring states it
 the same way.
@@ -108,7 +123,8 @@ dodge: a scan's result depends on the world, and a required lane that goes red
 on its own is how a team learns to merge past red. Its refusals are not
 weakened by that — `scripts/image-scan-verdict.py` fails on a scanner ERROR, on
 an empty or `null` result set, on an unrecognised OS, on a report about another
-image, and on an exit code nothing recorded, each with its own fixture.
+image, on an exit code nothing recorded, and on a `--fail-on` that names no
+failing severity at all, each with its own fixture or named test.
 
 Integration tests need real services and are behind `-tags=integration`:
 
@@ -119,7 +135,15 @@ make test-integration-shuffle   # the same suite, -shuffle=on
 
 They **fail rather than skip** when those are unset, for the same reason.
 
-CI runs both, on both cache flavours. The shuffled lane exists because an
+CI runs both, on both cache flavours — but **`build-test` invokes the
+integration suite DIRECTLY**, `go test -race -count=1 -tags=integration ./...`
+with the same package set, flags and services the recipe uses, so a no-opped
+make cannot silence it (before sweep B1 every integration invocation in this
+repository went through make). The recipes keep their own required coverage in
+both `cache-matrix` legs, so nothing was traded away, and the change cost no
+extra runtime: the direct steps replaced the `make` steps that stood there.
+
+The shuffled lane exists because an
 order- or timing-dependent failure makes a required lane go red at random, and
 a lane that is re-run until it is green has stopped being evidence. `go test`
 prints `-test.shuffle <seed>` as the first line of a FAILING package's output
@@ -147,18 +171,23 @@ decision it protects.
 | No credential, signed URL, session id or API key ever reaches a log line | `internal/obs`, `TestRedactionOfEveryValueClass` |
 | Default-deny authorization over the frozen ADR-007 matrix | `internal/authz`, `TestFrozenMatrix` (315 cases) |
 | A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
-| A one-line edit to the **Makefile or its includes** cannot turn every required lane into a no-op (a one-word edit to a workflow's own `make` line still can — see "What these two controls do NOT give you") | `scripts/make-integrity-guard.py`, run as an out-of-make workflow step BEFORE any `make`; `ci-required-guard.py` checks 8–9 assert that step is present, unconditional and not continue-on-error, and that one required lane runs the **unit** suite via `go test ./...` without make. Fixtures under `scripts/testdata/makeguard/` |
+| A lane that is REQUIRED but not on the FLOOR is checked like any other — trigger, continue-on-error, anchor, make argv, provenance | `ci-required-guard.py` runs checks 3, 4, 8, 8b and 10 over `set(FLOOR_LANES) \| set(required)`; fixture `scripts/testdata/guard/required-not-floor/` |
+| A one-line edit to the **Makefile or its includes**, and a one-word edit to a workflow's own `make` line, cannot turn a required lane into a no-op | `scripts/make-integrity-guard.py`, run as an out-of-make workflow step BEFORE any `make`; `ci-required-guard.py` check 8 asserts that step is present, unconditional and not continue-on-error, and check **8b** reads the make step's `run:` as shell and refuses no-op flags (short clusters and long-option abbreviations included), `VAR=value` overrides, and a MAKEFLAGS-family `env:` at step, job or workflow level. 17 new fixtures under `scripts/testdata/guard/`, plus `scripts/testdata/makeguard/`. **Residual: a wrapper script or `uses:` action that calls make is review-only** |
+| Whatever make did, a real failing test — UNIT **or INTEGRATION** — still fails a required lane | `ci-required-guard.py` check 9 requires a make-free `go test ./...` AND a make-free `go test -tags=integration ./...` in a required lane; `build-test` runs both. Fixtures `no-direct-test-lane/`, `no-direct-integration-lane/` |
+| A test lane cannot pass having run NOTHING, and its skip count is readable from the job log | the direct steps emit `go test -json`; `scripts/go-test-report.py` judges `go test`'s own exit code, names every failure and skip, fails on any skip not allowlisted by test name with a reason, and holds the executed count to the committed floors in `scripts/test-floors.json` (whole-suite and per-package). 11 fixtures under `scripts/testdata/gotest/` |
+| An image assertion cannot pass on a `docker run` FAILURE | `scripts/assert-runtime-image.sh` captures and judges every `docker run` exit; `$DOCKER` is injectable, and `scripts/testdata/fakedocker/` drives it against a daemon that cannot run anything |
+| A `--fail-on` that cannot fail is refused, not honoured | `scripts/image-scan-verdict.py` exits 3 on an empty or unrecognised `--fail-on`; `TestImageScanVerdictRefusesAThresholdThatCannotFail` |
 | A variable the contract names keeps that name in every service | `internal/config`, `TestTheContractAndTheLoaderNameTheSameVariable`, which reads `api/search-internal.openapi.yaml`'s own bytes |
 | A retired config name is a production boot refusal, never a silent ignore | `internal/config`, `RetiredKeys`, `TestProductionRefusesARetiredKeyName` |
-| A lane records the tree it actually stood in, not the SHA it was asked about | `scripts/provenance.sh`, called by every required workflow |
+| A lane records the tree it actually stood in, not the SHA it was asked about | `scripts/provenance.sh`, called by every required **job** that checks out — `append-only` included since sweep B1 — and asserted by `ci-required-guard.py` check 10, with fixtures `no-provenance/` and `provenance-conditional/`. It is a control, not a printout: a checkout pinned to the head (no `HEAD^2`) and a mismatched `PR_HEAD_SHA` both exit 1 |
 | An unset or unrecognised visibility DENIES; it is never normalised to public | `internal/authz`, `TestUnknownVisibilityDenies` |
 | A value this repository publishes is never a production secret | `internal/config`, `knownPublishedSecrets`, `TestProductionRefusesPublishedTestKeys` |
 | A crash-looping job is dead-lettered, not left at the head of the claim order | `SweepExpiredLeases`, `TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue` |
 | A merged migration's bytes are frozen | the `append-only` CI job (merge-base diff) + `migration-manifest.sh` + CODEOWNERS |
 | Every doctor verdict is tested | `internal/doctor` (the checks are pure; `cmd/vizra` only does I/O) |
 | The container healthcheck cannot pass while the service it probes is broken | `internal/healthcheck` (the probe reads the service's own `/readyz`, never its own opinion) and `internal/jobs.HealthHandler` (the worker's readiness is the claim loop's progress plus a probe-time PostgreSQL ping, not "the process exists"). Demonstrated end to end in `internal/integration/healthcheck_test.go`, which runs the SHIPPED binaries as separate processes against real PostgreSQL and reads their exit codes |
-| An image-scan lane cannot pass vacuously — scanner error, empty or `null` results, an unrecognised OS, a report about another image, a swallowed exit | `scripts/image-scan-verdict.py`, with its own exit code 3 for "there was no valid scan"; 16 fixtures under `scripts/testdata/imagescan/`, `scripts/imagescan_test.go` |
-| The runtime image carries no toolchain, and the libraries it ships actually load | the runtime stage is `FROM` a clean digest-pinned base (never `FROM vips`, never a purge, no `\|\| true` anywhere in the `Dockerfile`); `docker-build` asserts the toolchain is absent, that `/var/lib/vizra/media` is writable by uid 10001, and that the loader list `vips -l` produces IN THE RUNTIME IMAGE equals the one recorded at build time |
+| An image-scan lane cannot pass vacuously — scanner error, empty or `null` results, an unrecognised OS, a report about another image, a swallowed exit, **or a `--fail-on` that names no failing severity** | `scripts/image-scan-verdict.py`, with its own exit code 3 for "there was no valid scan"; 16 fixtures under `scripts/testdata/imagescan/`, `scripts/imagescan_test.go` |
+| The runtime image carries no toolchain, and the libraries it ships actually load | the runtime stage is `FROM` a clean digest-pinned base (never `FROM vips`, never a purge, no `\|\| true` anywhere in the `Dockerfile`); `docker-build` asserts the toolchain is absent (through `scripts/assert-runtime-image.sh`, which judges every `docker run` exit so the assertion cannot pass on a container that never ran), that `/var/lib/vizra/media` is writable by uid 10001, and that the loader list `vips -l` produces IN THE RUNTIME IMAGE equals the one recorded at build time |
 | migrate-lint, the gate guard and the import lint have their own negative cases | `scripts/scripts_test.go` against `scripts/testdata/` |
 | `last_error` is redacted before it is truncated | `internal/jobs`, `TestLastErrorIsRedactedBeforeItIsStored` |
 | PostgreSQL is the SINGLE clock authority for job eligibility: a "run now" enqueue takes `run_after` from the database, never from the application host | `EnqueueJob`'s `COALESCE(…, now())`, `TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost` |

@@ -1,0 +1,50 @@
+name: floor
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  append-only:
+    name: append-only
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
+  build-test:
+    name: build-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # A lane that checks out says which tree it stood in (check 10).
+      - name: Provenance
+        run: ./scripts/provenance.sh
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
+      - run: make ci
+      # The direct lane: a no-opped Makefile cannot make the suite silent.
+      - name: Unit suite, invoked directly (no make)
+        run: go test -race -count=1 ./...
+  cache-matrix:
+    name: cache-matrix
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
+  fixtures:
+    name: fixtures
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
+      - run: make fixtures-verify
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
+      - run: make govulncheck
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-24.04
+    steps:
+      - run: docker build .

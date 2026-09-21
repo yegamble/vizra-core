@@ -1,0 +1,11 @@
+{
+  "_why": "The same floors, with TestFour named as a deliberate skip and a reason.",
+  "suites": {
+    "unit": {
+      "min_tests": 4,
+      "allowed_skips": {
+        "TestFour": "fixture: a deliberate, reviewed skip with a reason"
+      }
+    }
+  }
+}

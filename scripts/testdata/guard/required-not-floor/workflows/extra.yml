@@ -1,0 +1,16 @@
+# A lane that is REQUIRED but absent from FLOOR_LANES. Before sweep B1 the guard
+# gave it exactly one line — "ok … resolves to a job" — and never looked at its
+# trigger, its continue-on-error or its unanchored `make -i ci`.
+name: extra
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  extra-lane:
+    name: extra-lane
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - run: make -i ci
