@@ -30,7 +30,7 @@ drift check then forces the follow-up PR.
 
 `search-hmac-testvectors.json` pins the exact bytes both repositories must sign.
 Its `key_utf8` field is a **test vector**. It must never be used as
-`VIZRA_SEARCH_HMAC_KEY`, in any environment an outsider can reach.
+`SEARCH_HMAC_KEY`, in any environment an outsider can reach.
 
 This is not only documentation: `internal/config` refuses that exact value in
 production, by exact match, along with every other key this repository

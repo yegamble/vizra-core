@@ -1,0 +1,23 @@
+# api/search-hmac-testvectors.json — BEFORE (base c043df7)
+
+## raw file sha256
+ff21e6b8cdd7d3bc32caa455cf605e1069ea4534db2b9b0a9e2d90c78a3d35c3  api/search-hmac-testvectors.json
+
+## top-level keys
+_comment
+key_utf8
+key_utf8_warning
+max_clock_skew_seconds
+negative_vectors
+scheme
+vectors
+verifier_now_unix
+window
+
+## vector counts
+_comment 16
+vectors 5
+negative_vectors 24
+
+## canonical sha256 of the WHOLE document MINUS key_utf8_warning
+411f7e2eed35efdcc58d6e7166a1e0fc821596aac86621be5e04f6d511908698 18948 bytes canonical

@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -226,12 +227,12 @@ func TestSearchModeRequiresURLAndKey(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected refusal for managed search with no URL or key, got %v", err)
 	}
-	if !ve.Has("VIZRA_SEARCH_URL") || !ve.Has("VIZRA_SEARCH_HMAC_KEY") {
-		t.Fatalf("expected both VIZRA_SEARCH_URL and VIZRA_SEARCH_HMAC_KEY problems, got %v", ve.Problems)
+	if !ve.Has("VIZRA_SEARCH_URL") || !ve.Has("SEARCH_HMAC_KEY") {
+		t.Fatalf("expected both VIZRA_SEARCH_URL and SEARCH_HMAC_KEY problems, got %v", ve.Problems)
 	}
 
 	env["VIZRA_SEARCH_URL"] = "http://search:8081"
-	env["VIZRA_SEARCH_HMAC_KEY"] = placeholderSecret(32)
+	env["SEARCH_HMAC_KEY"] = placeholderSecret(32)
 	if _, err := LoadFrom(lookupOf(env)); err != nil {
 		t.Fatalf("managed search with URL and key must load: %v", err)
 	}
@@ -309,11 +310,11 @@ func TestProductionRefusesPublishedTestKeys(t *testing.T) {
 		env := validProduction()
 		env["VIZRA_SEARCH_MODE"] = "managed"
 		env["VIZRA_SEARCH_URL"] = "http://search:8081"
-		env["VIZRA_SEARCH_HMAC_KEY"] = published
+		env["SEARCH_HMAC_KEY"] = published
 
 		_, err := LoadFrom(lookupOf(env))
 		ve, ok := AsValidationError(err)
-		if !ok || !ve.Has("VIZRA_SEARCH_HMAC_KEY") {
+		if !ok || !ve.Has("SEARCH_HMAC_KEY") {
 			t.Fatalf("production ACCEPTED the key published in api/search-hmac-testvectors.json. "+
 				"An operator who copies it out of that file gets a channel signed with a key anyone "+
 				"can read from the repository. err = %v", err)
@@ -341,11 +342,11 @@ func TestProductionRefusesPublishedTestKeys(t *testing.T) {
 	// Development must still accept them, or the vectors stop being usable.
 	t.Run("development still accepts them", func(t *testing.T) {
 		env := map[string]string{
-			"DATABASE_URL":          "postgres://localhost:5432/vizra",
-			"VIZRA_SEARCH_MODE":     "managed",
-			"VIZRA_SEARCH_URL":      "http://search:8081",
-			"VIZRA_SEARCH_HMAC_KEY": published,
-			"VIZRA_SESSION_SECRET":  published,
+			"DATABASE_URL":         "postgres://localhost:5432/vizra",
+			"VIZRA_SEARCH_MODE":    "managed",
+			"VIZRA_SEARCH_URL":     "http://search:8081",
+			"SEARCH_HMAC_KEY":      published,
+			"VIZRA_SESSION_SECRET": published,
 		}
 		if err := CheckEnv(env); err != nil {
 			t.Fatalf("development refused the test vectors' key; the vectors must stay usable: %v", err)
@@ -424,6 +425,177 @@ func TestEveryEscapeHatchIsRefusedForItsRealisticValues(t *testing.T) {
 			env[h.Name] = "false"
 			if _, err := LoadFrom(lookupOf(env)); err != nil {
 				t.Fatalf("%s=false must not refuse boot: %v", h.Name, err)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The naming ruling (chair, 2026-09-20): the core<->search shared secret is
+// SEARCH_HMAC_KEY, the name api/search-internal.openapi.yaml already uses and
+// vizra-search already reads.
+// ---------------------------------------------------------------------------
+
+// The contract's name is the name core reads. If this ever regresses, the two
+// services read the same shared secret under two spellings again and the
+// deployment templates have to paper over it.
+func TestTheSearchSecretIsTheNameTheContractUses(t *testing.T) {
+	const want = "SEARCH_HMAC_KEY"
+
+	var found *Key
+	for i := range Registry {
+		if Registry[i].Name == want {
+			found = &Registry[i]
+		}
+		if Registry[i].Name == "VIZRA_SEARCH_HMAC_KEY" {
+			t.Fatalf("the registry still reads VIZRA_SEARCH_HMAC_KEY; the contract names this secret %s", want)
+		}
+	}
+	if found == nil {
+		t.Fatalf("the registry does not read %s", want)
+	}
+	if !found.Secret {
+		t.Errorf("%s is not marked Secret; it would be eligible for logging and doctor output", want)
+	}
+
+	// And the loader must really read THAT name — a registry entry nothing
+	// reads would satisfy the check above and nothing else.
+	env := validProduction()
+	env["VIZRA_SEARCH_MODE"] = "managed"
+	env["VIZRA_SEARCH_URL"] = "http://search:8081"
+	env[want] = placeholderSecret(40)
+	cfg, err := LoadFrom(lookupOf(env))
+	if err != nil {
+		t.Fatalf("production with %s set was refused: %v", want, err)
+	}
+	if cfg.SearchHMACKey != placeholderSecret(40) {
+		t.Fatalf("LoadFrom did not read %s into Config.SearchHMACKey", want)
+	}
+}
+
+// The name the CONTRACT file uses and the name the loader reads must be the
+// same string, checked against the contract's own bytes rather than against a
+// constant in this package — otherwise both could drift together.
+func TestTheContractAndTheLoaderNameTheSameVariable(t *testing.T) {
+	raw, err := os.ReadFile("../../api/search-internal.openapi.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, "SEARCH_HMAC_KEY") {
+		t.Fatal("api/search-internal.openapi.yaml does not name SEARCH_HMAC_KEY at all; " +
+			"this test can no longer tell whether core agrees with the contract")
+	}
+	if strings.Contains(text, "VIZRA_SEARCH_HMAC_KEY") {
+		t.Error("api/search-internal.openapi.yaml names VIZRA_SEARCH_HMAC_KEY; " +
+			"the contract is the authority and core follows it, not the other way round")
+	}
+
+	var registryNames []string
+	for _, k := range AllKeys() {
+		registryNames = append(registryNames, k.Name)
+	}
+	if !slices.Contains(registryNames, "SEARCH_HMAC_KEY") {
+		t.Errorf("the contract names SEARCH_HMAC_KEY but the config registry does not read it: %v", registryNames)
+	}
+}
+
+// The core of the ruling: NO compatibility alias, and a leftover old name is a
+// production BOOT REFUSAL naming the variable — not a silent ignore that leaves
+// the operator believing a key is configured.
+func TestProductionRefusesARetiredKeyName(t *testing.T) {
+	const old = "VIZRA_SEARCH_HMAC_KEY"
+	const cur = "SEARCH_HMAC_KEY"
+
+	t.Run("refused by name, with the replacement in the message", func(t *testing.T) {
+		env := validProduction()
+		env[old] = placeholderSecret(40)
+
+		_, err := LoadFrom(lookupOf(env))
+		ve, ok := AsValidationError(err)
+		if !ok {
+			t.Fatalf("production with a leftover %s was ACCEPTED. The operator's file looks configured "+
+				"and the process booted with no search key at all. err = %v", old, err)
+		}
+		if !ve.Has(old) {
+			t.Fatalf("the refusal does not name %s; problems: %v", old, ve.Problems)
+		}
+		var msg string
+		for _, p := range ve.Problems {
+			if p.Key == old {
+				msg = p.Message
+			}
+		}
+		if !strings.Contains(msg, cur) {
+			t.Errorf("the refusal for %s does not name its replacement %s: %q", old, cur, msg)
+		}
+		if strings.Contains(err.Error(), placeholderSecret(40)) {
+			t.Errorf("the refusal echoed the secret: %v", err)
+		}
+	})
+
+	// There is NO alias. Setting only the old name must not configure search;
+	// if it did, the refusal above would be the only thing standing between an
+	// operator and an alias nobody decided to ship.
+	t.Run("the old name is not an alias", func(t *testing.T) {
+		env := map[string]string{
+			"VIZRA_MODE":        "development", // development, so the refusal above is not what fails
+			"DATABASE_URL":      "postgres://localhost:5432/vizra",
+			"VIZRA_SEARCH_MODE": "managed",
+			"VIZRA_SEARCH_URL":  "http://search:8081",
+			old:                 placeholderSecret(40),
+		}
+		_, err := LoadFrom(lookupOf(env))
+		ve, ok := AsValidationError(err)
+		if !ok {
+			t.Fatalf("managed search configured with ONLY %s loaded successfully; that is a compatibility "+
+				"alias, and the ruling says there is none. err = %v", old, err)
+		}
+		if !ve.Has(cur) {
+			t.Fatalf("expected a %s problem (no key configured), got %v", cur, ve.Problems)
+		}
+	})
+
+	// A completely empty `KEY=` is tolerated — the template ships the name as a
+	// tombstone, and an empty value cannot make anyone believe a key is set.
+	t.Run("a completely empty value is tolerated", func(t *testing.T) {
+		env := validProduction()
+		env[old] = ""
+		if _, err := LoadFrom(lookupOf(env)); err != nil {
+			t.Fatalf("production refused an EMPTY %s; the template carries it as a tombstone: %v", old, err)
+		}
+	})
+
+	// Whitespace is not empty. `KEY= ` is ambiguous and the fail-secure reading
+	// of an ambiguous env file is that the value is set.
+	t.Run("whitespace is refused, not trimmed away", func(t *testing.T) {
+		env := validProduction()
+		env[old] = "  "
+		_, err := LoadFrom(lookupOf(env))
+		ve, ok := AsValidationError(err)
+		if !ok || !ve.Has(old) {
+			t.Fatalf("production accepted %s set to whitespace; got %v", old, err)
+		}
+	})
+
+	// Every retired name, not only the one that prompted the rule, so adding a
+	// retirement without a refusal cannot pass.
+	for _, r := range RetiredKeys {
+		t.Run("every retired name: "+r.Name, func(t *testing.T) {
+			env := validProduction()
+			env[r.Name] = placeholderSecret(40)
+			_, err := LoadFrom(lookupOf(env))
+			ve, ok := AsValidationError(err)
+			if !ok || !ve.Has(r.Name) {
+				t.Fatalf("production accepted the retired name %s; got %v", r.Name, err)
+			}
+			if r.ReplacedBy == "" {
+				t.Errorf("%s declares no replacement, so the refusal cannot tell an operator what to do instead", r.Name)
+			}
+			for _, k := range AllKeys() {
+				if k.Name == r.Name {
+					t.Errorf("%s is both RETIRED and in AllKeys(); a name cannot be read and refused at once", r.Name)
+				}
 			}
 		})
 	}

@@ -39,6 +39,13 @@ func TestTemplateHasNoKeyNothingReads(t *testing.T) {
 	for _, k := range AllKeys() {
 		known[k.Name] = true
 	}
+	// A RETIRED name is the one legitimate exception. LoadFrom does not read it
+	// — it REFUSES it in production — and the template carries it as a
+	// tombstone so an operator upgrading from the old spelling finds out why
+	// their key stopped working from the file they already have open.
+	for _, r := range RetiredKeys {
+		known[r.Name] = true
+	}
 	var extra []string
 	for name := range templateKeys(t) {
 		if !known[name] {
@@ -101,6 +108,36 @@ func TestEscapeHatchesAreCommentedOutInTheTemplate(t *testing.T) {
 		}
 		if _, active := live[h.Name]; active {
 			t.Errorf(".env.example sets %s as a live value; escape hatches must be commented out", h.Name)
+		}
+	}
+}
+
+// A retired name must be in the template as a TOMBSTONE — named, commented out,
+// never a live assignment. Commented out because a live one would be refused by
+// the very block that exists to refuse it, so `.env.example` would stop booting
+// in production for a reason that is not the operator's fault; named because
+// the operator upgrading from the old spelling is reading this file, and an
+// absence tells them nothing.
+func TestRetiredKeysAreTombstonedInTheTemplate(t *testing.T) {
+	raw, err := os.ReadFile("../../.env.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := templateValues(t)
+	commented := commentedTemplateKeys(t)
+	for _, r := range RetiredKeys {
+		if !strings.Contains(string(raw), r.Name) {
+			t.Errorf(".env.example does not mention the retired name %s; "+
+				"an operator carrying it forward would get a boot refusal with no hint in the file they are editing", r.Name)
+		}
+		if !strings.Contains(string(raw), r.ReplacedBy) {
+			t.Errorf(".env.example mentions %s but not its replacement %s", r.Name, r.ReplacedBy)
+		}
+		if _, active := live[r.Name]; active {
+			t.Errorf(".env.example sets the retired name %s as a LIVE value; it must be commented out", r.Name)
+		}
+		if !commented[r.Name] {
+			t.Errorf(".env.example does not carry %s as a commented `# %s=` tombstone", r.Name, r.Name)
 		}
 	}
 }

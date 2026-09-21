@@ -103,6 +103,15 @@ sqlc-generate: ## Regenerate sqlc output
 ci-guard: ## The required-checks manifest floor, runner and action pinning
 	@echo "==> ci-guard"
 	@./scripts/ci-required-guard.sh
+	@# NOTE: this in-recipe invocation is for LOCAL parity only. It is NOT the
+	@# control, and must not be read as one: a `SHELL := /usr/bin/true` or
+	@# `MAKEFLAGS += -i` in this file no-ops this very line along with everything
+	@# else, which is the whole defect it exists for. The control is the
+	@# "Refuse a neutered Makefile" step in .github/workflows/build-test.yml,
+	@# fixtures.yml and govulncheck.yml, which runs OUTSIDE make and BEFORE any
+	@# `make` line; scripts/ci-required-guard.py asserts those steps exist, are
+	@# unconditional and are not continue-on-error.
+	@./scripts/make-integrity-guard.sh
 
 # ---------------------------------------------------------------------------
 # Fixtures (VZ-FOUND-007, ADR-009)

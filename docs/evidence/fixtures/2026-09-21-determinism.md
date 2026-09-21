@@ -131,3 +131,55 @@ bf7018e19e7d262cf9856aeceea0f51ba34c013cb6b3f847fb09b54ac2e68b32  mp4-short.mp4
 The same table is in `fixtures/manifest.json`, the committed artefact. The CI
 lane prints it again from the runner in its step summary, so the two platforms
 can be compared line by line.
+
+---
+
+## Correction, 2026-09-21 (appended; nothing above is rewritten)
+
+Two rows of the Summary table above were written as *instructions for how a
+reader could check a claim* — "Compare the sha256 table below with the CI job's
+step summary" — rather than as a recorded result. Read against this file's own
+"MEASURED / NOT OBSERVED / NOT CLAIMED" vocabulary they stand as PENDING. They
+are not pending. Both were proved by the independent verifier and the proof is
+recorded; this note attaches the result to the claim.
+
+| Row, as written above | Corrected status |
+|---|---|
+| "…and on linux/amd64, the acceptance platform" | **MEASURED.** The `fixtures` lane ran and was green on head `56920fec76c51f790de4506cef1fe79287d1cd12`, on GitHub-hosted `ubuntu-24.04`/amd64. |
+| "arm64 and amd64 produce the SAME bytes" | **MEASURED.** Verified by someone who did not write the generator. |
+
+Source of the proof, quoted rather than paraphrased —
+`vizra/docs/evidence/warroom/2026-09-21-vizra-core-pr5-fixtures-VERIFY.md`,
+section "Cross-architecture proof, verified by me and not by the builder":
+
+> I downloaded the corpus artifact the amd64 runner produced
+> (`fixtures-corpus-2572199a…`, 1336022 bytes, unexpired) and hashed every file
+> myself against the committed manifest: […] `EXTRA FILES IN ARTIFACT: none` /
+> `ALL MATCH`. So the linux/amd64 acceptance-platform bytes, my darwin/arm64
+> bytes, and the committed manifest are the same twelve files. Exactly twelve,
+> no extras.
+
+All twelve hashes the verifier listed are the twelve in the "Corpus produced on
+darwin/arm64 at this commit" table above, unchanged.
+
+### What this correction does NOT claim
+
+- It is evidence about **one** commit — `56920fe` — and about the toolchain,
+  encoder settings and codec inputs pinned there. It is not a standing guarantee
+  about future commits; the `fixtures` CI lane is what re-establishes it on each
+  one, which is why that lane is in `FLOOR_LANES`.
+- Two architectures are not "every architecture". Nothing here was measured on
+  a big-endian, 32-bit or non-Linux/Darwin target.
+- The manifest **of record** remains the one the CI lane reproduces on
+  ubuntu-24.04/amd64 (ADR-009). This machine is arm64 and is still not a
+  substitute for it.
+
+### Also corrected here (verifier finding V-4)
+
+The package doc in `internal/fixtures/fixtures.go` attributed BOTH committed
+codec inputs to "a recorded ffmpeg invocation". Only `webm-short.webm` came from
+ffmpeg; `avif-still.avif` came from libvips `heifsave` (libheif/aom). The
+machine-readable records were already correct in all three places an auditor
+would consult — `codec.go`'s `CodecInputs` (with the full `vips` argv),
+`fixtures/manifest.json`'s `codec_inputs`, and `NOTICE` — so only the prose
+summary was wrong. It now names both tools.

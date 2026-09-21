@@ -29,6 +29,75 @@ sqlc installed exits 1 and says the lane is BLOCKED — because a lane that did
 not run is not a pass. The same applies to `python3` and PyYAML, which the gate
 guard needs.
 
+### The gate is make-driven, so the Makefile itself is gated
+
+`make ci` is the contract, and that is also its weak point: ONE line —
+`SHELL := /usr/bin/true`, or `MAKEFLAGS += -i` — makes every recipe in this
+repository exit 0 without running (measured on GNU Make 3.81 and 4.3). No check
+written inside a Makefile can prevent it, because the neutering disarms that
+check too. Two out-of-make controls close it:
+
+1. **`scripts/make-integrity-guard.sh`** runs as its own workflow step, BEFORE
+   any `make` line, in every required lane that invokes make. It refuses a
+   `SHELL` / `.SHELLFLAGS` / `MAKEFLAGS` / `GNUMAKEFLAGS` / `.ONESHELL`
+   override, a `-`/`@-` prefix or `|| true` suffix on a gate recipe, and a
+   duplicate gate target — in the Makefile **and everything it includes**, with
+   the include list taken from make's own `MAKEFILE_LIST`.
+2. **`build-test` runs `go test -race -count=1 ./...` directly**, with no make,
+   so whatever `make ci` did, a real failing **unit** test still fails a
+   required lane. It carries no `-tags=integration`, so it is the UNIT suite
+   only — see the residual list below.
+
+`ci-required-guard.py` asserts both are present and armed.
+
+#### What these two controls do NOT give you
+
+This list is meant to be exhaustive. If you find something that belongs on it
+and is not here, that is a defect in this section, not a detail.
+
+- **The guard never reads the workflow's own `make` invocation.** It checks the
+  Makefile, its includes, and its OWN environment — it cannot see the argv or
+  the step-level `env:` of a different workflow step, and `ci-required-guard.py`
+  checks a make step's presence, position, `if:` and `continue-on-error` but
+  never the TEXT of its `run:`. So **one word on a workflow line** still
+  no-ops every make-driven lane with both guards exiting 0. Four spellings,
+  all measured green at `f56dc03`: `run: make -i ci`,
+  `run: make SHELL=/usr/bin/true ci`, `run: make MAKEFLAGS=-i ci`, and a
+  step-level `env: MAKEFLAGS: -i` on an otherwise ordinary make step.
+  Blast radius: everything make-driven goes silent — `fmt-check`, `vet`,
+  `lint-imports`, `migrate-lint`, `config-template-check`, `openapi-verify`,
+  `sqlc-verify`, `ci-guard`, `fixtures-verify`, `tidy-check`, `build`, and
+  **both integration lanes, including both `cache-matrix` legs**. Only the unit
+  suite survives, through control 2. Closing it — the guard refusing
+  flag/variable overrides on a make step's `run:` and a `MAKEFLAGS`-family
+  step-level `env:` — is queued for **core hardening sweep B**; it is
+  deliberately not implemented here.
+- **Control 2 covers the UNIT suite only.** Every integration invocation in this
+  repository goes through make (`make test-integration`,
+  `make test-integration-shuffle`, in `build-test` and in both `cache-matrix`
+  legs). Under the evasion above, a failing INTEGRATION test — the migrator
+  against real PostgreSQL 18, the permanent Valkey/Redis-7.2 matrix that
+  ADR-001 Q-004 exists for — is silent, not red.
+- **Control 2 does not fail when zero tests run.** `go test ./...` with every
+  `*_test.go` moved aside exits 0, reporting `[no test files]` per package
+  (measured at `f56dc03`). It is a control against make being neutered, not
+  against the suite being EMPTIED. Queued for sweep B.
+- **`append-only` is a required floor lane with no provenance step.** It checks
+  out with `fetch-depth: 0`, computes a merge base and echoes that SHA, without
+  saying which tree it is standing in — the shape meta-PR3 FINDING 5 is about.
+  `provenance.sh` runs in every required workflow FILE, which is not the same as
+  every required JOB. Queued.
+- The guard, the workflows and `ci-required-guard.py` are all checked out from
+  the pull request under test and can be edited in it — every such edit is
+  visible in the diff, and CODEOWNERS is **advisory only** until the owner's
+  ruleset exists (it currently returns 403 on their plan).
+
+Read the guarantee at exactly that strength; the guard's own docstring states it
+the same way.
+
+`make ci-guard` also invokes the guard for local parity. That invocation is not
+a control — a neutered Makefile no-ops it along with everything else.
+
 CI adds two lanes `make ci` cannot run locally: `append-only`, which diffs the
 migration manifest against the merge base (a merge-base diff needs the history,
 not a working tree), and `docker-build`.
@@ -70,6 +139,10 @@ decision it protects.
 | No credential, signed URL, session id or API key ever reaches a log line | `internal/obs`, `TestRedactionOfEveryValueClass` |
 | Default-deny authorization over the frozen ADR-007 matrix | `internal/authz`, `TestFrozenMatrix` (315 cases) |
 | A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
+| A one-line edit to the **Makefile or its includes** cannot turn every required lane into a no-op (a one-word edit to a workflow's own `make` line still can — see "What these two controls do NOT give you") | `scripts/make-integrity-guard.py`, run as an out-of-make workflow step BEFORE any `make`; `ci-required-guard.py` checks 8–9 assert that step is present, unconditional and not continue-on-error, and that one required lane runs the **unit** suite via `go test ./...` without make. Fixtures under `scripts/testdata/makeguard/` |
+| A variable the contract names keeps that name in every service | `internal/config`, `TestTheContractAndTheLoaderNameTheSameVariable`, which reads `api/search-internal.openapi.yaml`'s own bytes |
+| A retired config name is a production boot refusal, never a silent ignore | `internal/config`, `RetiredKeys`, `TestProductionRefusesARetiredKeyName` |
+| A lane records the tree it actually stood in, not the SHA it was asked about | `scripts/provenance.sh`, called by every required workflow |
 | An unset or unrecognised visibility DENIES; it is never normalised to public | `internal/authz`, `TestUnknownVisibilityDenies` |
 | A value this repository publishes is never a production secret | `internal/config`, `knownPublishedSecrets`, `TestProductionRefusesPublishedTestKeys` |
 | A crash-looping job is dead-lettered, not left at the head of the claim order | `SweepExpiredLeases`, `TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue` |
@@ -160,6 +233,35 @@ implemented by `vizra-search`, and drift-checked in both repositories. Its HMAC
 scheme is pinned by `api/search-hmac-testvectors.json`, generated independently
 of the Go implementation so the two repositories check against the same bytes
 rather than against each other's prose. See `api/README.md`.
+
+### A variable the contract names keeps that name in every service
+
+**Rule (chair, 2026-09-20).** If a contract file under `api/` names an
+environment variable, every service reads it under exactly that name. No
+service-local prefix, no per-service spelling, no alias.
+
+The shared core↔search secret is **`SEARCH_HMAC_KEY`** — the name
+`api/search-internal.openapi.yaml` uses and the name `vizra-search` reads. It is
+deliberately not `VIZRA_`-prefixed: the prefix marks a variable core owns, and
+this one is the contract's.
+
+Why it is a rule and not a preference: core read `VIZRA_SEARCH_HMAC_KEY` while
+search read `SEARCH_HMAC_KEY` for the same shared secret, and the deployment
+templates had begun to paper over the difference by setting both. Two names for
+one secret means the moment a template sets only one of them, one side signs
+with a key the other never loaded — and the failure surfaces as an
+authentication error at the boundary, not as a configuration error at boot.
+
+Mechanically: `internal/config.Registry` carries the contract's name;
+`TestTheContractAndTheLoaderNameTheSameVariable` reads the contract file's own
+bytes and fails if core and the contract disagree, in either direction.
+
+**Renaming one.** There is no compatibility alias. A retired name goes in
+`internal/config.RetiredKeys`, production **refuses to boot** while it is set to
+a non-empty value, and the refusal names the replacement. A leftover old name
+must never be silently ignored: the operator's file looks configured while the
+process has no key at all. `.env.example` carries the retired name as a
+commented tombstone (`TestRetiredKeysAreTombstonedInTheTemplate`).
 
 ## Evidence
 

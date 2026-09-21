@@ -242,6 +242,17 @@ func VerifyAgainstManifest(repoRoot, scratch string) ([]Problem, error) {
 	}
 	var probs []Problem
 
+	// 0. THE DECLARED SET.
+	//
+	// Verifier finding V-2: every other check below compares the manifest to
+	// the generator, and both sides shrink together — so a fixture dropped from
+	// Corpus() and re-pinned left `fixtures-verify` printing `ok — 11 fixtures`,
+	// and an empty Corpus() left it printing `ok — 0 fixtures`. This anchors
+	// both sides to ADR009Count, in the CLI path rather than only in the test
+	// suite, so the command a developer or a later M1 slice runs to answer "is
+	// the corpus intact?" cannot answer yes for a corpus that lost a fixture.
+	probs = append(probs, checkDeclaredSet(m)...)
+
 	// 1. The pinned toolchain. A different Go release can change what
 	//    compress/flate and image/jpeg emit, so a comparison made under one is
 	//    not evidence about the other.
@@ -351,6 +362,46 @@ func VerifyAgainstManifest(repoRoot, scratch string) ([]Problem, error) {
 		}
 	}
 
+	// 4b. A file in the output directory that NO manifest entry declares.
+	//
+	// Verifier finding V-3: step 4 walks the manifest's entries and looks each
+	// one up, so a file present on disk but absent from the manifest is never
+	// visited. The directory is gitignored, so this cannot reach the repository
+	// — the exposure is a later M1 slice that globs testdata/fixtures/* to drive
+	// a media assertion and silently picks up a file with no manifest entry, no
+	// declared expected-decode outcome and no provenance. That is the "someone
+	// else's image in the corpus" hazard this slice exists to prevent, arriving
+	// by the back door.
+	//
+	// Dotfiles are skipped by name: .DS_Store on a macOS working copy is an
+	// editor turd, not a fixture, and a check that goes red for it is a check
+	// people route around. Anything else — including a directory, which could
+	// hide files from this very walk — is reported.
+	if entries, err := os.ReadDir(outDir); err == nil {
+		declared := make(map[string]bool, len(m.Fixtures))
+		for _, e := range m.Fixtures {
+			declared[e.Path] = true
+		}
+		for _, de := range entries {
+			name := de.Name()
+			if strings.HasPrefix(name, ".") || declared[name] {
+				continue
+			}
+			what := "file"
+			if de.IsDir() {
+				what = "directory"
+			}
+			probs = append(probs, Problem{
+				Kind: "undeclared-fixture",
+				Detail: fmt.Sprintf("%s in %s is a %s that no manifest entry declares. "+
+					"Every byte in the corpus has a recorded origin, an expected decode outcome and a licence line; "+
+					"a file with none of those is not a fixture, and a later slice that globs this directory would "+
+					"treat it as one. Remove it, or add it to the generator and re-pin with `make fixtures-manifest`.",
+					name, OutputDir, what),
+			})
+		}
+	}
+
 	// Everything so far was cheap. Regenerating the corpus is not — it is tens
 	// of seconds under the race detector — so if anything above already
 	// disagrees, stop and say so rather than spending that time producing a
@@ -398,6 +449,71 @@ func VerifyAgainstManifest(repoRoot, scratch string) ([]Problem, error) {
 
 	sortProblems(probs)
 	return probs, nil
+}
+
+// checkDeclaredSet anchors BOTH the manifest and the generator to ADR009Count
+// and to the ADR-009 item numbers 1..N, so neither can shrink quietly.
+//
+// It checks both sides separately rather than only comparing them, because the
+// defect it exists for (V-2) is precisely that they agreed with each other while
+// both being wrong.
+func checkDeclaredSet(m *Manifest) []Problem {
+	var probs []Problem
+
+	type side struct {
+		what  string
+		count int
+		items map[int][]string
+	}
+	sides := []side{
+		{what: "the committed manifest lists", count: len(m.Fixtures), items: map[int][]string{}},
+		{what: "the generator's Corpus() produces", count: len(Corpus()), items: map[int][]string{}},
+	}
+	for _, e := range m.Fixtures {
+		sides[0].items[e.ADR009] = append(sides[0].items[e.ADR009], e.Path)
+	}
+	for _, s := range Corpus() {
+		sides[1].items[s.ADR009] = append(sides[1].items[s.ADR009], s.Path)
+	}
+
+	for _, s := range sides {
+		if s.count != ADR009Count {
+			probs = append(probs, Problem{
+				Kind: "declared-set",
+				Detail: fmt.Sprintf("%s %d fixture(s); ADR-009 names %d and says none is dropped. "+
+					"A corpus that lost a fixture would still report `ok` while every later media assertion "+
+					"made against it silently covered less than it claims.", s.what, s.count, ADR009Count),
+			})
+		}
+		for item := 1; item <= ADR009Count; item++ {
+			paths := s.items[item]
+			switch {
+			case len(paths) == 0:
+				probs = append(probs, Problem{
+					Kind:   "declared-set",
+					Detail: fmt.Sprintf("ADR-009 item %d is missing: %s no fixture for it", item, s.what),
+				})
+			case len(paths) > 1:
+				sort.Strings(paths)
+				probs = append(probs, Problem{
+					Kind: "declared-set",
+					Detail: fmt.Sprintf("ADR-009 item %d is claimed %d times where %s: %s",
+						item, len(paths), s.what, strings.Join(paths, ", ")),
+				})
+			}
+		}
+		for item, paths := range s.items {
+			if item < 1 || item > ADR009Count {
+				sort.Strings(paths)
+				probs = append(probs, Problem{
+					Kind: "declared-set",
+					Detail: fmt.Sprintf("%s an entry claiming ADR-009 item %d, which is outside 1..%d: %s",
+						s.what, item, ADR009Count, strings.Join(paths, ", ")),
+				})
+			}
+		}
+	}
+	return probs
 }
 
 func sortProblems(probs []Problem) {

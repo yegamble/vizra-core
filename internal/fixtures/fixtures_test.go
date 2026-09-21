@@ -266,6 +266,61 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 			wantKind: "codec-input",
 		},
 		{
+			// Verifier finding V-2. Dropping a fixture and re-pinning used to
+			// leave `fixtures-verify` printing `ok — 11 fixtures`, because the
+			// manifest and the generator were only ever compared to each other
+			// and both had shrunk. Here the manifest loses an entry; what makes
+			// the case sharp is that it is the MANIFEST that moved, which is the
+			// half `make fixtures-manifest` rewrites for you.
+			name: "a fixture was dropped from the manifest and the set is no longer the twelve",
+			mutate: func(t *testing.T, root string) {
+				m, err := ReadManifest(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				dropped := m.Fixtures[len(m.Fixtures)-1]
+				m.Fixtures = m.Fixtures[:len(m.Fixtures)-1]
+				if err := WriteManifest(root, m); err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("dropped %s (ADR-009 item %d) from the manifest", dropped.Path, dropped.ADR009)
+			},
+			wantKind: "declared-set",
+		},
+		{
+			// Verifier finding V-3. Step 4 walked the manifest and looked each
+			// entry up on disk, so a file on disk with no entry was never
+			// visited at all.
+			name: "an undeclared extra file in the corpus directory",
+			mutate: func(t *testing.T, root string) {
+				out := filepath.Join(root, filepath.FromSlash(OutputDir))
+				if _, err := Generate(out); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(out, "rogue-photograph.jpg"), []byte("not a fixture"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantKind: "undeclared-fixture",
+		},
+		{
+			// The NIT the verifier raised against its own recommendation: a
+			// directory walk that goes red for .DS_Store is a check people route
+			// around. This case asserts the exemption is exactly dotfiles — it
+			// is paired with the case above, which proves the walk still bites.
+			name: "a dotfile in the corpus directory is NOT reported",
+			mutate: func(t *testing.T, root string) {
+				out := filepath.Join(root, filepath.FromSlash(OutputDir))
+				if _, err := Generate(out); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(out, ".DS_Store"), []byte("editor turd"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantKind: "", // expect NO problems at all
+		},
+		{
 			name: "a fixture hash in the manifest was edited",
 			mutate: func(t *testing.T, root string) {
 				m, err := ReadManifest(root)
@@ -299,6 +354,12 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 			var kinds []string
 			for _, p := range probs {
 				kinds = append(kinds, p.Kind)
+			}
+			if tc.wantKind == "" {
+				if len(probs) != 0 {
+					t.Fatalf("%q must NOT be reported, but the verifier reported %v.\n%v", tc.name, kinds, probs)
+				}
+				return
 			}
 			if !contains(kinds, tc.wantKind) {
 				t.Fatalf("after %q the verifier reported %v, want a %q problem", tc.name, kinds, tc.wantKind)
@@ -455,4 +516,99 @@ func TestLoadCorpusIsNotInTheCorrectnessManifest(t *testing.T) {
 // readFile is a small helper shared with mutation_test.go.
 func readFile(dir, name string) ([]byte, error) {
 	return os.ReadFile(filepath.Join(dir, name))
+}
+
+// ---------------------------------------------------------------------------
+// Verifier finding V-2, the anchor itself.
+// ---------------------------------------------------------------------------
+
+// ADR009Count must be twelve. The literal is written here a SECOND time on
+// purpose: TestTheCorpusIsTheTwelveOfADR009 also carries its own literal, and
+// V-2 exists because two values that move together anchor nothing. A test that
+// read the constant it is checking would pass for any value.
+func TestADR009CountIsTwelve(t *testing.T) {
+	if ADR009Count != 12 {
+		t.Fatalf("ADR009Count is %d; ADR-009 names 12 fixtures and says none is dropped", ADR009Count)
+	}
+}
+
+// checkDeclaredSet is what makes `fixturegen verify`'s "ok" mean twelve. These
+// are the exact shapes the verifier demonstrated printing `ok`.
+func TestTheDeclaredSetCheckRefusesEveryShapeThatIsNotTheTwelve(t *testing.T) {
+	// A manifest that agrees with the real generator, as a starting point.
+	base, err := ReadManifest(repoRoot(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clone := func() *Manifest {
+		m := *base
+		m.Fixtures = append([]Entry(nil), base.Fixtures...)
+		return &m
+	}
+
+	if probs := checkDeclaredSet(clone()); len(probs) != 0 {
+		t.Fatalf("the real manifest is already failing the declared-set check: %v", probs)
+	}
+
+	cases := []struct {
+		name     string
+		mutate   func(m *Manifest)
+		wantText string
+	}{
+		{
+			// The verifier's exact reproduction: `ok — 11 fixtures`.
+			name:     "eleven fixtures",
+			mutate:   func(m *Manifest) { m.Fixtures = m.Fixtures[:len(m.Fixtures)-1] },
+			wantText: "11 fixture(s); ADR-009 names 12",
+		},
+		{
+			// And its other one: `ok — 0 fixtures`.
+			name:     "no fixtures at all",
+			mutate:   func(m *Manifest) { m.Fixtures = nil },
+			wantText: "0 fixture(s); ADR-009 names 12",
+		},
+		{
+			name: "thirteen fixtures",
+			mutate: func(m *Manifest) {
+				extra := m.Fixtures[0]
+				extra.Path = "extra.bin"
+				m.Fixtures = append(m.Fixtures, extra)
+			},
+			wantText: "13 fixture(s); ADR-009 names 12",
+		},
+		{
+			name: "twelve entries, but one ADR-009 item claimed twice and another missing",
+			mutate: func(m *Manifest) {
+				m.Fixtures[11].ADR009 = m.Fixtures[10].ADR009
+			},
+			wantText: "is claimed 2 times",
+		},
+		{
+			name:     "an item number outside 1..12",
+			mutate:   func(m *Manifest) { m.Fixtures[3].ADR009 = 99 },
+			wantText: "outside 1..12",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := clone()
+			tc.mutate(m)
+			probs := checkDeclaredSet(m)
+			if len(probs) == 0 {
+				t.Fatalf("%q produced NO problem; `fixtures-verify` would print ok for it", tc.name)
+			}
+			var joined string
+			for _, p := range probs {
+				if p.Kind != "declared-set" {
+					t.Errorf("problem kind %q, want declared-set", p.Kind)
+				}
+				joined += p.Detail + "\n"
+			}
+			if !strings.Contains(joined, tc.wantText) {
+				t.Fatalf("the refusal does not say %q, so a developer would not know what is wrong:\n%s", tc.wantText, joined)
+			}
+		})
+	}
 }

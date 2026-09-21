@@ -52,7 +52,14 @@ var Registry = []Key{
 	{Name: "VIZRA_MFA_KEY_KEK", Secret: true, RequiredInProduction: true, Doc: "Key-encryption key wrapping TOTP secrets. Unset in production is a boot refusal, never a warning (ADR-003)."},
 	{Name: "VIZRA_SEARCH_MODE", Default: "off", Doc: "off | managed | external. Default off until M3 (ADR-002, Q-001)."},
 	{Name: "VIZRA_SEARCH_URL", Doc: "Base URL of vizra-search. Required when VIZRA_SEARCH_MODE is not off."},
-	{Name: "VIZRA_SEARCH_HMAC_KEY", Secret: true, Doc: "Shared secret for the internal search contract. At least 32 bytes. Required when VIZRA_SEARCH_MODE is not off."},
+	// NOT VIZRA_-prefixed, and deliberately so. The canonical contract
+	// api/search-internal.openapi.yaml names this secret `SEARCH_HMAC_KEY`, and
+	// vizra-search reads it under that name. A variable the contract names keeps
+	// that name in every service (AGENTS.md § Contract ownership); a per-service
+	// spelling of one shared secret is a deployment template papering over a
+	// disagreement, which is how one side ends up signing with a key the other
+	// never loaded.
+	{Name: "SEARCH_HMAC_KEY", Secret: true, Doc: "Shared secret for the internal search contract. At least 32 bytes. Required when VIZRA_SEARCH_MODE is not off. Named by the contract (api/search-internal.openapi.yaml), so it is NOT VIZRA_-prefixed."},
 	{Name: "VIZRA_SEARCH_TIMEOUT", Default: "2s", Doc: "Per-request timeout for internal search calls."},
 	{Name: "VIZRA_CORS_ALLOWED_ORIGINS", Doc: "Comma-separated exact origins. Production refuses '*'."},
 	{Name: "VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN", Doc: "Set to true to allow a plain-http VIZRA_PUBLIC_ORIGIN in production. Explicit by design (ADR-002)."},
@@ -63,8 +70,37 @@ var Registry = []Key{
 	{Name: "VIZRA_SHUTDOWN_GRACE", Default: "20s", Doc: "Time allowed for in-flight requests after SIGTERM."},
 }
 
+// RetiredKey is a name this repository USED TO read and no longer does.
+//
+// Nothing is deployed, so there is no compatibility alias: the old name is not
+// read, and its value has no effect. That is exactly why it has to be refused
+// rather than ignored. An operator who carried the old name forward has a file
+// that LOOKS configured — the secret is right there, spelled the way last
+// week's template spelled it — while the process booted with no key at all. A
+// silent ignore turns that into a running production instance whose operator
+// believes a key is set.
+//
+// Production refuses these by name, with the replacement in the message. See
+// the production block in config.go, and TestProductionRefusesARetiredKeyName.
+type RetiredKey struct {
+	Name       string
+	ReplacedBy string
+	Why        string
+}
+
+// RetiredKeys is every name production refuses because it was renamed.
+var RetiredKeys = []RetiredKey{
+	{
+		Name:       "VIZRA_SEARCH_HMAC_KEY",
+		ReplacedBy: "SEARCH_HMAC_KEY",
+		Why: "the canonical contract api/search-internal.openapi.yaml names this secret SEARCH_HMAC_KEY " +
+			"and vizra-search reads it under that name; core read a different spelling of the same shared secret",
+	},
+}
+
 // AllKeys returns the registry followed by the escape hatches: the complete set
-// of names LoadFrom consults.
+// of names LoadFrom consults. Retired names are NOT here — LoadFrom does not
+// read them; it refuses them.
 func AllKeys() []Key {
 	out := make([]Key, 0, len(Registry)+len(EscapeHatches))
 	out = append(out, Registry...)

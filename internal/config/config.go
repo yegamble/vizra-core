@@ -211,7 +211,7 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		MFAKeyKEK:      get("VIZRA_MFA_KEY_KEK"),
 		SearchMode:     SearchMode(strings.ToLower(get("VIZRA_SEARCH_MODE"))),
 		SearchURL:      strings.TrimRight(get("VIZRA_SEARCH_URL"), "/"),
-		SearchHMACKey:  get("VIZRA_SEARCH_HMAC_KEY"),
+		SearchHMACKey:  get("SEARCH_HMAC_KEY"),
 	}
 
 	switch c.Mode {
@@ -285,16 +285,16 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		}
 		switch {
 		case len(c.SearchHMACKey) < minSecretBytes:
-			bad("VIZRA_SEARCH_HMAC_KEY", fmt.Sprintf("must be at least %d bytes when VIZRA_SEARCH_MODE is not 'off'", minSecretBytes))
+			bad("SEARCH_HMAC_KEY", fmt.Sprintf("must be at least %d bytes when VIZRA_SEARCH_MODE is not 'off'", minSecretBytes))
 		case production && isPublishedSecret(c.SearchHMACKey):
 			// Named first and specifically: this is the value an operator is
 			// most likely to have copied, and the message has to tell them why
 			// it will not do — without echoing it.
-			bad("VIZRA_SEARCH_HMAC_KEY",
+			bad("SEARCH_HMAC_KEY",
 				"this value is published in this repository (api/search-hmac-testvectors.json is a TEST VECTOR, not a configuration value). "+
 					"Generate a real key: openssl rand -base64 32")
 		case production && looksLikeDevSecret(c.SearchHMACKey):
-			bad("VIZRA_SEARCH_HMAC_KEY", "production refuses a known development value")
+			bad("SEARCH_HMAC_KEY", "production refuses a known development value")
 		}
 	}
 
@@ -331,6 +331,29 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 			} else if u.Scheme == "http" && !c.AllowInsecureOrigin {
 				bad("VIZRA_CORS_ALLOWED_ORIGINS", "production refuses a plain-http CORS origin: "+redactOrigin(o))
 			}
+		}
+
+		// Every RETIRED name, refused by name.
+		//
+		// There is no compatibility alias — nothing is deployed — so a leftover
+		// old name has no effect at all. Ignoring it silently is the dangerous
+		// reading: the operator's file looks configured, and the process booted
+		// without the secret. Refused on PRESENCE with any non-empty value,
+		// which is the same rule the value-bearing escape hatches use: a
+		// completely empty `KEY=` is tolerated so a template may carry the name
+		// as a tombstone, and whitespace is refused rather than trimmed away
+		// because `KEY= ` is ambiguous and the fail-secure reading of an
+		// ambiguous env file is that the value is set. The value is never
+		// echoed — it is a secret.
+		for _, r := range RetiredKeys {
+			raw, ok := lookup(r.Name)
+			if !ok || raw == "" {
+				continue
+			}
+			bad(r.Name, fmt.Sprintf(
+				"was renamed to %s and is NO LONGER READ. There is no compatibility alias, so this value has "+
+					"no effect: %s. Rename the variable — production will not boot believing a key is configured "+
+					"when none is.", r.ReplacedBy, r.Why))
 		}
 
 		// Every dev escape hatch, refused by name.
