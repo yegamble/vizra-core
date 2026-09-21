@@ -189,7 +189,7 @@ loop:
 		claimed, err := w.claim(ctx, pool)
 		if err != nil {
 			<-sem
-			log.Warn("jobs: claim failed", "error", err.Error())
+			log.Warn("jobs: claim failed", "error", safeError(err.Error()))
 			w.sleep(ctx, w.opts.PollInterval)
 			continue
 		}
@@ -290,7 +290,7 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 	case err == nil:
 		n, cerr := q.CompleteJob(recCtx, sqlcgen.CompleteJobParams{ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID)})
 		if cerr != nil {
-			log.Error("jobs: recording success failed", "error", cerr.Error())
+			log.Error("jobs: recording success failed", "error", safeError(cerr.Error()))
 			return
 		}
 		if n == 0 {
@@ -305,9 +305,15 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 			ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(safeError(err.Error())),
 		})
 		if derr != nil || n == 0 {
-			log.Warn("jobs: recording dead-letter failed", "rows", n, "error", errText(derr))
+			log.Warn("jobs: recording dead-letter failed", "rows", n, "error", safeError(errText(derr)))
 		}
-		log.Error("jobs: exhausted attempts", "attempts", j.Attempts, "error", err.Error())
+		// safeError, not err.Error(): the SAME path last_error already takes.
+		// Passing the raw handler error made this line safe only because
+		// cmd/api and cmd/worker install obs.NewLogger with slog.SetDefault —
+		// any other caller that builds a Worker with its own logger logged the
+		// credential in the clear (verifier FINDING V-2). Redaction belongs at
+		// the call site, not in the process wiring.
+		log.Error("jobs: exhausted attempts", "attempts", j.Attempts, "error", safeError(err.Error()))
 	default:
 		backoff := Backoff(j.Attempts) + jitter(Backoff(j.Attempts))
 		n, rerr := q.RetryJob(recCtx, sqlcgen.RetryJobParams{
@@ -315,9 +321,13 @@ func (w *Worker) run(ctx context.Context, pool *pgxpool.Pool, j Claimed, log *sl
 			Backoff: toInterval(backoff), LastError: strPtr(safeError(err.Error())),
 		})
 		if rerr != nil || n == 0 {
-			log.Warn("jobs: scheduling retry failed", "rows", n, "error", errText(rerr))
+			log.Warn("jobs: scheduling retry failed", "rows", n, "error", safeError(errText(rerr)))
 		}
-		log.Warn("jobs: retrying", "attempt", j.Attempts, "backoff", backoff.String(), "error", err.Error())
+		// safeError for the same reason as the dead-letter line above. The
+		// verifier named the other two; this third site passes the same raw
+		// handler error and would have been the one left leaking.
+		log.Warn("jobs: retrying", "attempt", j.Attempts, "backoff", backoff.String(),
+			"error", safeError(err.Error()))
 	}
 }
 
@@ -325,9 +335,11 @@ func (w *Worker) finishFailed(ctx context.Context, q *sqlcgen.Queries, j Claimed
 	if _, err := q.FailJob(ctx, sqlcgen.FailJobParams{
 		ID: j.ID, LeasedBy: strPtr(w.opts.WorkerID), LastError: strPtr(safeError(msg)),
 	}); err != nil {
-		log.Error("jobs: recording terminal failure failed", "error", err.Error())
+		log.Error("jobs: recording terminal failure failed", "error", safeError(err.Error()))
 	}
-	log.Error("jobs: terminal failure", "error", msg)
+	// safeError: msg is the raw handler error, exactly as it reaches
+	// last_error above (verifier FINDING V-2).
+	log.Error("jobs: terminal failure", "error", safeError(msg))
 }
 
 func (w *Worker) heartbeat(ctx context.Context, q *sqlcgen.Queries, j Claimed, cancelJob context.CancelFunc, log *slog.Logger) {
@@ -350,7 +362,7 @@ func (w *Worker) heartbeat(ctx context.Context, q *sqlcgen.Queries, j Claimed, c
 					cancelJob()
 					return
 				}
-				log.Warn("jobs: heartbeat failed", "error", err.Error())
+				log.Warn("jobs: heartbeat failed", "error", safeError(err.Error()))
 			}
 		}
 	}
@@ -369,11 +381,11 @@ func (w *Worker) sweepLoop(ctx context.Context, s site.Site, pool *pgxpool.Pool)
 			return
 		case <-t.C:
 			if err := w.sweepOnce(ctx, pool, log); err != nil {
-				log.Warn("jobs: sweep failed", "error", err.Error())
+				log.Warn("jobs: sweep failed", "error", safeError(err.Error()))
 			}
 			if w.metrics != nil {
 				if _, err := Collect(ctx, pool, w.metrics); err != nil {
-					log.Warn("jobs: metric collection failed", "error", err.Error())
+					log.Warn("jobs: metric collection failed", "error", safeError(err.Error()))
 				}
 			}
 		}

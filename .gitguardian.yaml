@@ -37,6 +37,28 @@ secret:
     # resolver. It is never dialled.
     - internal/site/site_test.go
 
+    # The same redaction inputs as internal/obs/log_test.go, reused end to end
+    # by TestAWorkerWithAPlainHandlerLogsNoCredentials: it builds a Worker with
+    # a deliberately NON-redacting slog handler, makes handlers fail with an
+    # error carrying every value class, and asserts none of them reaches the
+    # log. The flagged hit is `"cache URL password": "s3cr3tpw"` (line 1572),
+    # which is the literal the very next assertion requires to be ABSENT from
+    # the buffer. Also present: `hunter2`, `abc123def456`,
+    # `SuperSecretSignatureMaterial0123456789`, and `AKIAIOSFODNN7EXAMPLE` —
+    # AWS's own published documentation example access key ID, not a credential
+    # to anything. Delete any of them and VZ-OPS-005 loses its call-site
+    # coverage. Nothing here is real; nothing needs rotating.
+    - internal/integration/golden_test.go
+
+    # The verification transcripts for core PR2. They QUOTE the fixtures above
+    # verbatim — a mutation transcript's whole content is a worker log line that
+    # did or did not contain `hunter2` — so the same values appear in prose.
+    # Scoped to this one slice's directory rather than `docs/evidence/**`: a
+    # future slice's evidence gets its own entry and its own reason, so nobody
+    # can drop a real secret into an evidence file under cover of a standing
+    # exclusion.
+    - docs/evidence/pr2/
+
     # `http://user:sup3rsecret@127.0.0.1:1/` — the fixture for
     # TestTransportErrorDoesNotLeakCredentials, which asserts that a userinfo
     # URL in a transport error never reaches a log line. Port 1, never reachable.

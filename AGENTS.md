@@ -36,10 +36,18 @@ not a working tree), and `docker-build`.
 Integration tests need real services and are behind `-tags=integration`:
 
 ```
-make test-integration   # requires VIZRA_TEST_DATABASE_URL and VIZRA_TEST_CACHE_URL
+make test-integration           # requires VIZRA_TEST_DATABASE_URL and VIZRA_TEST_CACHE_URL
+make test-integration-shuffle   # the same suite, -shuffle=on
 ```
 
 They **fail rather than skip** when those are unset, for the same reason.
+
+CI runs both, on both cache flavours. The shuffled lane exists because an
+order- or timing-dependent failure makes a required lane go red at random, and
+a lane that is re-run until it is green has stopped being evidence. `go test`
+prints `-test.shuffle <seed>` as the first line of a FAILING package's output
+(a green run prints none), so a failing order is reproducible with
+`-shuffle=<seed>`.
 
 ## Rules that are mechanical, and where they are enforced
 
@@ -69,6 +77,9 @@ decision it protects.
 | Every doctor verdict is tested | `internal/doctor` (the checks are pure; `cmd/vizra` only does I/O) |
 | migrate-lint, the gate guard and the import lint have their own negative cases | `scripts/scripts_test.go` against `scripts/testdata/` |
 | `last_error` is redacted before it is truncated | `internal/jobs`, `TestLastErrorIsRedactedBeforeItIsStored` |
+| PostgreSQL is the SINGLE clock authority for job eligibility: a "run now" enqueue takes `run_after` from the database, never from the application host | `EnqueueJob`'s `COALESCE(…, now())`, `TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost` |
+| A worker leaks no credential into its OWN log whichever slog handler it was built with — redaction is at the call site, not in the process wiring | behaviour: `TestAWorkerWithAPlainHandlerLogsNoCredentials` drives the three handler-error branches with a plain `slog.TextHandler`. Coverage: `TestEveryErrorLogSiteInTheWorkerIsRedacted` parses `worker.go` and asserts **all 11** `"error"` attributes are `safeError(...)`, and fails if the count drifts |
+| A requeue of a dead or exhausted job must reset `attempts` | the contract comment on `SweepExpiredLeases` (`store/queries/jobs.sql`), carried into the generated doc comment |
 | The internal search client never follows a redirect | `internal/search`, `TestARedirectIsNeverFollowedAndNoSignatureLeaks` |
 | Every route, including the 404 path, carries the hardening headers | `internal/httpapi`, `TestEveryRouteCarriesHardeningHeaders` |
 

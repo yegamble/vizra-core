@@ -1,0 +1,98 @@
+//go:build integration
+
+// TEMPORARY DIAGNOSTIC — not for commit. Dumps the jobs table and the server
+// clock at the moment a claim unexpectedly returns no rows.
+package integration
+
+import (
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// diagSkew reports the database clock minus the host clock, measured over the
+// pool (sub-millisecond round trip), corrected for half the round trip.
+func diagSkew(t *testing.T, pool *pgxpool.Pool, where string) {
+	t.Helper()
+	var db time.Time
+	t0 := time.Now()
+	if err := pool.QueryRow(t.Context(), `select clock_timestamp()`).Scan(&db); err != nil {
+		t.Logf("DIAGSKEW %s: %v", where, err)
+		return
+	}
+	t1 := time.Now()
+	mid := t0.Add(t1.Sub(t0) / 2)
+	t.Logf("DIAGSKEW %s: skew(db-host)=%v rtt=%v", where, db.Sub(mid), t1.Sub(t0))
+}
+
+func diagDump(t *testing.T, pool *pgxpool.Pool, where string, cause error) {
+	t.Helper()
+	ctx := t.Context()
+	var dbNow, dbXactNow time.Time
+	_ = pool.QueryRow(ctx, `select clock_timestamp(), now()`).Scan(&dbNow, &dbXactNow)
+	t.Logf("DIAG %s: err=%v hostNow=%s dbClock=%s skew(db-host)=%s",
+		where, cause, time.Now().UTC().Format(time.RFC3339Nano),
+		dbNow.UTC().Format(time.RFC3339Nano), dbNow.Sub(time.Now()))
+
+	rows, err := pool.Query(ctx, `select id, kind, state, attempts, max_attempts,
+	        run_after, run_after <= now() as eligible, coalesce(leased_by,'-'),
+	        coalesce(correlation_id,'-'), created_at
+	    from jobs order by created_at`)
+	if err != nil {
+		t.Logf("DIAG %s: dumping jobs failed: %v", where, err)
+		return
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var id, kind, state, leasedBy, corr string
+		var attempts, maxAttempts int32
+		var runAfter, createdAt time.Time
+		var eligible bool
+		if err := rows.Scan(&id, &kind, &state, &attempts, &maxAttempts, &runAfter, &eligible, &leasedBy, &corr, &createdAt); err != nil {
+			t.Logf("DIAG scan: %v", err)
+			return
+		}
+		n++
+		t.Logf("DIAG %s: row id=%s kind=%s state=%s attempts=%d/%d run_after=%s eligible=%v leased_by=%s corr=%s created=%s",
+			where, id, kind, state, attempts, maxAttempts,
+			runAfter.UTC().Format(time.RFC3339Nano), eligible, leasedBy, corr,
+			createdAt.UTC().Format(time.RFC3339Nano))
+	}
+	t.Logf("DIAG %s: %d rows in jobs", where, n)
+
+	// Any other backend connected to this database, and what it is doing.
+	arows, aerr := pool.Query(ctx, `select pid, state, coalesce(application_name,'-'),
+	        coalesce(left(query, 120), '-'), backend_start
+	    from pg_stat_activity where datname = current_database() order by backend_start`)
+	if aerr == nil {
+		defer arows.Close()
+		for arows.Next() {
+			var pid int32
+			var st, app, q string
+			var start time.Time
+			if err := arows.Scan(&pid, &st, &app, &q, &start); err == nil {
+				t.Logf("DIAG %s: backend pid=%d state=%s app=%s start=%s q=%q",
+					where, pid, st, app, start.UTC().Format(time.RFC3339Nano), q)
+			}
+		}
+	}
+}
+
+// diagMargin reports now() - run_after as the database sees it, immediately
+// before a claim: negative means the row is not yet eligible.
+func diagMargin(t *testing.T, pool *pgxpool.Pool, where string) {
+	t.Helper()
+	var margin time.Duration
+	var micros int64
+	err := pool.QueryRow(t.Context(),
+		`select (extract(epoch from (now() - run_after)) * 1e6)::bigint
+		   from jobs order by created_at limit 1`).Scan(&micros)
+	if err != nil {
+		t.Logf("DIAGMARGIN %s: %v", where, err)
+		return
+	}
+	margin = time.Duration(micros) * time.Microsecond
+	t.Logf("DIAGMARGIN %s: now()-run_after = %v (negative => NOT eligible)", where, margin)
+}

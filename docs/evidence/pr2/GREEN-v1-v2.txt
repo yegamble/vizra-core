@@ -1,0 +1,7 @@
+=== RUN   TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost
+--- PASS: TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost (0.08s)
+=== RUN   TestAWorkerWithAPlainHandlerLogsNoCredentials
+    golden_test.go:1660: 1663 log bytes across three branches, all seven credential classes absent
+--- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.15s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	1.780s

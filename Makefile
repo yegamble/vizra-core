@@ -121,6 +121,21 @@ test-integration: ## Tests needing PostgreSQL and a RESP server (VIZRA_TEST_DATA
 	   exit 1; fi
 	@$(GO) test -race -count=1 -tags=integration ./...
 
+.PHONY: test-integration-shuffle
+test-integration-shuffle: ## The same suite in a RANDOM order, so order dependence cannot hide
+	@echo "==> test-integration-shuffle"
+	@# Verifier FINDING V-1 was an order- and timing-dependent failure that the
+	@# fixed source order happened to expose only sometimes. Running the suite
+	@# in a random permutation on every CI run is what stops the next one being
+	@# discovered by a builder at 2am instead of by CI. `go test` prints
+	@# `-test.shuffle <seed>` as the first line of a FAILING package's output
+	@# (verified 2026-09-20 on go1.27.1; a green run prints no seed), so a
+	@# failing permutation is reproducible with -shuffle=<seed>.
+	@if [ -z "$${VIZRA_TEST_DATABASE_URL:-}" ]; then \
+	   echo "  FAIL  VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."; \
+	   exit 1; fi
+	@$(GO) test -race -count=1 -shuffle=on -tags=integration ./...
+
 .PHONY: govulncheck
 govulncheck: ## Known vulnerabilities in the dependency set
 	@echo "==> govulncheck"
