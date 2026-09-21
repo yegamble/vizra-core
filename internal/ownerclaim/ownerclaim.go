@@ -32,6 +32,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -89,7 +90,34 @@ var (
 	// running claimed instance would be a standing escalation path for anyone
 	// with `docker exec` or the DSN.
 	ErrHasUsers = errors.New("ownerclaim: instance already has users")
+	// ErrLiveTokenExists means a redeemable token was already minted. Boot uses
+	// it to announce the command instead of minting a second one; `vizra
+	// claim-token` never sees it, because a deliberate re-mint must supersede.
+	ErrLiveTokenExists = errors.New("ownerclaim: a live claim token already exists")
+	// ErrUnavailable marks an INFRASTRUCTURE failure — the database is
+	// unreachable, a transaction could not begin or commit — as distinct from a
+	// rejected credential or a constraint violation.
+	//
+	// It exists because the published contract promises 503 for exactly this and
+	// ADR-003 states the rule ("a database outage returns 503, never 401"). A
+	// connection error is not a *pgconn.PgError, so without a sentinel it falls
+	// through every mapping branch to a 500 that tells the operator nothing on
+	// the one endpoint they cannot skip. It must never be returned for a bad
+	// token: a database error laundered into "token not accepted" is worse than
+	// either answer alone.
+	ErrUnavailable = errors.New("ownerclaim: the database is unavailable")
 )
+
+// unavailable wraps an infrastructure error in ErrUnavailable, preserving the
+// cause for the log. A *pgconn.PgError is NOT wrapped: the server answered, and
+// the mapper keys on its code and constraint name.
+func unavailable(op string, err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return fmt.Errorf("ownerclaim: %s: %w", op, err)
+	}
+	return fmt.Errorf("%w: %s: %v", ErrUnavailable, op, err)
+}
 
 // ValidationError names the first offending field in prose. The per-field error
 // envelope is M1-B's, where sign-up is the real multi-field consumer.
@@ -175,37 +203,71 @@ func Claimed(ctx context.Context, q *sqlcgen.Queries) (bool, error) {
 	return q.AnyUserExists(ctx)
 }
 
-// Mint supersedes any live token and mints a new one, returning the raw token
-// and its generation. It takes the advisory lock so concurrent minters cannot
-// interleave and leave the announced token different from the stored one.
+// Mint mints a fresh token and returns it with its generation.
 //
-// refuseIfUsersExist is the CLI's behaviour; boot passes false because it has
-// already decided what to do about an implicitly claimed instance.
-func Mint(ctx context.Context, pool *pgxpool.Pool, ttl time.Duration, refuseIfUsersExist bool) (raw string, generation int64, err error) {
+// EVERY decision it makes is taken INSIDE the advisory lock. That is the whole
+// point of the lock and it was the defect in the first round: boot read liveness
+// before taking it, so two replicas cold-starting together both observed "no
+// live token", both entered Mint, and the second overwrote the first's digest in
+// place. Two byte-identical-looking 64-hex lines then sat in the log, one dead,
+// and the operator who picked the wrong one got the deliberately uninformative
+// "that claim token was not accepted".
+//
+//   - refuseIfUsersExist — `vizra claim-token` passes true: minting an
+//     owner-creating credential on a running claimed instance would be a standing
+//     escalation path for anyone with `docker exec` or the DSN.
+//   - onlyIfNoLiveToken — boot passes true and announces the command instead when
+//     ErrLiveTokenExists comes back (with the live generation, so the operator can
+//     match the line to the instance). A deliberate re-mint passes false: the CLI
+//     must always supersede, which is what makes it a usable recovery path.
+func Mint(ctx context.Context, pool *pgxpool.Pool, ttl time.Duration, refuseIfUsersExist, onlyIfNoLiveToken bool) (raw string, generation int64, err error) {
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
-		return "", 0, fmt.Errorf("ownerclaim: beginning mint: %w", err)
+		return "", 0, unavailable("beginning mint", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", advisoryLockMint); err != nil {
-		return "", 0, fmt.Errorf("ownerclaim: taking the mint lock: %w", err)
+		return "", 0, unavailable("taking the mint lock", err)
 	}
 	q := sqlcgen.New(tx)
 
 	if refuseIfUsersExist {
 		has, err := q.AnyUserExists(ctx)
 		if err != nil {
-			return "", 0, fmt.Errorf("ownerclaim: checking for users: %w", err)
+			return "", 0, unavailable("checking for users", err)
 		}
 		if has {
 			return "", 0, ErrHasUsers
 		}
 	}
 
-	if _, err := q.SupersedeLiveOwnerClaimToken(ctx); err != nil {
-		return "", 0, fmt.Errorf("ownerclaim: superseding the previous token: %w", err)
+	// Read liveness UNDER the lock, never before it.
+	prior, err := State(ctx, q)
+	if err != nil {
+		return "", 0, unavailable("reading the token state", err)
 	}
+	if onlyIfNoLiveToken && prior.Live {
+		return "", prior.Generation, ErrLiveTokenExists
+	}
+
+	// A re-mint kills the previous generation. There is no separate UPDATE for
+	// that: the upsert below overwrites the digest in place, which is what makes
+	// invalidation atomic and total. What the previous round lacked was the
+	// HISTORY — a re-mint recorded `minted` and nothing about the generation it
+	// destroyed. The dead `SupersedeLiveOwnerClaimToken` call that used to sit
+	// here was overwritten by the upsert in the same transaction and is gone.
+	if prior.Live {
+		if err := audit.Emit(ctx, q, audit.Event{
+			ActorKind:   audit.ActorSystem,
+			Action:      audit.ActionOwnerClaimSuperseded,
+			SubjectType: audit.SubjectOwnerClaimToken,
+			SubjectID:   audit.String(fmt.Sprintf("%d", prior.Generation)),
+		}); err != nil {
+			return "", 0, err
+		}
+	}
+
 	raw, digest, err := GenerateToken()
 	if err != nil {
 		return "", 0, err
@@ -214,8 +276,14 @@ func Mint(ctx context.Context, pool *pgxpool.Pool, ttl time.Duration, refuseIfUs
 		TokenSha256: digest,
 		Ttl:         interval(ttl),
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		// The statement's own WHERE NOT EXISTS (SELECT 1 FROM users) refused it.
+		// "Never mint on a claimed instance" is a property of the statement, not
+		// of the two callers that happen to check first.
+		return "", 0, ErrHasUsers
+	}
 	if err != nil {
-		return "", 0, fmt.Errorf("ownerclaim: minting: %w", err)
+		return "", 0, unavailable("minting", err)
 	}
 	expires := row.ExpiresAt.Time.UTC().Format(time.RFC3339)
 	if err := audit.Emit(ctx, q, audit.Event{
@@ -228,7 +296,7 @@ func Mint(ctx context.Context, pool *pgxpool.Pool, ttl time.Duration, refuseIfUs
 		return "", 0, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return "", 0, fmt.Errorf("ownerclaim: committing mint: %w", err)
+		return "", 0, unavailable("committing mint", err)
 	}
 	return raw, row.Generation, nil
 }
@@ -297,18 +365,30 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 	}
 	normalized := Normalize(in.Token)
 
-	tx, err := pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
-	if err != nil {
-		return Result{}, fmt.Errorf("ownerclaim: beginning claim: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	q := sqlcgen.New(tx)
+	// ---- READ PHASE: no transaction, and no connection held across the hash --
+	//
+	// argon2id at ADR-003's parameters costs 19 MiB and tens of milliseconds, and
+	// a caller that loses the semaphore race waits until its request deadline. If
+	// that happened inside the transaction, every waiter would pin a pooled
+	// connection "idle in transaction" for the whole derivation plus the queue —
+	// so the POOL, not the CPU, would become the limit, and the symptom would
+	// point at PostgreSQL rather than at the hasher.
+	//
+	// This costs no correctness. Nothing read here is trusted: the authoritative
+	// gate re-runs inside the transaction below, the redeem CTE re-matches the
+	// row's digest against the COMMITTED row under READ COMMITTED, and
+	// users_one_owner is the final arbiter. A stale read can only send us into a
+	// transaction that then refuses.
+	//
+	// M1-B's sign-in is the real multi-caller of this hasher and is instructed to
+	// import it; this is the call shape it should copy.
+	q := sqlcgen.New(pool)
 
 	// The claimed check strictly precedes any token examination, so a claimed
 	// instance never reveals anything about a token.
 	claimed, err := q.AnyUserExists(ctx)
 	if err != nil {
-		return Result{}, fmt.Errorf("ownerclaim: checking claimed state: %w", err)
+		return Result{}, unavailable("checking claimed state", err)
 	}
 	if claimed {
 		return Result{}, ErrAlreadyClaimed
@@ -320,15 +400,27 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		return Result{}, ErrTokenNotAccepted
 	}
 	if err != nil {
-		return Result{}, fmt.Errorf("ownerclaim: reading the token: %w", err)
+		return Result{}, unavailable("reading the token", err)
 	}
 	if subtle.ConstantTimeCompare(Digest(normalized), row.TokenSha256) != 1 {
 		return Result{}, ErrTokenNotAccepted
 	}
 
-	// Only now is the password hashed. An attacker without the token never
-	// triggers a single 19 MiB derivation; the hasher's counter makes that
-	// assertable rather than merely asserted.
+	// LIVENESS PRE-CHECK. The redeem CTE's guard is the enforcement and stays;
+	// this is about the cost incurred BEFORE it. Without this, a token that is
+	// correct but consumed, superseded or expired — one an attacker may already
+	// hold, from a log under the stderr opt-in or after an operator re-mint —
+	// buys a full derivation before the CTE refuses it. The `live` column is
+	// already selected and is computed by the DATABASE clock.
+	//
+	// It returns the same ErrTokenNotAccepted, so nothing observable changes: the
+	// five causes stay indistinguishable in status, code and message.
+	if row.Live == nil || !*row.Live {
+		return Result{}, ErrTokenNotAccepted
+	}
+
+	// Only now is the password hashed, and no connection is checked out while it
+	// happens.
 	hash, err := hasher.Hash(ctx, in.Password)
 	if err != nil {
 		return Result{}, err
@@ -343,7 +435,26 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		return Result{}, fmt.Errorf("ownerclaim: generating credential id: %w", err)
 	}
 
-	claimed2, err := q.ClaimOwner(ctx, sqlcgen.ClaimOwnerParams{
+	// ---- WRITE PHASE: one explicit transaction, exactly the ruled contents ----
+	// gate -> ClaimOwner -> audit insert -> commit. Nothing else belongs here.
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return Result{}, unavailable("beginning claim", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := sqlcgen.New(tx)
+
+	// THE authoritative gate. The read-phase check above is an optimisation; this
+	// one decides, inside the transaction that does the writing.
+	claimed, err = qtx.AnyUserExists(ctx)
+	if err != nil {
+		return Result{}, unavailable("checking claimed state", err)
+	}
+	if claimed {
+		return Result{}, ErrAlreadyClaimed
+	}
+
+	created, err := qtx.ClaimOwner(ctx, sqlcgen.ClaimOwnerParams{
 		// The ROW'S OWN digest, never the presented value: attacker-controlled
 		// bytes must not reach SQL.
 		TokenSha256:  row.TokenSha256,
@@ -354,17 +465,24 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		PasswordHash: hash,
 	})
 	if err != nil {
-		return Result{}, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Result{}, err // the caller re-reads the claimed state to pick 409 or 403
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			return Result{}, err // a constraint spoke; the mapper keys on it
+		}
+		return Result{}, unavailable("redeeming the token", err)
 	}
 
-	if err := audit.Emit(ctx, q, audit.Event{
+	if err := audit.Emit(ctx, qtx, audit.Event{
 		ActorKind:   audit.ActorUser,
-		ActorUserID: &claimed2.ID,
+		ActorUserID: &created.ID,
 		Action:      audit.ActionOwnerClaimSucceeded,
 		SubjectType: audit.SubjectUser,
-		SubjectID:   audit.String(claimed2.ID.String()),
+		SubjectID:   audit.String(created.ID.String()),
 		// username only — never the email. See the package doc and 0005's header.
-		After:         map[string]any{"username": claimed2.Username, "role": string(claimed2.Role)},
+		After:         map[string]any{"username": created.Username, "role": string(created.Role)},
 		CorrelationID: nonEmpty(correlationID),
 		IPPrefix:      ipPrefix,
 	}); err != nil {
@@ -372,13 +490,13 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return Result{}, fmt.Errorf("ownerclaim: committing claim: %w", err)
+		return Result{}, unavailable("committing claim", err)
 	}
 	return Result{
-		UserID:          claimed2.ID,
-		Username:        claimed2.Username,
-		Role:            string(claimed2.Role),
-		TokenGeneration: claimed2.TokenGeneration,
+		UserID:          created.ID,
+		Username:        created.Username,
+		Role:            string(created.Role),
+		TokenGeneration: created.TokenGeneration,
 	}, nil
 }
 

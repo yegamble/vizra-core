@@ -56,11 +56,17 @@ func (s *Server) claimLimiterKeys(c *echo.Context) (perOrigin string, global str
 	return "", global
 }
 
-// allowClaimRequest applies the hard ceiling to EVERY request to the setup
-// routes. It is deliberately far above operator-plausible use: its job is to
-// keep a flood of one-row SELECTs from exhausting the connection pool, not to
-// police credentials. Unlike the failure budget, this one can refuse a request
-// carrying a valid token — a fact stated rather than hidden.
+// allowClaimRequest applies the hard ceiling. BOTH setup routes call it — the
+// POST and the claim-status GET — which is what the name claims and what the
+// first round did not do: the comment here asserted coverage the code lacked,
+// and a comment that promises a control the code does not have is worse than no
+// comment (0003's own header says so).
+//
+// It is deliberately far above operator-plausible use: its job is to keep a
+// flood of one-row SELECTs from exhausting the connection pool, not to police
+// credentials. Unlike the failure budget, this one CAN refuse a request carrying
+// a valid token — stated rather than hidden. A flood past it is a network-level
+// denial of service, which an application limiter cannot answer.
 func (s *Server) allowClaimRequest(c *echo.Context) bool {
 	if s.deps.Limiter == nil {
 		return true

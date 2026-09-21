@@ -16,6 +16,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/yegamble/vizra-core/internal/audit"
+	"github.com/yegamble/vizra-core/internal/config"
 	"github.com/yegamble/vizra-core/internal/credential"
 	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/site"
@@ -190,7 +191,16 @@ func (s *Server) poolFor(c *echo.Context) (*pgxpool.Pool, error) {
 // public /setup/claim page and an empty gallery — concealment there is illusory
 // while the token remains the real control.
 func (s *Server) handleClaimStatus(c *echo.Context) error {
-	claimed, err := s.lookupClaimed(c)
+	// Under the hard ceiling like the POST: this is the only unauthenticated read
+	// surface the product has, it carries Cache-Control: no-store so nothing
+	// upstream absorbs a flood, and post-claim the answer is a constant.
+	if !s.allowClaimRequest(c) {
+		return newCodedError(http.StatusTooManyRequests, "rate_limited",
+			"too many requests to the setup endpoint; try again shortly")
+	}
+	// instanceClaimed, not lookupClaimed: the monotonic cache means that once an
+	// instance is claimed this performs no database work, ever again.
+	claimed, err := s.instanceClaimed(c)
 	if err != nil {
 		return newCodedError(http.StatusServiceUnavailable, "unavailable",
 			"the instance state could not be read")
@@ -226,6 +236,24 @@ func (s *Server) handleClaimOwner(c *echo.Context) error {
 	if !s.allowClaimRequest(c) {
 		return newCodedError(http.StatusTooManyRequests, "rate_limited",
 			"too many requests to the setup endpoint; try again shortly")
+	}
+
+	// Refuse a CLAIMED instance from the monotonic cache, before touching the
+	// pool or parsing anything.
+	//
+	// After day one every instance is claimed, so this is the path every
+	// anonymous POST takes for the rest of the product's life. Without this it
+	// cost two transactions per request AND — worse — wrote one permanent row
+	// into a table migration 0005 makes undeletable: no DELETE, no TRUNCATE, no
+	// retention path yet. The hard ceiling bounds requests per window, but a
+	// per-window bound integrates to unbounded over the life of an instance.
+	//
+	// The bit can only ever go false->true (the gate is EXISTS(users) and no path
+	// deletes the last user), so a cached true is never wrong. The authoritative
+	// in-transaction AnyUserExists inside Claim stays exactly where it is: this
+	// is a short-circuit, not the gate.
+	if claimed, fresh := s.claimed.get(s.deps.Now()); fresh && claimed {
+		return newCodedError(http.StatusConflict, "conflict", claimedMessage)
 	}
 
 	// 1. Media type. Echo's binder would accept urlencoded and multipart and
@@ -314,8 +342,14 @@ func requireJSONContentType(req *http.Request) error {
 // credential is in the body. The chair recorded that interpretation; an amending
 // ADR adding the row is owed before M1-B merges.
 func (s *Server) checkOrigin(req *http.Request) error {
+	// Compare NORMALISED origins, not strings. Config.PublicOrigin was normalised
+	// once at boot; the request's Origin is normalised the same way here, so a
+	// trailing slash, an uppercase host, an explicitly written default port or a
+	// trailing dot on either side cannot turn a same-origin browser claim into a
+	// 403 that only curl escapes.
 	want := s.deps.Config.PublicOrigin
-	if origin := req.Header.Get("Origin"); origin != "" && origin != want {
+	if origin := req.Header.Get("Origin"); origin != "" &&
+		config.NormalizeOrigin(origin) != config.NormalizeOrigin(want) {
 		// A DISTINCT code, because a wrong VIZRA_PUBLIC_ORIGIN breaks the browser
 		// claim page while curl still works, and an operator has to be able to
 		// tell that apart from a rejected token.
@@ -338,7 +372,12 @@ func (s *Server) checkOrigin(req *http.Request) error {
 func (s *Server) mapClaimError(c *echo.Context, err error) error {
 	switch {
 	case errors.Is(err, ownerclaim.ErrAlreadyClaimed):
-		s.recordClaimRefusal(c, audit.ReasonAlreadyClaimed)
+		// Deliberately NO audit row. A refusal on a permanently closed endpoint
+		// is not a security event: the answer is a constant, so the first row is
+		// already indistinguishable from the ten-thousandth, and the table it
+		// would grow cannot be pruned. The claimed bit is cached here so the
+		// next request never reaches the database at all.
+		s.claimed.set(true, s.deps.Now())
 		return newCodedError(http.StatusConflict, "conflict", claimedMessage)
 
 	case errors.Is(err, ownerclaim.ErrTokenNotAccepted):
@@ -347,6 +386,14 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 	case errors.Is(err, credential.ErrBusy):
 		return newCodedError(http.StatusServiceUnavailable, "unavailable",
 			"the server is busy; try again shortly")
+
+	case errors.Is(err, ownerclaim.ErrUnavailable):
+		// The published contract promises 503 for a database outage and ADR-003
+		// states the rule. Without this branch a connection error — which is not
+		// a *pgconn.PgError — falls through every mapping below to a 500 that
+		// tells the operator nothing on the one endpoint they cannot skip.
+		return newCodedError(http.StatusServiceUnavailable, "unavailable",
+			"the instance state could not be read")
 
 	case errors.Is(err, pgx.ErrNoRows):
 		// The redeem matched nothing: a concurrent claimer won, or the token was

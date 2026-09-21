@@ -47,6 +47,7 @@ type probes struct {
 	openCache       func(*config.Config) (cacher, error)
 	searchReachable func(context.Context, *config.Config) bool
 	ownerClaim      func(context.Context, pooler) doctor.OwnerClaimState
+	rawPublicOrigin func() string
 }
 
 // pooler and cacher are the narrow views collect() needs, so a fake is three
@@ -117,6 +118,10 @@ func realProbes(envFile string) probes {
 			return c, nil
 		},
 		ownerClaim: realOwnerClaim,
+		rawPublicOrigin: func() string {
+			v, _ := os.LookupEnv("VIZRA_PUBLIC_ORIGIN")
+			return v
+		},
 		searchReachable: func(ctx context.Context, cfg *config.Config) bool {
 			if cfg.SearchMode == config.SearchOff {
 				return false
@@ -224,6 +229,15 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 	}
 
 	// --- search -------------------------------------------------------------
+	// Config.PublicOrigin is already normalised by LoadFrom, so compare the raw
+	// environment value against it to show an operator what browsers will send.
+	raw := cfg.PublicOrigin
+	if p.rawPublicOrigin != nil {
+		raw = p.rawPublicOrigin()
+	}
+	results = append(results, doctor.CheckPublicOrigin(
+		raw, cfg.PublicOrigin, cfg.Mode == config.ModeProduction))
+
 	results = append(results, doctor.CheckSearch(cfg.SearchMode, p.searchReachable(ctx, cfg)))
 
 	return results

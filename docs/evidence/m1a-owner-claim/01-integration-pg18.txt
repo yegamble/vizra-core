@@ -1,67 +1,77 @@
-# VZ-INSTALL-003 M1-A — integration suite on real PostgreSQL 18 + Valkey
-date:  2026-09-21T08:36:44Z
+# VZ-INSTALL-003 M1-A — integration suite on real PostgreSQL 18 + Valkey (fix round 1)
+date:  2026-09-21T09:40:57Z
 host:  Darwin/arm64
 go:    go version go1.27.1 darwin/arm64
 base:  5eb2829eb4f830206029f8e2a836f93a44a93a02 (origin/main)
 pg:    PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
 cmd:   go test -tags=integration -race -count=1 -v ./internal/integration/
 
+=== RUN   TestClaimTokenCLIOnAnUnclaimedInstance
+    claimtoken_cli_test.go:79: vizra claim-token -> exit 0, stdout 65 bytes (1 64-hex lines), stderr 205 bytes
+--- PASS: TestClaimTokenCLIOnAnUnclaimedInstance (9.47s)
+=== RUN   TestClaimTokenCLIRemintSupersedesThePrevious
+    claimtoken_cli_test.go:113: vizra claim-token -> exit 0, stdout 65 bytes (1 64-hex lines), stderr 205 bytes
+    claimtoken_cli_test.go:114: vizra claim-token -> exit 0, stdout 65 bytes (1 64-hex lines), stderr 205 bytes
+--- PASS: TestClaimTokenCLIRemintSupersedesThePrevious (0.59s)
+=== RUN   TestClaimTokenCLIRefusesOnAClaimedInstanceAsABinary
+    claimtoken_cli_test.go:152: vizra claim-token -> exit 1, stdout 0 bytes (0 64-hex lines), stderr 259 bytes
+--- PASS: TestClaimTokenCLIRefusesOnAClaimedInstanceAsABinary (0.52s)
+=== RUN   TestClaimTokenCLIWithAnUnreachableDatabase
+    claimtoken_cli_test.go:175: vizra claim-token -> exit 1, stdout 0 bytes (0 64-hex lines), stderr 241 bytes
+--- PASS: TestClaimTokenCLIWithAnUnreachableDatabase (0.01s)
+=== RUN   TestVizraUsageNamesClaimToken
+--- PASS: TestVizraUsageNamesClaimToken (0.01s)
 === RUN   TestMigrateUpOnEmptyDatabase
---- PASS: TestMigrateUpOnEmptyDatabase (0.07s)
+--- PASS: TestMigrateUpOnEmptyDatabase (0.10s)
 === RUN   TestMigrateIsIdempotent
---- PASS: TestMigrateIsIdempotent (0.09s)
+--- PASS: TestMigrateIsIdempotent (0.13s)
 === RUN   TestSchemaConstraintsAreEnforced
 === RUN   TestSchemaConstraintsAreEnforced/only_one_default_storage_location
 === RUN   TestSchemaConstraintsAreEnforced/a_read-only_location_cannot_be_the_default
 === RUN   TestSchemaConstraintsAreEnforced/a_job_state_outside_the_enum_is_rejected
 === RUN   TestSchemaConstraintsAreEnforced/a_leased_job_must_name_its_holder
 === RUN   TestSchemaConstraintsAreEnforced/a_system_audit_event_cannot_claim_a_user
---- PASS: TestSchemaConstraintsAreEnforced (0.06s)
+--- PASS: TestSchemaConstraintsAreEnforced (0.11s)
     --- PASS: TestSchemaConstraintsAreEnforced/only_one_default_storage_location (0.00s)
     --- PASS: TestSchemaConstraintsAreEnforced/a_read-only_location_cannot_be_the_default (0.00s)
     --- PASS: TestSchemaConstraintsAreEnforced/a_job_state_outside_the_enum_is_rejected (0.00s)
     --- PASS: TestSchemaConstraintsAreEnforced/a_leased_job_must_name_its_holder (0.00s)
     --- PASS: TestSchemaConstraintsAreEnforced/a_system_audit_event_cannot_claim_a_user (0.00s)
 === RUN   TestEnqueueIsRolledBackWithItsTransaction
---- PASS: TestEnqueueIsRolledBackWithItsTransaction (0.05s)
+--- PASS: TestEnqueueIsRolledBackWithItsTransaction (0.10s)
 === RUN   TestEnqueueIdempotency
---- PASS: TestEnqueueIdempotency (0.06s)
+--- PASS: TestEnqueueIdempotency (0.11s)
 === RUN   TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost
---- PASS: TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost (0.06s)
+--- PASS: TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost (0.14s)
 === RUN   TestConcurrentClaimsNeverTakeTheSameJob
---- PASS: TestConcurrentClaimsNeverTakeTheSameJob (0.09s)
+--- PASS: TestConcurrentClaimsNeverTakeTheSameJob (0.18s)
 === RUN   TestHeartbeatRequiresStillHoldingTheLease
---- PASS: TestHeartbeatRequiresStillHoldingTheLease (0.06s)
+--- PASS: TestHeartbeatRequiresStillHoldingTheLease (0.10s)
 === RUN   TestSweepReclaimsOnlyElapsedLeases
---- PASS: TestSweepReclaimsOnlyElapsedLeases (0.06s)
+--- PASS: TestSweepReclaimsOnlyElapsedLeases (0.11s)
 === RUN   TestWorkerRunsAndCompletesAJob
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
-2026/09/21 04:36:47 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
---- PASS: TestWorkerRunsAndCompletesAJob (0.08s)
+2026/09/21 05:41:13 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+--- PASS: TestWorkerRunsAndCompletesAJob (0.14s)
 === RUN   TestRetryLadderAndTerminalFailure
-2026/09/21 04:36:47 ERROR jobs: exhausted attempts site=default worker=test-worker job_id=01a0c31c-50b2-7069-986c-167497168d60 kind=always-retryable correlation_id=c1 attempts=1 error=transient
-2026/09/21 04:36:47 ERROR jobs: terminal failure site=default worker=test-worker job_id=01a0c31c-50bd-7509-a2d4-25b915a4f401 kind=always-terminal correlation_id=c2 error="terminal: malformed payload"
---- PASS: TestRetryLadderAndTerminalFailure (0.18s)
+2026/09/21 05:41:13 ERROR jobs: exhausted attempts site=default worker=test-worker job_id=01a0c357-4cb2-76ed-8639-dd7c0c8ac95f kind=always-retryable correlation_id=c1 attempts=1 error=transient
+2026/09/21 05:41:13 ERROR jobs: terminal failure site=default worker=test-worker job_id=01a0c357-4cc0-75a9-a6b9-9a232f6ce98e kind=always-terminal correlation_id=c2 error="terminal: malformed payload"
+2026/09/21 05:41:13 WARN jobs: claim failed site=default worker=test-worker error="context canceled"
+--- PASS: TestRetryLadderAndTerminalFailure (0.22s)
 === RUN   TestCacheFlavourAndVersionAreIdentified
     golden_test.go:674: cache identified as valkey 9.1.2
 --- PASS: TestCacheFlavourAndVersionAreIdentified (0.00s)
 === RUN   TestRateLimiterOnTheConnectedServer
---- PASS: TestRateLimiterOnTheConnectedServer (0.00s)
+--- PASS: TestRateLimiterOnTheConnectedServer (0.01s)
 === RUN   TestGoldenPathPassesAfterFlushAll
     golden_test.go:810: FLUSHALL issued; the cache is now empty
---- PASS: TestGoldenPathPassesAfterFlushAll (2.20s)
+--- PASS: TestGoldenPathPassesAfterFlushAll (2.26s)
 === RUN   TestReadinessDegradesWhenTheCacheIsUnreachable
-redis: 2026/09/21 04:36:50 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
-redis: 2026/09/21 04:36:51 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
-redis: 2026/09/21 04:36:51 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 05:41:16 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 05:41:16 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 05:41:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
 --- PASS: TestReadinessDegradesWhenTheCacheIsUnreachable (1.39s)
 === RUN   TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue
---- PASS: TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue (0.07s)
+--- PASS: TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue (0.12s)
 === RUN   TestClaimPlanDoesNotSortTheBacklog
     golden_test.go:1051: claim plan:
         [
@@ -97,171 +107,194 @@ redis: 2026/09/21 04:36:51 pool.go:762: redis: connection pool: failed to dial a
             }
           }
         ]
---- PASS: TestClaimPlanDoesNotSortTheBacklog (0.12s)
+--- PASS: TestClaimPlanDoesNotSortTheBacklog (0.23s)
 === RUN   TestClaimIndexExcludesTerminalRows
     golden_test.go:1070: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
---- PASS: TestClaimIndexExcludesTerminalRows (0.06s)
+--- PASS: TestClaimIndexExcludesTerminalRows (0.08s)
 === RUN   TestEnqueueRefusesAnUnboundedPayload
 === RUN   TestEnqueueRefusesAnUnboundedPayload/the_Go_error
 === RUN   TestEnqueueRefusesAnUnboundedPayload/a_raw_INSERT_is_rejected_by_the_database
 === RUN   TestEnqueueRefusesAnUnboundedPayload/an_oversized_kind_and_correlation_id_are_rejected
 === RUN   TestEnqueueRefusesAnUnboundedPayload/a_normal_payload_is_accepted
---- PASS: TestEnqueueRefusesAnUnboundedPayload (0.07s)
-    --- PASS: TestEnqueueRefusesAnUnboundedPayload/the_Go_error (0.01s)
+--- PASS: TestEnqueueRefusesAnUnboundedPayload (0.10s)
+    --- PASS: TestEnqueueRefusesAnUnboundedPayload/the_Go_error (0.02s)
     --- PASS: TestEnqueueRefusesAnUnboundedPayload/a_raw_INSERT_is_rejected_by_the_database (0.00s)
     --- PASS: TestEnqueueRefusesAnUnboundedPayload/an_oversized_kind_and_correlation_id_are_rejected (0.00s)
     --- PASS: TestEnqueueRefusesAnUnboundedPayload/a_normal_payload_is_accepted (0.00s)
 === RUN   TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob
---- PASS: TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob (0.27s)
+--- PASS: TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob (0.30s)
 === RUN   TestRetryLadderActuallyWalksTheLadder
-2026/09/21 04:36:52 WARN jobs: retrying site=default worker=ladder-worker job_id=01a0c31c-61c2-7e30-92b6-a651614ced13 kind=flaky correlation_id=ladder attempt=1 backoff=29.333141795s error=transient
-2026/09/21 04:36:52 WARN jobs: retrying site=default worker=ladder-worker job_id=01a0c31c-61c2-7e30-92b6-a651614ced13 kind=flaky correlation_id=ladder attempt=2 backoff=2m10.131464029s error=transient
-2026/09/21 04:36:52 ERROR jobs: exhausted attempts site=default worker=ladder-worker job_id=01a0c31c-61c2-7e30-92b6-a651614ced13 kind=flaky correlation_id=ladder attempts=3 error=transient
-2026/09/21 04:36:53 WARN jobs: claim failed site=default worker=ladder-worker error="context canceled"
---- PASS: TestRetryLadderActuallyWalksTheLadder (0.98s)
+2026/09/21 05:41:18 WARN jobs: retrying site=default worker=ladder-worker job_id=01a0c357-5f1b-7d32-8488-279a72c428c2 kind=flaky correlation_id=ladder attempt=1 backoff=28.093563417s error=transient
+2026/09/21 05:41:18 WARN jobs: retrying site=default worker=ladder-worker job_id=01a0c357-5f1b-7d32-8488-279a72c428c2 kind=flaky correlation_id=ladder attempt=2 backoff=1m52.458443275s error=transient
+2026/09/21 05:41:18 ERROR jobs: exhausted attempts site=default worker=ladder-worker job_id=01a0c357-5f1b-7d32-8488-279a72c428c2 kind=flaky correlation_id=ladder attempts=3 error=transient
+--- PASS: TestRetryLadderActuallyWalksTheLadder (1.00s)
 === RUN   TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
-2026/09/21 04:36:53 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
-2026/09/21 04:36:53 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
-2026/09/21 04:36:53 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
---- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.49s)
+2026/09/21 05:41:19 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
+2026/09/21 05:41:19 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+--- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.52s)
 === RUN   TestSitesIsASingleton
---- PASS: TestSitesIsASingleton (0.08s)
+--- PASS: TestSitesIsASingleton (0.12s)
 === RUN   TestAuditEventsRefusesAFullIPAddress
 === RUN   TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused
 === RUN   TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused
 === RUN   TestAuditEventsRefusesAFullIPAddress/uppercase_hex_is_refused
 === RUN   TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted
 === RUN   TestAuditEventsRefusesAFullIPAddress/null_is_accepted
---- PASS: TestAuditEventsRefusesAFullIPAddress (0.08s)
-    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused (0.00s)
+--- PASS: TestAuditEventsRefusesAFullIPAddress (0.14s)
+    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused (0.01s)
     --- PASS: TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused (0.00s)
     --- PASS: TestAuditEventsRefusesAFullIPAddress/uppercase_hex_is_refused (0.00s)
     --- PASS: TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted (0.01s)
     --- PASS: TestAuditEventsRefusesAFullIPAddress/null_is_accepted (0.00s)
 === RUN   TestAMultibyteErrorIsStoredInLastError
     golden_test.go:1531: stored 2014 bytes, valid UTF-8, redacted, message preserved
---- PASS: TestAMultibyteErrorIsStoredInLastError (0.18s)
+--- PASS: TestAMultibyteErrorIsStoredInLastError (0.19s)
 === RUN   TestAWorkerWithAPlainHandlerLogsNoCredentials
-    golden_test.go:1685: 1664 log bytes across three branches, all seven credential classes absent
---- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.18s)
+    golden_test.go:1685: 1662 log bytes across three branches, all seven credential classes absent
+--- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.19s)
 === RUN   TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops
-    healthcheck_test.go:340: vizra healthcheck api [] -> exit 0 in 1.007s
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 9ms)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 9ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 0s)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 9ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 9ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
-          stderr: 
-    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 1 in 9ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:61726/readyz, 0s)
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 1 in 11ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:61726/readyz, 0s)
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 1 in 14ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:61726/readyz, 3ms)
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 0 in 19ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 10ms)
           stderr: 
     healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 10ms
-          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:60023/readyz, 1ms)
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 11ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 10ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 10ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 10ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 12ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 13ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 9ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:61726/readyz, 1ms)
           stderr: 
     healthcheck_test.go:346: vizra healthcheck api [] -> exit 1 in 10ms
-          stdout:   stderr: vizra healthcheck api: NOT READY — HTTP 503 unavailable (127.0.0.1:60023/readyz, 2ms)
---- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops (10.22s)
+          stdout:   stderr: vizra healthcheck api: NOT READY — HTTP 503 unavailable (127.0.0.1:61726/readyz, 2ms)
+--- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops (3.00s)
 === RUN   TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent
     healthcheck_test.go:365: vizra healthcheck api [--timeout=2s] -> exit 1 in 9ms
-          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:60063/readyz, 0s)
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:61753/readyz, 0s)
 --- PASS: TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent (0.01s)
 === RUN   TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops
-    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 7ms
-          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:60069/readyz, 0s)
-    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 15ms
-          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:60069/readyz, 0s)
-    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 0 in 11ms
-          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:60069/readyz, 2ms)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 9ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:61758/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 14ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:61758/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 0 in 12ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:61758/readyz, 3ms)
           stderr: 
     healthcheck_test.go:403: vizra healthcheck worker [] -> exit 1 in 10ms
-          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:60069/readyz, 1ms)
---- PASS: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops (0.64s)
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:61758/readyz, 1ms)
+--- PASS: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops (0.65s)
 === RUN   TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine
-    healthcheck_test.go:447: vizra healthcheck worker [] -> exit 0 in 9ms
-          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:60079/readyz, 1ms)
+    healthcheck_test.go:447: vizra healthcheck worker [] -> exit 0 in 13ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:61769/readyz, 2ms)
           stderr: 
-2026/09/21 04:37:05 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
-    healthcheck_test.go:467: vizra healthcheck worker [] -> exit 1 in 10ms
-          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:60079/readyz, 2ms)
---- PASS: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine (2.10s)
+2026/09/21 05:41:24 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+2026/09/21 05:41:24 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+2026/09/21 05:41:24 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+2026/09/21 05:41:24 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+2026/09/21 05:41:24 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+2026/09/21 05:41:24 WARN jobs: claim failed site=default worker=stall-test error="context canceled"
+    healthcheck_test.go:467: vizra healthcheck worker [] -> exit 1 in 11ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:61769/readyz, 2ms)
+--- PASS: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine (2.14s)
 === RUN   TestHealthcheckUsageErrorsAreDistinctFromAVerdict
---- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict (0.01s)
+--- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict (0.02s)
 === RUN   TestOwnerClaimCreatesExactlyOneOwnerAndConsumesTheToken
---- PASS: TestOwnerClaimCreatesExactlyOneOwnerAndConsumesTheToken (0.36s)
+--- PASS: TestOwnerClaimCreatesExactlyOneOwnerAndConsumesTheToken (0.48s)
 === RUN   TestClaimStatusRevealsOnlyTheClaimedBit
---- PASS: TestClaimStatusRevealsOnlyTheClaimedBit (0.34s)
+--- PASS: TestClaimStatusRevealsOnlyTheClaimedBit (0.51s)
 === RUN   TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation
 === RUN   TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/read_committed
 === RUN   TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/repeatable_read
 === RUN   TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable
---- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation (2.34s)
-    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/read_committed (0.77s)
-    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/repeatable_read (0.77s)
-    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable (0.80s)
+--- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation (13.22s)
+    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/read_committed (4.25s)
+    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/repeatable_read (4.50s)
+    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable (4.47s)
 === RUN   TestASecondLiveOwnerIsRefusedByTheDatabase
---- PASS: TestASecondLiveOwnerIsRefusedByTheDatabase (0.08s)
+--- PASS: TestASecondLiveOwnerIsRefusedByTheDatabase (0.15s)
 === RUN   TestATombstonedOwnerDoesNotPermanentlyBlockOwnership
---- PASS: TestATombstonedOwnerDoesNotPermanentlyBlockOwnership (0.08s)
+--- PASS: TestATombstonedOwnerDoesNotPermanentlyBlockOwnership (0.16s)
 === RUN   TestCaseVariantUsernameAndEmailAreRejectedAsDuplicates
---- PASS: TestCaseVariantUsernameAndEmailAreRejectedAsDuplicates (0.07s)
+--- PASS: TestCaseVariantUsernameAndEmailAreRejectedAsDuplicates (0.13s)
 === RUN   TestASecondPasswordCredentialForOneUserIsRefused
---- PASS: TestASecondPasswordCredentialForOneUserIsRefused (0.35s)
+--- PASS: TestASecondPasswordCredentialForOneUserIsRefused (0.58s)
 === RUN   TestTokenSingletonAndTerminalStateChecks
---- PASS: TestTokenSingletonAndTerminalStateChecks (0.08s)
+--- PASS: TestTokenSingletonAndTerminalStateChecks (0.14s)
 === RUN   TestOwnerIndexNameMatchesTheMapper
---- PASS: TestOwnerIndexNameMatchesTheMapper (0.07s)
+--- PASS: TestOwnerIndexNameMatchesTheMapper (0.13s)
 === RUN   TestUserRoleEnumOrderMatchesAuthzRanking
---- PASS: TestUserRoleEnumOrderMatchesAuthzRanking (0.06s)
+--- PASS: TestUserRoleEnumOrderMatchesAuthzRanking (0.14s)
 === RUN   TestAuditEventsCannotBeUpdatedOrDeleted
---- PASS: TestAuditEventsCannotBeUpdatedOrDeleted (0.07s)
+--- PASS: TestAuditEventsCannotBeUpdatedOrDeleted (0.14s)
 === RUN   TestAuditEventsCannotBeTruncated
---- PASS: TestAuditEventsCannotBeTruncated (0.06s)
+--- PASS: TestAuditEventsCannotBeTruncated (0.14s)
 === RUN   TestAUserWithAuditRowsCannotBeDeleted
---- PASS: TestAUserWithAuditRowsCannotBeDeleted (0.33s)
+--- PASS: TestAUserWithAuditRowsCannotBeDeleted (0.61s)
 === RUN   TestOwnerClaimAuditEventsCarryNoSecretMaterial
---- PASS: TestOwnerClaimAuditEventsCarryNoSecretMaterial (0.35s)
+--- PASS: TestOwnerClaimAuditEventsCarryNoSecretMaterial (0.59s)
 === RUN   TestOwnerClaimRejectsAReusedToken
---- PASS: TestOwnerClaimRejectsAReusedToken (0.35s)
+--- PASS: TestOwnerClaimRejectsAReusedToken (0.56s)
 === RUN   TestOwnerClaimRejectsASupersededOrExpiredToken
---- PASS: TestOwnerClaimRejectsASupersededOrExpiredToken (0.34s)
+--- PASS: TestOwnerClaimRejectsASupersededOrExpiredToken (0.18s)
 === RUN   TestARestartDoesNotInvalidateALiveToken
---- PASS: TestARestartDoesNotInvalidateALiveToken (0.34s)
+--- PASS: TestARestartDoesNotInvalidateALiveToken (0.65s)
 === RUN   TestBootMintsOnlyUnderTheStderrOptIn
---- PASS: TestBootMintsOnlyUnderTheStderrOptIn (0.07s)
+--- PASS: TestBootMintsOnlyUnderTheStderrOptIn (0.14s)
 === RUN   TestBootSupersedesALeftoverTokenOnAClaimedInstance
---- PASS: TestBootSupersedesALeftoverTokenOnAClaimedInstance (0.08s)
+--- PASS: TestBootSupersedesALeftoverTokenOnAClaimedInstance (0.17s)
 === RUN   TestClaimTokenCLIRefusesOnAClaimedInstance
---- PASS: TestClaimTokenCLIRefusesOnAClaimedInstance (0.06s)
+--- PASS: TestClaimTokenCLIRefusesOnAClaimedInstance (0.15s)
 === RUN   TestClaimWithNoMintedTokenIsIndistinguishableFromAWrongToken
---- PASS: TestClaimWithNoMintedTokenIsIndistinguishableFromAWrongToken (0.15s)
+--- PASS: TestClaimWithNoMintedTokenIsIndistinguishableFromAWrongToken (0.34s)
 === RUN   TestClaimRefusesANonJSONContentType
---- PASS: TestClaimRefusesANonJSONContentType (0.33s)
+--- PASS: TestClaimRefusesANonJSONContentType (0.67s)
 === RUN   TestClaimRefusesAnUnknownField
---- PASS: TestClaimRefusesAnUnknownField (0.07s)
+--- PASS: TestClaimRefusesAnUnknownField (0.15s)
 === RUN   TestClaimRefusesAnEmptyBody
---- PASS: TestClaimRefusesAnEmptyBody (0.06s)
+--- PASS: TestClaimRefusesAnEmptyBody (0.15s)
 === RUN   TestClaimBodyLimitAppliesToAChunkedRequest
---- PASS: TestClaimBodyLimitAppliesToAChunkedRequest (0.06s)
+--- PASS: TestClaimBodyLimitAppliesToAChunkedRequest (0.14s)
 === RUN   TestClaimRefusesACrossOriginRequest
---- PASS: TestClaimRefusesACrossOriginRequest (0.06s)
+--- PASS: TestClaimRefusesACrossOriginRequest (0.14s)
 === RUN   TestClaimAcceptsAHeaderlessCLIRequest
---- PASS: TestClaimAcceptsAHeaderlessCLIRequest (0.32s)
+--- PASS: TestClaimAcceptsAHeaderlessCLIRequest (0.65s)
 === RUN   TestClaimAcceptsTheConfiguredOrigin
---- PASS: TestClaimAcceptsTheConfiguredOrigin (0.34s)
+--- PASS: TestClaimAcceptsTheConfiguredOrigin (0.77s)
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings/exactly_the_configured_value
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings/trailing_slash
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings/uppercased
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings/trailing_dot_on_the_host
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings/a_genuinely_different_host
+=== RUN   TestOriginsAreComparedNormalisedNotAsStrings/a_different_scheme
+--- PASS: TestOriginsAreComparedNormalisedNotAsStrings (2.68s)
+    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/exactly_the_configured_value (0.67s)
+    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/trailing_slash (0.69s)
+    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/uppercased (0.59s)
+    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/trailing_dot_on_the_host (0.53s)
+    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/a_genuinely_different_host (0.11s)
+    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/a_different_scheme (0.10s)
 === RUN   TestMalformedFieldsYield400AndDoNotConsumeTheToken
 === RUN   TestMalformedFieldsYield400AndDoNotConsumeTheToken/short_username
 === RUN   TestMalformedFieldsYield400AndDoNotConsumeTheToken/leading_hyphen
@@ -271,7 +304,7 @@ redis: 2026/09/21 04:36:51 pool.go:762: redis: connection pool: failed to dial a
 === RUN   TestMalformedFieldsYield400AndDoNotConsumeTheToken/11-character_password
 === RUN   TestMalformedFieldsYield400AndDoNotConsumeTheToken/257-character_password
 === RUN   TestMalformedFieldsYield400AndDoNotConsumeTheToken/1_KiB_of_astral_characters
---- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken (0.33s)
+--- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken (0.52s)
     --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/short_username (0.00s)
     --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/leading_hyphen (0.00s)
     --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/31_characters (0.00s)
@@ -281,41 +314,84 @@ redis: 2026/09/21 04:36:51 pool.go:762: redis: connection pool: failed to dial a
     --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/257-character_password (0.00s)
     --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/1_KiB_of_astral_characters (0.00s)
 === RUN   TestNoPasswordHashingOccursWithoutAValidToken
---- PASS: TestNoPasswordHashingOccursWithoutAValidToken (0.10s)
+--- PASS: TestNoPasswordHashingOccursWithoutAValidToken (0.15s)
+=== RUN   TestACorrectButDeadTokenCostsNoDerivation
+=== RUN   TestACorrectButDeadTokenCostsNoDerivation/expired
+=== RUN   TestACorrectButDeadTokenCostsNoDerivation/consumed
+=== RUN   TestACorrectButDeadTokenCostsNoDerivation/superseded
+--- PASS: TestACorrectButDeadTokenCostsNoDerivation (0.44s)
+    --- PASS: TestACorrectButDeadTokenCostsNoDerivation/expired (0.13s)
+    --- PASS: TestACorrectButDeadTokenCostsNoDerivation/consumed (0.14s)
+    --- PASS: TestACorrectButDeadTokenCostsNoDerivation/superseded (0.16s)
 === RUN   TestClaimTokenIsStoredOnlyAsASHA256Digest
---- PASS: TestClaimTokenIsStoredOnlyAsASHA256Digest (0.06s)
+--- PASS: TestClaimTokenIsStoredOnlyAsASHA256Digest (0.15s)
 === RUN   TestOwnerClaimTokenNeverReachesTheStructuredLogOrAResponse
---- PASS: TestOwnerClaimTokenNeverReachesTheStructuredLogOrAResponse (0.31s)
+--- PASS: TestOwnerClaimTokenNeverReachesTheStructuredLogOrAResponse (0.59s)
 === RUN   TestAValidTokenIsNeverRateLimitedByTheFailureLimiter
---- PASS: TestAValidTokenIsNeverRateLimitedByTheFailureLimiter (0.41s)
+--- PASS: TestAValidTokenIsNeverRateLimitedByTheFailureLimiter (0.71s)
 === RUN   TestARateLimitedClaimWritesNoAuditRow
---- PASS: TestARateLimitedClaimWritesNoAuditRow (0.19s)
+--- PASS: TestARateLimitedClaimWritesNoAuditRow (1.34s)
 === RUN   TestForwardedHeaderWithoutTrustedProxyYieldsNullIPPrefix
---- PASS: TestForwardedHeaderWithoutTrustedProxyYieldsNullIPPrefix (0.07s)
+--- PASS: TestForwardedHeaderWithoutTrustedProxyYieldsNullIPPrefix (0.14s)
 === RUN   TestOwnerClaimSucceedsFromIPv6Loopback
 === RUN   TestOwnerClaimSucceedsFromIPv6Loopback/[::1]:8080
 === RUN   TestOwnerClaimSucceedsFromIPv6Loopback/[::]:8080
 === RUN   TestOwnerClaimSucceedsFromIPv6Loopback/127.0.0.1:8080
 === RUN   TestOwnerClaimSucceedsFromIPv6Loopback/[::ffff:127.0.0.1]:8080
 === RUN   TestOwnerClaimSucceedsFromIPv6Loopback/garbage
---- PASS: TestOwnerClaimSucceedsFromIPv6Loopback (1.67s)
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::1]:8080 (0.32s)
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::]:8080 (0.33s)
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/127.0.0.1:8080 (0.34s)
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::ffff:127.0.0.1]:8080 (0.34s)
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/garbage (0.34s)
-=== RUN   TestOwnerInsertConflictMapsTo409NotFiveHundred
---- PASS: TestOwnerInsertConflictMapsTo409NotFiveHundred (0.09s)
+--- PASS: TestOwnerClaimSucceedsFromIPv6Loopback (2.72s)
+    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::1]:8080 (0.53s)
+    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::]:8080 (0.54s)
+    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/127.0.0.1:8080 (0.58s)
+    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::ffff:127.0.0.1]:8080 (0.52s)
+    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/garbage (0.54s)
+=== RUN   TestAClaimAgainstAnOutOfBandOwnerIs409NotFiveHundred
+--- PASS: TestAClaimAgainstAnOutOfBandOwnerIs409NotFiveHundred (0.14s)
 === RUN   TestMintTimestampsComeFromTheDatabaseClock
---- PASS: TestMintTimestampsComeFromTheDatabaseClock (0.06s)
+--- PASS: TestMintTimestampsComeFromTheDatabaseClock (0.11s)
 === RUN   TestAClaimSucceedsWhileTheCacheIsStopped
-redis: 2026/09/21 04:37:18 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
-redis: 2026/09/21 04:37:18 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
-redis: 2026/09/21 04:37:19 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
---- PASS: TestAClaimSucceedsWhileTheCacheIsStopped (1.63s)
+redis: 2026/09/21 05:41:58 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 05:41:58 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/21 05:41:59 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+--- PASS: TestAClaimSucceedsWhileTheCacheIsStopped (1.78s)
 === RUN   TestUnclaimedInstanceRefusesEveryNonAllowlistedRoute
---- PASS: TestUnclaimedInstanceRefusesEveryNonAllowlistedRoute (0.33s)
+--- PASS: TestUnclaimedInstanceRefusesEveryNonAllowlistedRoute (0.52s)
 === RUN   TestEmailFoldIsProducedByPostgresOnEveryPath
---- PASS: TestEmailFoldIsProducedByPostgresOnEveryPath (0.33s)
+--- PASS: TestEmailFoldIsProducedByPostgresOnEveryPath (0.53s)
+=== RUN   TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail
+--- PASS: TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail (0.59s)
+=== RUN   TestNoConnectionIsHeldWhileHashing
+--- PASS: TestNoConnectionIsHeldWhileHashing (0.52s)
+=== RUN   TestConcurrentBootsMintExactlyOneToken
+--- PASS: TestConcurrentBootsMintExactlyOneToken (0.86s)
+=== RUN   TestMintIsRefusedByTheDatabaseOnAClaimedInstance
+--- PASS: TestMintIsRefusedByTheDatabaseOnAClaimedInstance (0.11s)
+=== RUN   TestASupersedingRemintRecordsTheGenerationItKilled
+--- PASS: TestASupersedingRemintRecordsTheGenerationItKilled (0.14s)
+=== RUN   TestOwnerClaimAnswers503WhenTheDatabaseIsDown
+2026/09/21 05:42:02 ERROR http: request failed error="the instance state could not be read" request_id=01a0c358-0dcd-7543-bb8a-8a158be67483 path=/api/v1/setup/claim-owner method=POST
+--- PASS: TestOwnerClaimAnswers503WhenTheDatabaseIsDown (0.09s)
+=== RUN   TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed
+--- PASS: TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed (0.11s)
+=== RUN   TestClaimStatusIsBoundedByTheHardCeiling
+--- PASS: TestClaimStatusIsBoundedByTheHardCeiling (0.40s)
+=== RUN   TestUsersOneOwnerFiresThroughTheHandler
+--- PASS: TestUsersOneOwnerFiresThroughTheHandler (0.88s)
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/plaintext
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/bcrypt
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/scrypt
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/argon2i,_the_wrong_variant
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/sha256_hex
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/empty-ish
+=== RUN   TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/a_near_miss
+--- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret (0.12s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/plaintext (0.00s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/bcrypt (0.00s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/scrypt (0.00s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/argon2i,_the_wrong_variant (0.00s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/sha256_hex (0.00s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/empty-ish (0.00s)
+    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/a_near_miss (0.00s)
 PASS
-ok  	github.com/yegamble/vizra-core/internal/integration	34.328s
+ok  	github.com/yegamble/vizra-core/internal/integration	64.571s

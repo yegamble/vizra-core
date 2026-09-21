@@ -120,6 +120,8 @@ HND=internal/httpapi/setup.go
 LIM=internal/httpapi/setup_limits.go
 AUD=internal/audit/audit.go
 KEY=internal/config/keys.go
+CLI=cmd/vizra/claimtoken.go
+CFG=internal/config/config.go
 INT=./internal/integration/
 UNI_AUD=./internal/audit/
 UNI_API=./internal/httpapi/
@@ -144,22 +146,13 @@ run_case MUT-2b "drop the users_one_owner index entirely" \
 
 run_case MUT-16 "drop the explicit ReadCommitted TxOptions from the claim" \
   "$SVC" 'TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation' "$INT" \
-  perl -0pi -e 's/tx, err := pool\.BeginTx\(ctx, pgx\.TxOptions\{IsoLevel: pgx\.ReadCommitted\}\)\n\tif err != nil \{\n\t\treturn Result\{\}, fmt\.Errorf\("ownerclaim: beginning claim/tx, err := pool.Begin(ctx)\n\tif err != nil {\n\t\treturn Result{}, fmt.Errorf("ownerclaim: beginning claim/' "$SVC"
+  perl -0pi -e 's/\ttx, err := pool\.BeginTx\(ctx, pgx\.TxOptions\{IsoLevel: pgx\.ReadCommitted\}\)\n\tif err != nil \{\n\t\treturn Result\{\}, unavailable\("beginning claim", err\)/\ttx, err := pool.Begin(ctx)\n\tif err != nil {\n\t\treturn Result{}, unavailable("beginning claim", err)/' "$SVC"
 
 # --- the token ---------------------------------------------------------------
 run_case MUT-3 "store the raw token instead of its SHA-256 digest" \
   "$SVC" 'TestClaimTokenIsStoredOnlyAsASHA256Digest' "$INT" \
   perl -0pi -e 's/sum := sha256\.Sum256\(\[\]byte\(normalized\)\)\n\treturn sum\[:\]/return []byte(normalized + strings.Repeat("\\x00", 32-len(normalized)%32))[:32]/' "$SVC"
 
-EXTRA_RESTORE="internal/store/sqlcgen/"
-run_case MUT-6 "remove the expires_at predicate from the redeem" \
-  "$QRY" 'TestOwnerClaimRejectsASupersededOrExpiredToken' "$INT" \
-  bash -c "perl -0pi -e 's/\n       AND expires_at    > now\(\)//' $QRY && sqlc generate"
-EXTRA_RESTORE=""
-
-run_case MUT-14 "re-mint unconditionally at boot" \
-  "$ANN" 'TestARestartDoesNotInvalidateALiveToken' "$INT" \
-  perl -0pi -e 's/\tif state\.Live \{\n\t\tannounceCommand\(w, state\)\n\t\treturn BootOutcome\{Generation: state\.Generation\}, nil\n\t\}\n//' "$ANN"
 
 run_case MUT-5b "flip the announce default to stderr" \
   "$KEY" 'TestTheAnnounceDefaultIsOff' "$UNI_API" \
@@ -229,6 +222,76 @@ run_case MUT-27 "let the unclaimed guard fall through on a lookup error" \
   "$HND" 'TestClaimGuardReturns503WhenTheStateCannotBeRead' "$UNI_API" \
   perl -0pi -e 's/claimed, err := s\.instanceClaimed\(c\)\n\t\t\tif err != nil \{/claimed, err := s.instanceClaimed(c)\n\t\t\tif false \&\& err != nil {/' "$HND"
 
+# --- fix round 1: F1-F5, N-1..N-6 -------------------------------------------
+
+run_case MUT-17 "delete the users_one_owner case from the error mapper" \
+  "$HND" 'TestClaimErrorMapping' "$UNI_API" \
+  perl -0pi -e 's/case pgErr\.Code == "23505" && pgErr\.ConstraintName == "users_one_owner":/case false:/' "$HND"
+
+run_case MUT-11c "restore the per-request already_claimed audit row" \
+  "$HND" 'TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail' "$INT" \
+  perl -0pi -e 's/\tif claimed, fresh := s\.claimed\.get\(s\.deps\.Now\(\)\); fresh && claimed \{\n\t\treturn newCodedError\(http\.StatusConflict, "conflict", claimedMessage\)\n\t\}\n//' "$HND"
+
+run_case MUT-11d "audit every already-claimed refusal again" \
+  "$HND" 'TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail' "$INT" \
+  bash -c "perl -0pi -e 's/\tif claimed, fresh := s\\.claimed\\.get\\(s\\.deps\\.Now\\(\\)\\); fresh && claimed \\{\\n\\t\\treturn newCodedError\\(http\\.StatusConflict, \\\"conflict\\\", claimedMessage\\)\\n\\t\\}\\n//' $HND && perl -0pi -e 's/\t\ts\\.claimed\\.set\\(true, s\\.deps\\.Now\\(\\)\\)\\n\\t\\treturn newCodedError\\(http\\.StatusConflict, \\\"conflict\\\", claimedMessage\\)/\t\ts.recordClaimRefusal(c, audit.ReasonAlreadyClaimed)\\n\\t\\treturn newCodedError(http.StatusConflict, \\\"conflict\\\", claimedMessage)/' $HND"
+
+run_case MUT-29 "hash inside the claim transaction again" \
+  "$SVC" 'TestNoConnectionIsHeldWhileHashing' "$INT" \
+  perl -0pi -e 's/\thash, err := hasher\.Hash\(ctx, in\.Password\)\n\tif err != nil \{\n\t\treturn Result\{\}, err\n\t\}\n\n\tuserID/\tuserID/; s/\tcreated, err := qtx\.ClaimOwner\(ctx, sqlcgen\.ClaimOwnerParams\{/\thash, err := hasher.Hash(ctx, in.Password)\n\tif err != nil {\n\t\treturn Result{}, err\n\t}\n\tcreated, err := qtx.ClaimOwner(ctx, sqlcgen.ClaimOwnerParams{/' "$SVC"
+
+run_case MUT-31 "remove the liveness pre-check before hashing" \
+  "$SVC" 'TestACorrectButDeadTokenCostsNoDerivation' "$INT" \
+  perl -0pi -e 's/\tif row\.Live == nil \|\| !\*row\.Live \{\n\t\treturn Result\{\}, ErrTokenNotAccepted\n\t\}\n//' "$SVC"
+
+run_case MUT-14b "move the liveness decision back outside the advisory lock" \
+  "$SVC" 'TestConcurrentBootsMintExactlyOneToken' "$INT" \
+  perl -0pi -e 's/\tif onlyIfNoLiveToken && prior\.Live \{\n\t\treturn "", prior\.Generation, ErrLiveTokenExists\n\t\}\n//' "$SVC"
+
+EXTRA_RESTORE="internal/store/sqlcgen/"
+run_case MUT-32 "drop the users guard from the mint statement" \
+  "$QRY" 'TestMintIsRefusedByTheDatabaseOnAClaimedInstance' "$INT" \
+  bash -c "perl -0pi -e 's/\n WHERE NOT EXISTS \(SELECT 1 FROM users\)//' $QRY && sqlc generate"
+EXTRA_RESTORE=""
+
+run_case MUT-28 "delete the ErrUnavailable branch from the error mapper" \
+  "$HND" 'TestClaimErrorMapping' "$UNI_API" \
+  perl -0pi -e 's/\tcase errors\.Is\(err, ownerclaim\.ErrUnavailable\):/\tcase false:/' "$HND"
+
+run_case MUT-30 "stamp minted_at from the application clock" \
+  "$MIG" 'TestMintTimestampsComeFromTheDatabaseClock' "$INT" \
+  perl -0pi -e "s/    minted_at     timestamptz NOT NULL DEFAULT now\(\),/    minted_at     timestamptz NOT NULL DEFAULT (now() - interval '3 seconds'),/" "$MIG"
+
+run_case MUT-33 "serve claim-status from the uncached path again" \
+  "$HND" 'TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed' "$INT" \
+  perl -0pi -e 's/\tclaimed, err := s\.instanceClaimed\(c\)\n\tif err != nil \{\n\t\treturn newCodedError\(http\.StatusServiceUnavailable, "unavailable",\n\t\t\t"the instance state could not be read"\)\n\t\}\n\ts\.claimed\.set/\tclaimed, err := s.lookupClaimed(c)\n\tif err != nil {\n\t\treturn newCodedError(http.StatusServiceUnavailable, "unavailable",\n\t\t\t"the instance state could not be read")\n\t}\n\ts.claimed.set/' "$HND"
+
+run_case MUT-34 "take the hard ceiling off the claim-status route" \
+  "$HND" 'TestClaimStatusIsBoundedByTheHardCeiling' "$INT" \
+  perl -0pi -e 's/\tif !s\.allowClaimRequest\(c\) \{\n\t\treturn newCodedError\(http\.StatusTooManyRequests, "rate_limited",\n\t\t\t"too many requests to the setup endpoint; try again shortly"\)\n\t\}\n\t\/\/ instanceClaimed, not lookupClaimed/\t\/\/ instanceClaimed, not lookupClaimed/' "$HND"
+
+run_case MUT-35 "compare origins as raw strings again" \
+  "$HND" 'TestOriginsAreComparedNormalisedNotAsStrings' "$INT" \
+  perl -0pi -e 's/\t\tconfig\.NormalizeOrigin\(origin\) != config\.NormalizeOrigin\(want\) \{/\t\torigin != want {/' "$HND"
+
+# --- verifier findings V1-V10 ----------------------------------------------
+
+run_case MUT-37 "print the claim token to stderr as well as stdout" \
+  "$CLI" 'TestClaimTokenCLIOnAnUnclaimedInstance' "$INT" \
+  perl -0pi -e 's/\tfmt\.Println\(raw\)/\tfmt.Fprintln(os.Stderr, raw)\n\tfmt.Println(raw)/' "$CLI"
+
+run_case MUT-38 "loosen credentials_password_is_argon2id to accept anything" \
+  "$MIG" 'TestTheCredentialsCheckRefusesEveryNonArgon2idSecret' "$INT" \
+  perl -0pi -e "s/kind <> 'password' OR secret LIKE '\\\$argon2id\\\$%'/kind <> 'password' OR secret LIKE '%'/" "$MIG"
+
+run_case MUT-39 "audit every rate-limited request instead of the transition" \
+  "$HND" 'TestARateLimitedClaimWritesNoAuditRow' "$INT" \
+  perl -0pi -e 's/\t\tif s\.claimLimitTransition\(c\) \{\n\t\t\ts\.recordClaimRateLimited\(c, "failure"\)\n\t\t\}/\t\ts.recordClaimRateLimited(c, "failure")/' "$HND"
+
+run_case MUT-40 "normalise the configured origin but not the request's" \
+  "$CFG" 'TestLoadStoresTheNormalisedPublicOrigin' "./internal/config/" \
+  perl -0pi -e 's/\t\tc\.PublicOrigin = n\n/\t\t_ = n\n/' "$CFG"
+
 rule "REVIEW-ONLY PROPERTIES (no mutation here turns a test red)"
 cat <<'NOTE'
 Stated rather than implied, because a mutation matrix that quietly omits these
@@ -240,6 +303,31 @@ would overclaim:
   MUT-4b passing the PRESENTED digest rather than the row's own digest to the
          redeem statement. Identical results today; the property is defence
          against a future index-probing change. Code review owns it.
+
+  MUT-36 flipping `refuseIfUsersExist` to false in `vizra claim-token` — the S-12
+         escalation path the verifier found unobserved. MEASURED: it no longer
+         reddens anything, and the reason is the fix N-6/F-2 asked for.
+         `MintOwnerClaimToken` now carries
+         `WHERE NOT EXISTS (SELECT 1 FROM users)`, so the STATEMENT refuses the
+         mint and the CLI still exits non-zero with nothing minted. The scored
+         proof of that guard is MUT-32, whose test
+         (TestMintIsRefusedByTheDatabaseOnAClaimedInstance) calls the generated
+         query directly, bypassing every Go-side check. The Go flag is now
+         redundancy in front of a database guarantee — which is the right way
+         round, and better than the first round where neither existed.
+
+  MUT-6  dropping `expires_at > now()` from the redeem CTE. MEASURED: since the
+         liveness pre-check landed (MUT-31), a correct-but-EXPIRED token is
+         refused in Go before the CTE is reached, so removing the CTE predicate
+         no longer reddens anything. The CTE guard remains the enforcement of
+         record — the pre-check is an optimisation in front of it, and a race
+         that expires a token between the two is still caught by the CTE. Both
+         are kept; only one is observable, and this says which.
+
+  MUT-14 re-minting unconditionally at boot. The decision it targeted MOVED into
+         Mint, under the advisory lock, which is the whole point of the fix —
+         MUT-14b mutates it in its new home and reddens
+         TestConcurrentBootsMintExactlyOneToken.
 
   MUT-1c dropping `superseded_at IS NULL` from the redeem CTE. MEASURED: no
          test goes red, and the reason is structural rather than a gap. A
@@ -256,9 +344,14 @@ would overclaim:
          raises 23505 on users_one_owner instead of matching no row, and the
          error mapper turns that into the same 409 the guard would have
          produced. Exactly one owner still exists and no 5xx is returned, so
-         there is nothing for a test to observe. The index is proven by MUT-2b
-         and the mapper by MUT-17; the row guard's own contribution is
-         redundancy, and saying so is worth more than a test that pretends.
+         there is nothing for a test to observe. The index is proven by MUT-2b,
+         by TestUsersOneOwnerFiresThroughTheHandler (which forces 23505 through
+         the real handler with an uncommitted concurrent insert), and the mapper
+         by MUT-17 — which only reddens because TestClaimErrorMapping pins the
+         MESSAGE: both 23505 branches answer 409/conflict, so a status-and-code
+         assertion alone left that mutation green. The row guard's own
+         contribution is redundancy, and saying so is worth more than a test
+         that pretends.
 NOTE
 
 rule "SUMMARY"

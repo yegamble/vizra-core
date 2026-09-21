@@ -2,6 +2,7 @@ package ownerclaim
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -71,6 +72,9 @@ func Boot(ctx context.Context, pool *pgxpool.Pool, mode string, ttl time.Duratio
 		return BootOutcome{Claimed: true, Superseded: n > 0}, nil
 	}
 
+	// The liveness decision is NOT taken here. It is taken inside Mint, under the
+	// advisory lock, because two replicas reading it here would both observe "no
+	// live token" and both mint. State is read only for what to PRINT.
 	state, err := State(ctx, q)
 	if err != nil {
 		return BootOutcome{Degraded: true}, fmt.Errorf("ownerclaim: reading token state: %w", err)
@@ -80,12 +84,15 @@ func Boot(ctx context.Context, pool *pgxpool.Pool, mode string, ttl time.Duratio
 		announceCommand(w, state)
 		return BootOutcome{Generation: state.Generation}, nil
 	}
-	if state.Live {
-		announceCommand(w, state)
-		return BootOutcome{Generation: state.Generation}, nil
-	}
 
-	raw, generation, err := Mint(ctx, pool, ttl, false)
+	raw, generation, err := Mint(ctx, pool, ttl, false, true)
+	if errors.Is(err, ErrLiveTokenExists) {
+		// Another replica won the lock, or a token from an earlier boot is still
+		// live. Announce the command and the live generation; never a credential,
+		// and never a second one.
+		announceCommand(w, TokenState{Exists: true, Live: true, Generation: generation})
+		return BootOutcome{Generation: generation}, nil
+	}
 	if err != nil {
 		return BootOutcome{Degraded: true}, err
 	}

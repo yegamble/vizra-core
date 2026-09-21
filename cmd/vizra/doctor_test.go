@@ -31,6 +31,7 @@ var everyCheckDoctorMustReport = []string{
 	"database version",
 	"schema",
 	"owner claim",
+	"public origin",
 	"cache",
 	"cache version floor",
 	"search",

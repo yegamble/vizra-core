@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/yegamble/vizra-core/internal/credential"
 )
 
 const migrationPath = "../../migrations/0005_users_credentials_owner_claim.up.sql"
@@ -17,10 +19,12 @@ func testPassphrase() string {
 	return strings.Join([]string{"correct", "horse", "battery", "staple", "xyzzy"}, "-")
 }
 
-// Mirrored from internal/credential so the implication test reads clearly.
+// The REAL constants, not mirrored literals. Mirroring them meant raising
+// credential.MaxPasswordRunes would not have tripped the implication guard
+// below — the guard would have kept checking the old numbers.
 const (
-	credentialMaxRunes = 256
-	credentialMaxBytes = 1024
+	credentialMaxRunes = credential.MaxPasswordRunes
+	credentialMaxBytes = credential.MaxPasswordBytes
 )
 
 // TestValidatorsMatchTheMigration is the guard behind "no input the OpenAPI

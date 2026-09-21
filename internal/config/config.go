@@ -291,6 +291,17 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		bad("VIZRA_PUBLIC_ORIGIN", "must not carry a path")
 	} else if production && u.Scheme == "http" && !c.AllowInsecureOrigin {
 		bad("VIZRA_PUBLIC_ORIGIN", "production refuses a plain-http origin; set VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN=true only behind a trusted TLS terminator")
+	} else if n := NormalizeOrigin(c.PublicOrigin); n == "" {
+		// Reached only for a shape url.Parse accepted but that cannot be compared
+		// with a browser's Origin — in practice a non-ASCII host.
+		bad("VIZRA_PUBLIC_ORIGIN", "must be comparable with a browser Origin header; write an internationalised host in its A-label (punycode) form, for example https://xn--80ak6aa92e.example")
+	} else {
+		// Store the NORMALISED origin: lowercased scheme and host, default port
+		// elided, trailing slash and trailing dot stripped. The Origin check is a
+		// value comparison, and normalising once at boot is what keeps a single
+		// trailing slash in .env from 403-ing every browser claim while curl
+		// still works.
+		c.PublicOrigin = n
 	}
 
 	// DSN and cache URL.

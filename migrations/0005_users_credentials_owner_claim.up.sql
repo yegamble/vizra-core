@@ -19,6 +19,13 @@
 -- out of the only privileged account on the instance. Generated columns make the
 -- divergence unrepresentable rather than merely detectable.
 --
+-- If the folding rule ever has to change, the generated expressions cannot be
+-- ALTERed in place — but an additive escape exists and is not matched by
+-- migrate-lint's destructive pattern:
+--     ALTER TABLE users ALTER COLUMN email_fold DROP EXPRESSION   (PostgreSQL 13+)
+-- followed by a backfill. Recorded so the next writer does not assume the column
+-- is frozen beyond recovery.
+--
 -- PASSWORD RULE (frozen here; M1-B inherits it).
 -- The password is hashed as the RAW UTF-8 BYTES of the submitted field, with NO
 -- Unicode normalisation, and is bounded in BYTES (<= 1024 octets) as well as in
@@ -67,6 +74,15 @@ CREATE TABLE users (
     -- The Go validator compiles THIS literal; a test reads this file's bytes and
     -- asserts the two are identical, so no input the API accepts can reach the
     -- CHECK and become a 500.
+    --
+    -- ASCII-ONLY IS A DECISION, not an oversight, and it is effectively forever:
+    -- widening it later needs an annotated-destructive CHECK swap. The username
+    -- appears in /u/{username} and is the account's public handle, where a
+    -- Unicode homograph is an impersonation primitive — two visually identical
+    -- handles owned by different people. `display_name` carries the Unicode
+    -- identity instead, which is where a global photo community needs it
+    -- (VZ-I18N-001). The trade is legibility of a URL-bearing identifier against
+    -- expressiveness of a display field, and it is taken knowingly.
     CONSTRAINT users_username_shape CHECK (username ~ '^[A-Za-z0-9][A-Za-z0-9_-]{2,29}$'),
     -- The bound is BYTES. JSON Schema maxLength counts characters, so a
     -- character bound alone would disagree with this CHECK on any non-ASCII

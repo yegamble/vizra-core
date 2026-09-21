@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/yegamble/vizra-core/internal/config"
@@ -129,29 +131,49 @@ func TestTheClaimedBitIsCachedMonotonically(t *testing.T) {
 // what the database returns. Before it existed, the only coverage for 23505->409
 // was a mutation of the SQL, which says nothing about the mapper.
 func TestClaimErrorMapping(t *testing.T) {
+	// wantMessage is asserted, not just the status and code. Without it, deleting
+	// the users_one_owner branch falls through to the generic 23505 branch, which
+	// also answers 409/conflict — so the mutation stayed GREEN and the
+	// operator-facing message for the two-owners case was unpinned.
 	cases := []struct {
-		name     string
-		err      error
-		wantCode int
-		wantName string
+		name        string
+		err         error
+		wantCode    int
+		wantName    string
+		wantMessage string
 	}{
-		{"already claimed", ownerclaim.ErrAlreadyClaimed, http.StatusConflict, "conflict"},
+		{"already claimed", ownerclaim.ErrAlreadyClaimed, http.StatusConflict, "conflict", claimedMessage},
 		{"two live owners", &pgconn.PgError{Code: "23505", ConstraintName: "users_one_owner"},
-			http.StatusConflict, "conflict"},
+			http.StatusConflict, "conflict", claimedMessage},
 		{"duplicate username", &pgconn.PgError{Code: "23505", ConstraintName: "users_username_fold_key"},
-			http.StatusConflict, "conflict"},
+			http.StatusConflict, "conflict", "that username or email address is already taken"},
 		{"duplicate email", &pgconn.PgError{Code: "23505", ConstraintName: "users_email_fold_key"},
-			http.StatusConflict, "conflict"},
+			http.StatusConflict, "conflict", "that username or email address is already taken"},
 		{"a CHECK the validator should have caught",
 			&pgconn.PgError{Code: "23514", ConstraintName: "users_email_shape"},
-			http.StatusBadRequest, "bad_request"},
-		{"hashing capacity exhausted", credentialBusy(), http.StatusServiceUnavailable, "unavailable"},
+			http.StatusBadRequest, "bad_request", "one of the submitted values is not acceptable"},
+		{"hashing capacity exhausted", credentialBusy(), http.StatusServiceUnavailable,
+			"unavailable", "the server is busy; try again shortly"},
+		// F1: a connection failure is NOT a *pgconn.PgError, so without the
+		// ErrUnavailable sentinel it falls through every branch to a 500 — on the
+		// one endpoint an operator cannot skip, with the contract promising 503.
+		{"database unreachable", fmt.Errorf("%w: beginning claim: %v",
+			ownerclaim.ErrUnavailable, &pgconn.ConnectError{}),
+			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
+		{"a bare network error wrapped as unavailable", fmt.Errorf("%w: dial: %v",
+			ownerclaim.ErrUnavailable, errors.New("connection refused")),
+			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			status, code := mapOnly(t, tc.err)
+			status, code, message := mapOnly(t, tc.err)
 			if status != tc.wantCode || code != tc.wantName {
 				t.Fatalf("%v mapped to %d/%s, want %d/%s", tc.err, status, code, tc.wantCode, tc.wantName)
+			}
+			if message != tc.wantMessage {
+				t.Fatalf("%v produced message %q, want %q — two branches answering the same "+
+					"status and code are only distinguishable by what the operator reads",
+					tc.err, message, tc.wantMessage)
 			}
 		})
 	}
@@ -162,9 +184,64 @@ func TestClaimErrorMapping(t *testing.T) {
 // endpoint an operator cannot skip.
 func TestNoClaimErrorMapsToAnUnhandledFiveHundred(t *testing.T) {
 	for _, code := range []string{"23505", "23514"} {
-		status, _ := mapOnly(t, &pgconn.PgError{Code: code, ConstraintName: "users_one_owner"})
+		status, _, _ := mapOnly(t, &pgconn.PgError{Code: code, ConstraintName: "users_one_owner"})
 		if status >= 500 {
 			t.Errorf("PgError %s became %d", code, status)
+		}
+	}
+	// 503 is a HANDLED answer, so the property is "nothing falls through to the
+	// generic internal_error", not "nothing is >= 500".
+	for _, err := range []error{
+		fmt.Errorf("%w: x", ownerclaim.ErrUnavailable),
+		ownerclaim.ErrAlreadyClaimed,
+		ownerclaim.ErrTokenNotAccepted,
+		credential.ErrBusy,
+	} {
+		status, code, _ := mapOnly(t, err)
+		if code == "internal_error" {
+			t.Errorf("%v fell through to an unhandled %d internal_error", err, status)
+		}
+	}
+}
+
+// TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs (F1).
+//
+// openapi-verify checks route<->operation and never status codes, so nothing
+// else stops the handler and the published contract drifting apart — which is
+// exactly how "database unreachable" came to answer 500 while the spec promised
+// 503, frozen for vizra-user's generated client.
+func TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs(t *testing.T) {
+	spec := loadSpec(t, specPath)
+	op := spec.Paths.Find("/api/v1/setup/claim-owner").Post
+	if op == nil {
+		t.Fatal("claimOwner is not in the contract")
+	}
+	declared := map[string]bool{}
+	for code := range op.Responses.Map() {
+		declared[code] = true
+	}
+
+	// Every status the handler can return, with where it is produced. A new
+	// branch that returns a status absent from this list fails the test, and so
+	// does a status declared in the spec that nothing produces.
+	produced := map[string]string{
+		"201": "handleClaimOwner success",
+		"400": "validation / decode",
+		"403": "token refused, origin_mismatch",
+		"409": "already claimed, duplicate identifier",
+		"413": "MaxBytesReader",
+		"415": "requireJSONContentType",
+		"429": "hard ceiling, failure budget",
+		"503": "ErrUnavailable, ErrBusy",
+	}
+	for code := range declared {
+		if _, ok := produced[code]; !ok {
+			t.Errorf("the contract declares %s for claimOwner but no handler path produces it", code)
+		}
+	}
+	for code, where := range produced {
+		if !declared[code] {
+			t.Errorf("the handler can return %s (%s) but the contract does not declare it", code, where)
 		}
 	}
 }
@@ -198,7 +275,7 @@ func credentialBusy() error { return credential.ErrBusy }
 
 // mapOnly drives the real mapper with a real request context and reports the
 // status and application code the client would see.
-func mapOnly(t *testing.T, err error) (int, string) {
+func mapOnly(t *testing.T, err error) (status int, code, message string) {
 	t.Helper()
 	s := newProbeServer(t, func(d *Deps) {
 		d.InstanceClaimed = func(context.Context) (bool, error) { return true, nil }
@@ -211,9 +288,9 @@ func mapOnly(t *testing.T, err error) (int, string) {
 	mapped := s.mapClaimError(c, err)
 	var ce *codedError
 	if errors.As(mapped, &ce) {
-		return ce.status, ce.code
+		return ce.status, ce.code, ce.message
 	}
-	return http.StatusInternalServerError, "internal_error"
+	return http.StatusInternalServerError, "internal_error", "an internal error occurred"
 }
 
 func errCode(body map[string]any) string {

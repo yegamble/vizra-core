@@ -108,8 +108,18 @@ type Querier interface {
 	// Used only to choose between 409 and 403 when ClaimOwner returns no row.
 	LiveOwnerExists(ctx context.Context) (bool, error)
 	// Mint or re-mint the single token row. Re-minting bumps the generation and
-	// clears both terminal columns, so exactly one token — the newest — is ever
-	// redeemable. Timestamps come from the database clock.
+	// overwrites the digest IN PLACE, so invalidation of the previous token is
+	// atomic and total: the old digest ceases to exist at commit, and no second copy
+	// of a credential verifier is retained at rest. Timestamps come from the
+	// database clock.
+	//
+	// WHERE NOT EXISTS (SELECT 1 FROM users) makes "never mint on a claimed
+	// instance" a property of the STATEMENT rather than of the callers that happen
+	// to check first. Both current callers do check — the CLI under the advisory
+	// lock, boot by branching earlier — so there is no live defect; but this slice's
+	// thesis is that an invariant of this class belongs in the database, and a
+	// future owner-transfer or re-claim route is exactly where a Go-only guard
+	// breaks. Zero rows -> pgx.ErrNoRows -> the caller's existing ErrHasUsers.
 	MintOwnerClaimToken(ctx context.Context, arg MintOwnerClaimTokenParams) (MintOwnerClaimTokenRow, error)
 	// Feeds vizra_jobs_oldest_queued_age_seconds, which readiness and doctor read
 	// against the Q-028 threshold.

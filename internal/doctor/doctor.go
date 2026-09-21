@@ -352,3 +352,36 @@ func CheckOwnerClaim(st OwnerClaimState) Result {
 			Detail: "unclaimed and no token is live; run `vizra claim-token` to mint one"}
 	}
 }
+
+// CheckPublicOrigin reports whether VIZRA_PUBLIC_ORIGIN is a form a browser's
+// Origin header can match.
+//
+// A wrong value here breaks the browser claim page with 403 `origin_mismatch`
+// while curl keeps working, on the first endpoint an operator touches — so it is
+// exactly the kind of misconfiguration doctor exists to name. The comparison is
+// now normalised, which removes the trailing-slash and letter-case traps
+// entirely; what remains worth reporting is the value actually in force and
+// whether it is plain http.
+//
+// It reports SKIP, never OK, when there is no configuration to check: doctor
+// never claims to have checked something it did not.
+func CheckPublicOrigin(raw, normalized string, production bool) Result {
+	const name = "public origin"
+	switch {
+	case raw == "":
+		return Result{Name: name, Status: StatusSkip, Detail: "no VIZRA_PUBLIC_ORIGIN is configured"}
+	case normalized == "":
+		return Result{Name: name, Status: StatusFail,
+			Detail: "VIZRA_PUBLIC_ORIGIN cannot be compared with a browser Origin header; " +
+				"write an internationalised host in its A-label (punycode) form"}
+	case raw != normalized:
+		return Result{Name: name, Status: StatusWarn,
+			Detail: fmt.Sprintf("configured as %q; browsers send %q, which is what the claim page is checked against",
+				raw, normalized)}
+	case strings.HasPrefix(normalized, "http://") && production:
+		return Result{Name: name, Status: StatusWarn,
+			Detail: normalized + " is plain http in production; the claim token would cross the network in clear"}
+	default:
+		return Result{Name: name, Status: StatusOK, Detail: normalized}
+	}
+}

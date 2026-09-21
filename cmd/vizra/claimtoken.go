@@ -44,7 +44,9 @@ func runClaimToken(args []string) error {
 	}
 	defer pools.Close()
 
-	raw, generation, err := ownerclaim.Mint(ctx, pools.Default(), cfg.OwnerClaimTTL, true)
+	raw, generation, err := // refuseIfUsersExist=true, onlyIfNoLiveToken=false: a deliberate re-mint
+		// must ALWAYS supersede, which is what makes this a usable recovery path.
+		ownerclaim.Mint(ctx, pools.Default(), cfg.OwnerClaimTTL, true, false)
 	if errors.Is(err, ownerclaim.ErrHasUsers) {
 		// Refusing here is a security decision, not tidiness. Minting on a
 		// claimed instance would manufacture a live owner-creating credential on

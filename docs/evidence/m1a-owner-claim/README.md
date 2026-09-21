@@ -34,6 +34,17 @@ tree would make the NEXT case's result meaningless. Both checks earned their
 place: the first caught MUT-27's stale pattern, and the second caught the
 harness restoring a mutated `.sql` file without the sqlc-generated Go beside it.
 
+### Fix round 1
+
+Seven blocking specialist findings were closed on top of the first head: the
+per-request `already_claimed` audit row, argon2id inside the claim transaction,
+the liveness pre-check, the mint liveness decision outside the advisory lock, a
+database outage answering 500 where the contract promises 503, two tests that
+could not go red, and the frozen migration text. Thirteen mutation cases were
+added, including the **MUT-17 this transcript previously cited without running**.
+Every `MUT-` id referenced anywhere in the repository is now either declared in
+`demonstrate.sh` or listed as review-only with its reason — audited, not assumed.
+
 **Three properties have no mutation that turns a test red, and are listed as
 review-only in `02-mutations.txt` rather than implied to be covered:** the
 constant-time token comparison, passing the row's own digest rather than the

@@ -40,6 +40,11 @@ WITH consumed AS (
      WHERE id
        AND token_sha256  = $1::bytea
        AND consumed_at   IS NULL
+       -- superseded_at is unreachable today: the only writer is a boot that
+       -- already found users, in which state Claim refuses before reading the
+       -- token. It is kept deliberately as DEFENCE IN DEPTH — it costs one
+       -- predicate and becomes live the moment a slice supersedes without
+       -- minting on an unclaimed instance.
        AND superseded_at IS NULL
        AND expires_at    > now()
     RETURNING generation
@@ -171,7 +176,8 @@ func (q *Queries) LiveOwnerExists(ctx context.Context) (bool, error) {
 
 const mintOwnerClaimToken = `-- name: MintOwnerClaimToken :one
 INSERT INTO owner_claim_tokens (id, token_sha256, generation, expires_at)
-VALUES (true, $1::bytea, 1, now() + $2::interval)
+SELECT true, $1::bytea, 1, now() + $2::interval
+ WHERE NOT EXISTS (SELECT 1 FROM users)
 ON CONFLICT (id) DO UPDATE
    SET token_sha256  = EXCLUDED.token_sha256,
        generation    = owner_claim_tokens.generation + 1,
@@ -194,8 +200,18 @@ type MintOwnerClaimTokenRow struct {
 }
 
 // Mint or re-mint the single token row. Re-minting bumps the generation and
-// clears both terminal columns, so exactly one token — the newest — is ever
-// redeemable. Timestamps come from the database clock.
+// overwrites the digest IN PLACE, so invalidation of the previous token is
+// atomic and total: the old digest ceases to exist at commit, and no second copy
+// of a credential verifier is retained at rest. Timestamps come from the
+// database clock.
+//
+// WHERE NOT EXISTS (SELECT 1 FROM users) makes "never mint on a claimed
+// instance" a property of the STATEMENT rather than of the callers that happen
+// to check first. Both current callers do check — the CLI under the advisory
+// lock, boot by branching earlier — so there is no live defect; but this slice's
+// thesis is that an invariant of this class belongs in the database, and a
+// future owner-transfer or re-claim route is exactly where a Go-only guard
+// breaks. Zero rows -> pgx.ErrNoRows -> the caller's existing ErrHasUsers.
 func (q *Queries) MintOwnerClaimToken(ctx context.Context, arg MintOwnerClaimTokenParams) (MintOwnerClaimTokenRow, error) {
 	row := q.db.QueryRow(ctx, mintOwnerClaimToken, arg.TokenSha256, arg.Ttl)
 	var i MintOwnerClaimTokenRow
