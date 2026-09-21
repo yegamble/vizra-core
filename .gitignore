@@ -9,3 +9,13 @@
 *.env
 env/*.env
 !.env.example
+
+# The fixture corpus (VZ-FOUND-007) is GENERATED, not committed: ADR-009 commits
+# the manifest, and a committed copy would make "the generator reproduces it
+# byte-identically" untestable, because the committed copy would be the thing
+# the check compared against. Run `make fixtures`.
+/testdata/fixtures/
+
+# The declared load corpus (VZ-OPS-007) is gigabytes of generated photographs
+# and belongs nowhere near git. Run `make load-corpus LOAD_CORPUS_OUT=...`.
+/testdata/load-corpus/

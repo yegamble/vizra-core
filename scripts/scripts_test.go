@@ -109,6 +109,11 @@ func TestCIRequiredGuardFixtures(t *testing.T) {
 
 		// The manifest is editable by the PR it gates.
 		{dir: "floor-deleted", wantFail: true, wantText: "missing"},
+		// VZ-FOUND-007: deleting the deterministic-corpus lane from the
+		// manifest must turn the floor red by name. Without that, a PR that
+		// moved the fixture bytes could drop the lane that would have noticed
+		// and every later media assertion would still report green.
+		{dir: "fixtures-floor-deleted", wantFail: true, wantText: "'fixtures' is missing"},
 		{dir: "floor-commented", wantFail: true, wantText: "commented out"},
 
 		// Every spelling of continue-on-error. The regex saw only the first.

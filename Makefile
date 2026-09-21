@@ -35,7 +35,7 @@ help: ## Show this help
 # ---------------------------------------------------------------------------
 
 .PHONY: ci
-ci: fmt-check vet lint-imports migrate-lint config-template-check openapi-verify sqlc-verify ci-guard test-race ## Everything ci-required runs
+ci: fmt-check vet lint-imports migrate-lint config-template-check openapi-verify sqlc-verify ci-guard fixtures-verify test-race ## Everything ci-required runs
 	@echo
 	@echo "make ci: all lanes passed"
 
@@ -103,6 +103,42 @@ sqlc-generate: ## Regenerate sqlc output
 ci-guard: ## The required-checks manifest floor, runner and action pinning
 	@echo "==> ci-guard"
 	@./scripts/ci-required-guard.sh
+
+# ---------------------------------------------------------------------------
+# Fixtures (VZ-FOUND-007, ADR-009)
+# ---------------------------------------------------------------------------
+#
+# The corpus is NOT committed; fixtures/manifest.json is. `make fixtures`
+# produces the twelve files from the pinned generator with nothing but a Go
+# toolchain — no libvips, no exiftool, no Docker — so an M1 slice can get the
+# bytes it needs in one command.
+
+.PHONY: fixtures
+fixtures: ## Generate the M0 fixture corpus into testdata/fixtures
+	@echo "==> fixtures"
+	@$(GO) run ./cmd/fixturegen -repo . generate
+
+.PHONY: fixtures-verify
+fixtures-verify: ## Regenerate the corpus and compare every byte against the committed manifest
+	@echo "==> fixtures-verify"
+	@$(GO) run ./cmd/fixturegen -repo . verify
+
+.PHONY: fixtures-manifest
+fixtures-manifest: ## Re-pin fixtures/manifest.json (ONLY when the corpus is meant to move)
+	@$(GO) run ./cmd/fixturegen -repo . manifest
+
+.PHONY: load-corpus
+load-corpus: ## Generate the DECLARED load corpus (VZ-OPS-007). Not committed, not in the manifest.
+	@echo "==> load-corpus"
+	@if [ -z "$${LOAD_CORPUS_OUT:-}" ]; then \
+	   echo "  FAIL  set LOAD_CORPUS_OUT to a directory with room for the corpus."; \
+	   echo "        e.g. make load-corpus LOAD_CORPUS_OUT=/var/tmp/vizra-load LOAD_CORPUS_COUNT=10000"; \
+	   exit 1; fi
+	@$(GO) run ./cmd/loadcorpusgen \
+	   -out "$$LOAD_CORPUS_OUT" \
+	   -count "$${LOAD_CORPUS_COUNT:-10000}" \
+	   -seed  "$${LOAD_CORPUS_SEED:-1}" \
+	   -mix   "$${LOAD_CORPUS_MIX:-12,8,4}"
 
 .PHONY: test
 test: ## Unit tests

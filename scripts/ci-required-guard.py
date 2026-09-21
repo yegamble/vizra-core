@@ -69,6 +69,13 @@ except ImportError:  # pragma: no cover - the CI image always has it
 #   cache-matrix  the permanent two-image Valkey/Redis-7.2 matrix. ADR-001 Q-004
 #                 makes it permanent precisely because no upstream guarantees
 #                 the compatibility it asserts.
+#   fixtures      the deterministic fixture corpus (VZ-FOUND-007, ADR-009).
+#                 Every M1 media assertion — upload validation, EXIF and
+#                 orientation handling, GPS stripping, derivative budgets,
+#                 decoder resource bounds — is compared against these exact
+#                 bytes. If the corpus stops being reproducible, every one of
+#                 those results becomes unfalsifiable while still looking
+#                 green, which is the worst failure mode this repository has.
 #   govulncheck   a known-vulnerable dependency set.
 #   docker-build  the release image, its digest-pinned base and its loader list.
 #
@@ -76,7 +83,7 @@ except ImportError:  # pragma: no cover - the CI image always has it
 # editing this file, which CODEOWNERS also protects, so the removal is visible
 # in review instead of hiding in a one-line manifest diff.
 # ---------------------------------------------------------------------------
-FLOOR_LANES = ["append-only", "build-test", "cache-matrix", "govulncheck", "docker-build"]
+FLOOR_LANES = ["append-only", "build-test", "cache-matrix", "fixtures", "govulncheck", "docker-build"]
 
 RUNNER = "ubuntu-24.04"
 SHA_PIN = re.compile(r"^[^@\s]+@[0-9a-f]{40}(\s|$)")

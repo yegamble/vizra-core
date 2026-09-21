@@ -21,7 +21,7 @@ It also owns three things the other repositories consume and must never edit:
 
 ```
 fmt-check  vet  lint-imports  migrate-lint  config-template-check
-openapi-verify  sqlc-verify  ci-guard  test-race
+openapi-verify  sqlc-verify  ci-guard  fixtures-verify  test-race
 ```
 
 A missing tool is a FAILURE, never a silent skip. `make sqlc-verify` without
@@ -82,6 +82,44 @@ decision it protects.
 | A requeue of a dead or exhausted job must reset `attempts` | the contract comment on `SweepExpiredLeases` (`store/queries/jobs.sql`), carried into the generated doc comment |
 | The internal search client never follows a redirect | `internal/search`, `TestARedirectIsNeverFollowedAndNoSignatureLeaks` |
 | Every route, including the 404 path, carries the hardening headers | `internal/httpapi`, `TestEveryRouteCarriesHardeningHeaders` |
+| The fixture corpus reproduces byte-identically from the pinned generator, and each fixture really carries the property it exists for | `make fixtures-verify` + the `fixtures` CI lane; `internal/fixtures`, `TestRemovingThePropertyAFixtureExistsForIsCaught` and `TestManifestDetectsEveryClassOfDrift` |
+| A fixture is never a downloaded photograph: every byte is synthesised | `NOTICE`, `TestCommittedCodecSourceIsGeneratorOutput`, and the "No image is fetched" step in `.github/workflows/fixtures.yml` |
+
+## Fixtures (VZ-FOUND-007, ADR-009)
+
+The twelve M0 fixtures are **generated, not committed**. `fixtures/manifest.json`
+is the committed artefact; `testdata/fixtures/` is gitignored.
+
+```
+make fixtures          # produce the corpus (needs only a Go toolchain)
+make fixtures-verify   # regenerate and compare every byte against the manifest
+make fixtures-manifest # RE-PIN the manifest: only when the corpus is meant to move
+make load-corpus LOAD_CORPUS_OUT=/var/tmp/vizra-load   # the DECLARED load corpus
+```
+
+Three things about this corpus are load-bearing and easy to break by accident:
+
+1. **The generator writes every byte itself** — pixels, EXIF and GPS IFDs, PNG
+   chunks, GIF blocks, the RIFF/VP8L bitstream, the ISOBMFF box tree — using the
+   Go standard library and nothing else. ADR-009 names libvips and exiftool;
+   neither reproduces byte-identically (libjpeg-turbo/libwebp/libaom bytes move
+   across versions and build options, and exiftool stamps its own version and a
+   timestamp). ADR-001 permits this: "a pure-Go decoder path exists only to
+   generate fixtures."
+2. **Two pins move the bytes**, and the manifest records both: the Go toolchain,
+   and go.mod's `go` directive, which sets the GODEBUG compatibility defaults the
+   standard library runs under. Building this generator with the same go1.27.1
+   under `go 1.26.0` and under `go 1.26.2` produces different deflate output.
+   Changing either without `make fixtures-manifest` turns `fixtures-verify` red
+   by name.
+3. **AVIF and WebM are committed generator inputs** under
+   `internal/fixtures/codec/`, because AV1 and VP8 have no pure-Go encoder. They
+   were encoded once from a PNG this generator produced; `NOTICE` and the
+   manifest's `codec_inputs` record the exact commands, and a test asserts the
+   committed source PNG is still the generator's own output.
+
+Every fixture is asserted for what it is FOR, not merely hashed, and every one
+of those assertions has a mutation case that shows it can fail.
 
 ## Pinned versions
 
@@ -143,7 +181,7 @@ Saying this plainly so nobody reads an absence as an oversight:
   migrations are append-only and `asset_files.storage_location_id` must be able
   to reference it from its first day.
 - No compose file, installer or boot lane — VZ-ISSUE-002…004 own those.
-- The fixture corpus (VZ-FOUND-007) is core PR2.
+- The fixture corpus (VZ-FOUND-007) has landed; see "Fixtures" below.
 - The ruleset that makes `ci-required` and CODEOWNERS mandatory is an OWNER
   action after this PR lands: `ci-required` must exist before it can be
   required (ADR-002 item 9). Until it is applied, no ledger entry may reach

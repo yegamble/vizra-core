@@ -1,0 +1,122 @@
+# fixtures — the deterministic fixture corpus (VZ-FOUND-007, ADR-009).
+#
+# ADR-009 makes ubuntu-24.04 on native amd64 the acceptance platform, so the
+# manifest OF RECORD is the one this lane reproduces. The owner's machine is
+# arm64 and is not a substitute for it.
+#
+# What this lane proves, and why each part is here:
+#
+#   1. The generator, built with the pinned toolchain, reproduces all twelve
+#      fixtures byte-identically against the committed manifest. That is the
+#      claim every later media assertion rests on: upload validation, EXIF and
+#      orientation handling, GPS stripping, derivative budgets and decoder
+#      resource bounds are all compared against THESE bytes, so if the bytes are
+#      not reproducible then none of those results is falsifiable.
+#   2. Each fixture is what it claims to be — the orientation fixture really
+#      carries orientation 6, the GPS fixture really carries GPS, the truncated
+#      one really fails to decode, and so on — and removing that property is
+#      demonstrated to turn the check red.
+#   3. The corpus is generated from a Go toolchain alone. No image is fetched at
+#      build or test time and no third-party photograph exists in the tree.
+#
+# Named in .github/required-checks.txt and in FLOOR_LANES of
+# scripts/ci-required-guard.py, so it cannot be removed by the pull request it
+# gates. Both of those files are CODEOWNERS-protected.
+name: fixtures
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixtures:
+    name: fixtures
+    # The acceptance platform (ADR-009). The manifest of record is made here.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+
+      # The standard library's encoders are what write these bytes, so the
+      # toolchain is a pin of the corpus and not only of the build.
+      - name: Assert the pinned toolchain
+        run: |
+          set -euo pipefail
+          want="$(grep -E '^toolchain ' go.mod | awk '{print $2}')"
+          got="$(go version | awk '{print $3}')"
+          echo "go.mod pins $want; this runner has $got"
+          [ "$want" = "$got" ] || { echo "::error::toolchain mismatch: go.mod pins $want but the runner has $got"; exit 1; }
+          echo "go.mod language version: $(grep -E '^go ' go.mod | awk '{print $2}')"
+
+      - name: No image is fetched at build or test time
+        run: |
+          set -euo pipefail
+          # The corpus must be synthesised, never downloaded (ADR-009: its
+          # provenance is the script). A generator that reached the network for
+          # a photograph would put someone else's copyright in the repository.
+          if grep -rnE 'http://|https://' --include='*.go' internal/fixtures cmd/fixturegen cmd/loadcorpusgen \
+             | grep -v '_test.go' \
+             | grep -vE 'www\.w3\.org|169\.254\.169\.254' ; then
+            echo "::error::the fixture generator references a URL. Fixtures are synthesised, never fetched."
+            exit 1
+          fi
+          echo "ok: the generator references no fetchable URL"
+          echo "    (the two allowed strings are the SVG namespace and the link-local address"
+          echo "     written INTO the polyglot fixture as SSRF bait — neither is fetched)"
+
+      - name: Generate the corpus
+        run: make fixtures
+
+      # The lane itself: regenerate into a scratch directory and compare every
+      # byte, the generator's own source digest, the committed codec inputs and
+      # both toolchain pins against the committed manifest.
+      - name: Reproduce the manifest byte-identically
+        run: make fixtures-verify
+
+      - name: Every fixture is what it claims to be, and the checks can fail
+        run: go test -race -count=1 -v ./internal/fixtures/
+
+      # The declared load corpus is a different artefact with a different
+      # lifetime (VZ-OPS-007). A small dry run keeps its generator honest
+      # without putting gigabytes on a runner.
+      - name: The load-corpus generator runs and declares its shape
+        run: |
+          set -euo pipefail
+          go run ./cmd/loadcorpusgen -out "$RUNNER_TEMP/load" -count 6 -mix 12,8,4 -dry-run
+          cat "$RUNNER_TEMP/load/corpus.json"
+
+      - name: Record the corpus this runner produced
+        if: always()
+        run: |
+          set -euo pipefail
+          echo "## Fixture corpus on $(uname -s)/$(uname -m)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ( cd testdata/fixtures && sha256sum -- * ) >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the corpus this runner produced
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fixtures-corpus-${{ github.sha }}
+          path: testdata/fixtures/
+          if-no-files-found: error
+          retention-days: 14

@@ -38,3 +38,41 @@ assertion in .github/workflows/docker-build.yml is the detector.
 
 libheif and libde265 (LGPL-3.0-or-later) exist only in the HEIC option image,
 which is a separate build and a separate licence review (VZ-MEDIA-010, M3).
+
+----------------------------------------------------------------------------
+Test fixtures (VZ-FOUND-007, ADR-009)
+----------------------------------------------------------------------------
+
+The fixture corpus contains NO third-party material and NO photograph taken by
+anyone. Every fixture is synthesised by `cmd/fixturegen`: the pixels come from a
+painter in internal/fixtures/raster.go driven by a fixed PRNG, and the metadata
+— EXIF and GPS IFDs, PNG chunks, GIF blocks, the RIFF/VP8L bitstream, the
+ISOBMFF box tree — is written byte by byte by that same package. Nothing is
+downloaded at build time or at test time.
+
+No licence therefore attaches to the corpus: its provenance is the script, which
+is the reason ADR-009 chose a synthesised corpus over a collected one. The
+corpus itself is not committed; fixtures/manifest.json is, and it records a
+sha256, the dimensions, the expected decode outcome and this licence position
+for every file.
+
+Two of the twelve files could not be synthesised in pure Go, because AVIF needs
+an AV1 encoder and WebM needs VP8/VP9/AV1, and no pure-Go encoder for those
+exists:
+
+  internal/fixtures/codec/avif-still.avif   libvips 8.18.2 (libheif 1.21.2/aom)
+  internal/fixtures/codec/webm-short.webm   ffmpeg 8.1 (libvpx VP8)
+
+Both were encoded from internal/fixtures/codec/source.png, which this generator
+produced and which is committed beside them; a test asserts that the committed
+source.png is still exactly what the generator emits, so the provenance chain is
+checked rather than asserted. The exact commands are recorded in
+fixtures/manifest.json under `codec_inputs`. Those two files are likewise
+original synthetic material with no third-party rights in them.
+
+The coordinates in the GPS fixture are the Royal Observatory, Greenwich. They
+are nobody's home address, and they exist so that a later slice can prove GPS is
+stripped from every derivative (ADR-006).
+
+Real CC0 photographs, if any are ever added for visual QA, are listed with their
+source URL and licence at that point (ADR-009). None is present today.
