@@ -19,9 +19,34 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `git rev-parse HEAD^1` needs the parent OBJECT; a depth-1 clone
+          # grafts it away (measured). This is a fetch depth, NOT a `ref:` pin:
+          # refs/pull/N/merge is still the tree that is tested.
+          fetch-depth: 2
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
+      # THE ANCHOR — runs OUTSIDE make, BEFORE the `make` line below. One line
+      # in the Makefile (`SHELL := /usr/bin/true`, `MAKEFLAGS += -i`) makes
+      # every recipe exit 0 without running. scripts/ci-required-guard.py
+      # asserts this step exists, is unconditional, is not continue-on-error,
+      # and precedes the first `make` invocation in this job.
+      # Provenance. On a `pull_request`, actions/checkout with no `ref:` checks
+      # out refs/pull/N/merge — the head merged into the CURRENT base tip — so
+      # the tree these commands run against is NEITHER the head SHA nor the
+      # base SHA, and it moves whenever the base branch moves. A step that
+      # records provenance must name the tree it is standing in. See
+      # docs/evidence/warroom/2026-09-21-meta-pr3-validate-lane-VERIFY.md,
+      # FINDING 5, where exactly this printed a SHA that was not the tree it
+      # described. The checkout is deliberately NOT pinned to the head.
+      - name: Provenance — which tree this lane tested
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/provenance.sh
+
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
       - name: govulncheck
         run: make govulncheck

@@ -26,6 +26,21 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `git rev-parse HEAD^1` needs the parent OBJECT; a depth-1 clone
+          # grafts it away (measured). This is a fetch depth, NOT a `ref:` pin:
+          # refs/pull/N/merge is still the tree that is tested.
+          fetch-depth: 2
+
+      # Provenance. On a `pull_request`, actions/checkout with no `ref:` checks
+      # out refs/pull/N/merge — the head merged into the CURRENT base tip — so
+      # the tree these commands run against is NEITHER the head SHA nor the
+      # base SHA, and it moves whenever the base branch moves (meta-PR3
+      # FINDING 5). The checkout is deliberately NOT pinned to the head.
+      - name: Provenance — which tree this lane tested
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/provenance.sh
 
       # The guard runs FIRST and independently of the fan-in below. It enforces
       # the floor: a pull request cannot shrink its own gate by deleting a line

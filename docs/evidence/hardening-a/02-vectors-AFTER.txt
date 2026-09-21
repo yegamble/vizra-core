@@ -1,0 +1,31 @@
+# api/search-hmac-testvectors.json — AFTER
+
+## raw file sha256 (EXPECTED to differ: one prose string changed)
+f95623b0ad6783818bc73c5b4d516d84ce7b2b6afde01397a6c8b15a422c2862  api/search-hmac-testvectors.json
+
+## raw unified diff against base c043df7 — must be exactly one changed line
+diff --git a/api/search-hmac-testvectors.json b/api/search-hmac-testvectors.json
+index 6548d87..1509da8 100644
+--- a/api/search-hmac-testvectors.json
++++ b/api/search-hmac-testvectors.json
+@@ -22 +22 @@
+-  "key_utf8_warning": "TEST VECTOR ONLY. This value is published in a public repository and must NEVER be used as VIZRA_SEARCH_HMAC_KEY, VIZRA_SESSION_SECRET or any other configuration value. vizra-core's production loader refuses it by exact match (knownPublishedSecrets in internal/config/config.go); vizra-search must do the same. Generate a real key with `openssl rand -base64 32`.",
++  "key_utf8_warning": "TEST VECTOR ONLY. This value is published in a public repository and must NEVER be used as SEARCH_HMAC_KEY, VIZRA_SESSION_SECRET or any other configuration value. vizra-core's production loader refuses it by exact match (knownPublishedSecrets in internal/config/config.go); vizra-search must do the same. Generate a real key with `openssl rand -base64 32`.",
+
+## line-level accounting
+1	1	api/search-hmac-testvectors.json
+
+## canonical sha256 of the WHOLE document MINUS key_utf8_warning
+   BEFORE: 411f7e2eed35efdcc58d6e7166a1e0fc821596aac86621be5e04f6d511908698 (18948 bytes)
+   AFTER:  411f7e2eed35efdcc58d6e7166a1e0fc821596aac86621be5e04f6d511908698 (18948 bytes)
+
+## per-vector byte comparison, base blob vs worktree (every positive AND negative vector)
+   positive vectors: 5  negative vectors: 24
+   vectors byte-identical: 29   differing: 0
+   SAME     top-level '_comment'
+   SAME     top-level 'key_utf8'
+   CHANGED  top-level 'key_utf8_warning'
+   SAME     top-level 'max_clock_skew_seconds'
+   SAME     top-level 'scheme'
+   SAME     top-level 'verifier_now_unix'
+   SAME     top-level 'window'

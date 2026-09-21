@@ -127,6 +127,25 @@ func TestCIRequiredGuardFixtures(t *testing.T) {
 		// A floor lane that never runs on a PR gates nothing.
 		{dir: "not-on-pull-request", wantFail: true, wantText: "pull_request"},
 
+		// Checks 8 and 9: the out-of-make controls on the make-driven gate.
+		// Every required lane here runs through `make`, and ONE line in a
+		// Makefile no-ops every recipe, so these assert the anchor step and the
+		// direct test lane are present AND armed. Each fixture changes exactly
+		// one thing relative to "good".
+		{dir: "anchor-missing", wantFail: true, wantText: "with no make-integrity-guard step before it"},
+		{dir: "anchor-after-make", wantFail: true, wantText: "after `make` at position"},
+		{dir: "anchor-conditional", wantFail: true, wantText: "conditional"},
+		{dir: "anchor-continue-on-error", wantFail: true, wantText: "continue-on-error"},
+		// An aggregate floor lane whose `needs:` leg runs make with no anchor.
+		// This is the shape `cache-matrix` really has: checking only the named
+		// job would have printed ok while the job that invokes make was
+		// unanchored.
+		{dir: "needs-leg-unanchored", wantFail: true, wantText: "needs:cache-matrix-leg"},
+		// The Actions analogue of `SHELL := /usr/bin/true`.
+		{dir: "defaults-shell-workflow", wantFail: true, wantText: "defaults.run.shell"},
+		{dir: "defaults-shell-job", wantFail: true, wantText: "defaults.run.shell"},
+		{dir: "no-direct-test-lane", wantFail: true, wantText: "every test invocation goes through"},
+
 		{dir: "bad-runner", wantFail: true, wantText: "runner"},
 		{dir: "unpinned-action", wantFail: true, wantText: "pinned"},
 		{dir: "missing-job", wantFail: true, wantText: "matches no job"},
@@ -159,6 +178,114 @@ func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
 	// And it must have actually read the Makefile — the check it used to skip.
 	if !strings.Contains(out, "PKGS = ./...") {
 		t.Fatalf("the guard did not report on the Makefile's test selection:\n%s", out)
+	}
+	// A check that silently stopped running still prints nothing, so assert the
+	// two out-of-make controls were REPORTED ON, not merely not-failed.
+	for _, want := range []string{
+		"runs the make-integrity-guard anchor",
+		"runs the suite directly, without make",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the guard did not report %q against the real workflows:\n%s", want, out)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// make-integrity-guard
+// ---------------------------------------------------------------------------
+
+// Every required lane in this repository runs through `make`, and a verifier
+// measured that ONE line — `SHELL := /usr/bin/true` or `MAKEFLAGS += -i` —
+// makes every recipe exit 0 without running, so `ci-required` would be green
+// with the whole gate failing underneath it. These fixtures are one crafted
+// Makefile per way of doing that.
+func TestMakeIntegrityGuardFixtures(t *testing.T) {
+	cases := []struct {
+		dir      string
+		wantFail bool
+		wantText string
+	}{
+		{dir: "good", wantFail: false},
+
+		// The two the verifier actually measured.
+		{dir: "shell-override", wantFail: true, wantText: "shell"},
+		{dir: "makeflags-ignore", wantFail: true, wantText: "makeflags"},
+
+		// The same two reached through an `include`, which a scan of the root
+		// Makefile alone would not see. MAKEFILE_LIST comes from make itself.
+		{dir: "included-makeflags", wantFail: true, wantText: "inc.mk"},
+		{dir: "included-shell", wantFail: true, wantText: "inc.mk"},
+
+		// Neighbours of the same class.
+		{dir: "shell-colon", wantFail: true, wantText: "shell"},
+		{dir: "shellflags-neutered", wantFail: true, wantText: "shellflags"},
+		{dir: "gnumakeflags", wantFail: true, wantText: "gnumakeflags"},
+		{dir: "no-shell-pin", wantFail: true, wantText: "approved assignments"},
+		{dir: "oneshell", wantFail: true, wantText: "oneshell"},
+
+		// A `-` prefix is INVISIBLE to `make --dry-run`, which prints the
+		// command without it. Only the text reading can see this one, which is
+		// why there is a text reading at all.
+		{dir: "dash-prefix", wantFail: true, wantText: "prefixed `-`"},
+		{dir: "at-dash-prefix", wantFail: true, wantText: "prefixed `-`"},
+		{dir: "plus-prefix", wantFail: true, wantText: "prefixed `+`"},
+
+		{dir: "or-true", wantFail: true, wantText: "|| true"},
+		{dir: "semicolon-true", wantFail: true, wantText: "; true"},
+
+		// make runs the LAST definition while a reader — and any text-based
+		// check — sees the first.
+		{dir: "duplicate-target", wantFail: true, wantText: "defined 2 times"},
+		{dir: "conditional-target", wantFail: true, wantText: "conditional"},
+
+		{dir: "missing-target", wantFail: true, wantText: "could not be established"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.dir, func(t *testing.T) {
+			out, code := run(t, "make-integrity-guard.sh",
+				"--root", filepath.Join("scripts", "testdata", "makeguard", tc.dir),
+				"--targets", "ci")
+			failed := code != 0
+			if failed != tc.wantFail {
+				t.Fatalf("exit %d (failed=%v), want failed=%v.\n%s", code, failed, tc.wantFail, out)
+			}
+			if tc.wantText != "" && !strings.Contains(strings.ToLower(out), strings.ToLower(tc.wantText)) {
+				t.Fatalf("the failure does not mention %q, so an author would not know what to fix:\n%s", tc.wantText, out)
+			}
+		})
+	}
+}
+
+// The guard must pass on THIS repository's own Makefile, or every fixture above
+// is checking a program the gate does not actually run against anything real.
+//
+// This test is also the third reading of the control: the workflow anchor is
+// outside make, `make ci-guard` runs it for local parity, and this runs it from
+// the ordinary suite — which the `build-test` lane invokes DIRECTLY, without
+// make. So a Makefile neutered badly enough to disarm the other two still turns
+// this red.
+func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
+	out, code := run(t, "make-integrity-guard.sh")
+	if code != 0 {
+		t.Fatalf("the make-integrity guard fails on this repository's own Makefile:\n%s", out)
+	}
+	for _, want := range []string{
+		"resolves SHELL to the approved",
+		"resolves .SHELLFLAGS to the approved",
+		"MAKEFLAGS carries nothing beyond",
+		"no duplicate-definition override",
+		"defined exactly once",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)
+		}
+	}
+	// The closure must really have expanded: `ci` has no recipe of its own, and
+	// it is `test-race`'s recipe that runs the tests.
+	if !strings.Contains(out, "gate target `test-race` is defined exactly once") {
+		t.Errorf("the guard did not reach `test-race` through `ci`'s prerequisites, so the recipe that "+
+			"actually runs the tests was never scanned:\n%s", out)
 	}
 }
 

@@ -36,8 +36,9 @@
 // multi-symbol arithmetic codecs whose default probability tables run to
 // thousands of values; there is no pure-Go encoder for any of them, and
 // hand-writing one is not something to do from memory. Those two files were
-// produced once by a recorded ffmpeg invocation over a PNG that THIS generator
-// produced, and are committed under internal/fixtures/codec as embedded
+// produced once by recorded libvips and ffmpeg invocations — libvips heifsave
+// (libheif/aom) for the AVIF, ffmpeg for the WebM — over a PNG that THIS
+// generator produced, and are committed under internal/fixtures/codec as embedded
 // generator inputs (see codec.go). No third-party photograph and no downloaded
 // image is involved, and because the bytes are committed the whole corpus still
 // reproduces byte-identically on every platform.
@@ -104,6 +105,23 @@ type Spec struct {
 }
 
 const genLicense = "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+
+// ADR009Count is how many fixtures ADR-009 names. It is a CONSTANT and not
+// `len(Corpus())` on purpose.
+//
+// Verifier finding V-2 (docs/evidence/warroom/2026-09-21-vizra-core-pr5-fixtures-VERIFY.md):
+// `VerifyAgainstManifest` compared the manifest to the generator in both
+// directions, and both sides shrink together — drop a spec from Corpus(),
+// re-pin, and `make fixtures-verify` printed `ok — 11 fixtures`; with Corpus()
+// returning nil it printed `ok — 0 fixtures`. Nothing anchored either side to
+// the number ADR-009 actually names. This constant is that anchor, and the CLI
+// path reads it, so "ok" means what its text claims.
+//
+// `TestTheCorpusIsTheTwelveOfADR009` keeps its own literal 12 rather than
+// reading this constant: a check that reads the value it is checking is not a
+// check, and the whole point of V-2 is that two things which move together
+// anchor nothing.
+const ADR009Count = 12
 
 // Corpus returns the twelve M0 fixtures of ADR-009, in ADR order. The order is
 // fixed because the manifest is a committed, diffable file.

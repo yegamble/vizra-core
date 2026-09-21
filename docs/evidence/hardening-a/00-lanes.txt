@@ -1,0 +1,47 @@
+# Lane transcript — hardening sweep A (builder's machine)
+Date: 2026-09-21T05:40:30Z
+Host: Darwin/arm64   go: go1.27.1   make: GNU Make 3.81
+sqlc: v1.31.1   python3: Python 3.9.6   PyYAML: 6.0.3
+Branch: chore/m0-hardening-a   base: main @ c043df72f06cc7b5d7237a12d2be4dac25fa788e
+
+NOT the ADR-009 acceptance platform. ubuntu-24.04/amd64 CI on the head SHA is
+what stands as evidence there; this is the local pre-flight.
+
+## make ci  — every lane ci-required runs
+==> fmt-check
+==> vet
+==> lint-imports
+==> migrate-lint
+==> config-template-check
+==> openapi-verify
+==> sqlc-verify
+==> ci-guard
+==> fixtures-verify
+==> test-race
+make ci: all lanes passed
+MAKE_CI_EXIT=0
+
+### test-race package results (the -race unit suite over ./...)
+ok  	github.com/yegamble/vizra-core/cmd/api	2.148s
+?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
+?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
+ok  	github.com/yegamble/vizra-core/cmd/vizra	1.776s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/authz	1.517s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/cache	1.348s
+ok  	github.com/yegamble/vizra-core/internal/config	2.365s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.587s
+ok  	github.com/yegamble/vizra-core/internal/fixtures	102.894s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	3.458s
+ok  	github.com/yegamble/vizra-core/internal/jobs	4.665s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/obs	2.392s
+ok  	github.com/yegamble/vizra-core/internal/search	2.455s
+ok  	github.com/yegamble/vizra-core/internal/site	2.286s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+ok  	github.com/yegamble/vizra-core/scripts	8.419s
+
+counts: 13 packages ok, 8 with no test files, 0 failed, 0 skips reported

@@ -1,0 +1,53 @@
+# Re-pin of fixtures/manifest.json after editing generator source files
+Date: 2026-09-21T05:15:42Z  Host: Darwin/arm64  go: go1.27.1
+
+Why: internal/fixtures/fixtures.go (a comment + ADR009Count) and manifest.go
+(checkDeclaredSet, the undeclared-file walk) are in GeneratorSourceFiles, so the
+generator source digest moved. fixtures-verify named it. That is the designed signal.
+
+The CLAIM being proved here: NO fixture byte moved. Only the generator digest did.
+
+== manifest sha256 BEFORE re-pin ==
+99ab82eaf39404c3489542ef69758c187441e9d7c1fd70eb0f1cf1c032501b30  fixtures/manifest.json
+
+== the twelve fixture hashes BEFORE re-pin ==
+  jpeg-exif-orientation6-gps.jpg         1976  44863b49cf10222c13a85dca77ea7f6b1950905b5e48dfc3ff37a24c368185e4
+  png-alpha.png                           568  1a1f167d06a2086ae69424a77706cb0d9635c17b870191cc28440dcd707240b0
+  jpeg-truncated.jpg                     1222  df0c816e0c1442a0f64ef7754989164555e71ed59e02a6d09895dcef48953f9f
+  png-oversized-dimensions.png         122067  e884f5303764d491fcdb5f8cd393c450bb9855e46333fa12a418eaf8e1b79c82
+  png-decoder-bomb.png                  69830  3da19cc1b42f8f37d0eb52f5051a437ed4fd2becab368a2e21d7103783aca610
+  polyglot-gif-svg-active.svg             704  59bd983da145c698e45d2bcf57238e4d6b9ef258ad899350fa704e744d2ca822
+  gif-animated.gif                       2513  b691c5125af022e1f6cefe9965697f996fcbf79485f3d0a14c80f674ac6f5ae9
+  webp-animated.webp                      182  a9358ca2a446f9666093e6c6c271a7a591582fb16135ac60a9056b219f876f77
+  avif-still.avif                        1459  e521f13e2659eebe55d40e33034f2310bff2e2c55ed7f40279b23033a5baf189
+  jpeg-12mp-budget.jpg                1542694  66e66264b03a773ad2260ee658ab5cdf6b543092719c744e7a339f9880b2e7f8
+  mp4-short.mp4                         44729  bf7018e19e7d262cf9856aeceea0f51ba34c013cb6b3f847fb09b54ac2e68b32
+  webm-short.webm                        3564  2e50fda961c2701bc9a47e03b37b45af50a5937dcd07d9f87b6b365df9542c77
+  count: 12
+
+== make fixtures-manifest ==
+wrote fixtures/manifest.json: 12 fixtures, 1791508 bytes, generator 1 (4ff582ba6959), toolchain go1.27.1
+Review the diff: a changed fixture hash means the bytes every later media
+assertion is compared against have moved.
+exit=0
+
+== manifest sha256 AFTER re-pin ==
+1332290a78b002995e51dfb361615ad6ed0b6124b21e4a9466d0d8530450b982  fixtures/manifest.json
+
+== field-by-field comparison ==
+  codec_inputs     SAME
+  fixtures         SAME
+  generator        CHANGED
+  note             SAME
+  output_dir       SAME
+  schema           SAME
+  toolchain        SAME
+
+  fixtures compared: 12
+  fixture entries byte-identical: 12
+  fixture entries that MOVED: 0 []
+
+  generator.name           SAME
+  generator.source_files   SAME
+  generator.source_sha256  CHANGED  a34db2c4f1bf9c7ed1a6 -> 4ff582ba6959ba9b1799
+  generator.version        SAME

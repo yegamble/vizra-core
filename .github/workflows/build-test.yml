@@ -124,6 +124,24 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `git rev-parse HEAD^1` needs the parent OBJECT; a depth-1 clone
+          # grafts it away (measured). This is a fetch depth, NOT a `ref:` pin:
+          # refs/pull/N/merge is still the tree that is tested.
+          fetch-depth: 2
+
+      # Provenance. On a `pull_request`, actions/checkout with no `ref:` checks
+      # out refs/pull/N/merge — the head merged into the CURRENT base tip — so
+      # the tree these commands run against is NEITHER the head SHA nor the
+      # base SHA, and it moves whenever the base branch moves. A step that
+      # records provenance must name the tree it is standing in. See
+      # docs/evidence/warroom/2026-09-21-meta-pr3-validate-lane-VERIFY.md,
+      # FINDING 5, where exactly this printed a SHA that was not the tree it
+      # described. The checkout is deliberately NOT pinned to the head.
+      - name: Provenance — which tree this lane tested
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/provenance.sh
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -150,11 +168,47 @@ jobs:
           go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
           sqlc version
 
+      # ---------------------------------------------------------------
+      # THE ANCHOR. Runs OUTSIDE make, BEFORE any `make` line below.
+      #
+      # One line in the Makefile — `SHELL := /usr/bin/true` or
+      # `MAKEFLAGS += -i` — makes every recipe in this repository exit 0
+      # without running, so every `make` step below would go green with the
+      # whole gate failing underneath it (measured: the war-room verifier's
+      # FINDING 8 on vizra-search). No check written INSIDE a Makefile can
+      # stop that, because the neutering disarms that check too.
+      #
+      # scripts/ci-required-guard.py asserts this step exists, is
+      # unconditional, is not continue-on-error, and comes BEFORE the first
+      # `make` invocation in this job — so deleting it, adding an `if:`, or
+      # moving it down turns `ci-required` red.
+      # ---------------------------------------------------------------
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
+
       - name: go.mod and go.sum are tidy
         run: make tidy-check
 
       - name: make ci
         run: make ci
+
+      # ---------------------------------------------------------------
+      # THE SECOND LAYER: the unit suite, run DIRECTLY, with no make.
+      #
+      # The anchor above refuses a neutered Makefile by name. This step is
+      # the control for the case the anchor cannot cover: whatever `make ci`
+      # did or did not do, the suite runs here and a real failing test fails
+      # this required lane. Every other test invocation in this repository
+      # goes through a make recipe, so before this step a no-opped make made
+      # the whole suite SILENT rather than red.
+      #
+      # It duplicates `make ci`'s `test-race` deliberately — the duplication
+      # IS the control, and costs one unit-suite run. scripts/ci-required-
+      # guard.py asserts a step like this exists in a floor lane, invokes
+      # `go test` without `make`, and covers `./...`.
+      # ---------------------------------------------------------------
+      - name: Unit suite, invoked directly (no make)
+        run: go test -race -count=1 ./...
 
       - name: ci-required guard
         run: ./scripts/ci-required-guard.sh
@@ -255,10 +309,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `git rev-parse HEAD^1` needs the parent OBJECT; a depth-1 clone
+          # grafts it away (measured). This is a fetch depth, NOT a `ref:` pin:
+          # refs/pull/N/merge is still the tree that is tested.
+          fetch-depth: 2
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
+
+      # Provenance. On a `pull_request`, actions/checkout with no `ref:` checks
+      # out refs/pull/N/merge — the head merged into the CURRENT base tip — so
+      # the tree these commands run against is NEITHER the head SHA nor the
+      # base SHA, and it moves whenever the base branch moves. A step that
+      # records provenance must name the tree it is standing in. See
+      # docs/evidence/warroom/2026-09-21-meta-pr3-validate-lane-VERIFY.md,
+      # FINDING 5, where exactly this printed a SHA that was not the tree it
+      # described. The checkout is deliberately NOT pinned to the head.
+      - name: Provenance — which tree this lane tested
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/provenance.sh
 
       - name: Start ${{ matrix.flavour }}
         run: |
@@ -271,6 +343,24 @@ jobs:
           done
           docker exec cache ${{ matrix.cli }} ping | grep -q PONG
           docker exec cache ${{ matrix.cli }} info server | grep -Ei 'version|server_name' || true
+
+      # ---------------------------------------------------------------
+      # THE ANCHOR. Runs OUTSIDE make, BEFORE any `make` line below.
+      #
+      # One line in the Makefile — `SHELL := /usr/bin/true` or
+      # `MAKEFLAGS += -i` — makes every recipe in this repository exit 0
+      # without running, so every `make` step below would go green with the
+      # whole gate failing underneath it (measured: the war-room verifier's
+      # FINDING 8 on vizra-search). No check written INSIDE a Makefile can
+      # stop that, because the neutering disarms that check too.
+      #
+      # scripts/ci-required-guard.py asserts this step exists, is
+      # unconditional, is not continue-on-error, and comes BEFORE the first
+      # `make` invocation in this job — so deleting it, adding an `if:`, or
+      # moving it down turns `ci-required` red.
+      # ---------------------------------------------------------------
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
 
       - name: Integration tests against ${{ matrix.flavour }}
         env:

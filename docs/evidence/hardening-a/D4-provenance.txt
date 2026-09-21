@@ -1,0 +1,171 @@
+# D4 — provenance: the lane names the tree it stands in
+Closes meta-PR3 FINDING 5 for vizra-core. Date: 2026-09-21T05:32:28Z
+Host: Darwin/arm64  git version 2.50.1 (Apple Git-155)
+
+A synthetic repository reproducing the exact shape GitHub builds for a pull_request:
+  base branch advanced AFTER the PR branched, then head merged into the CURRENT base tip.
+  This is what refs/pull/N/merge is, and it is NOT the head SHA.
+    *   4fc396b Merge feat into base
+    |\  
+    | * f2c622c feat
+    * | 1422486 base moves
+    |/  
+    * 1407217 base
+
+    merge commit (= what refs/pull/N/merge resolves to): 4fc396bec408aed08533e0038c435528502a1ad9
+    HEAD^1 = the base ACTUALLY merged in:                14224868c172047ac5027bcc58ddfd707c752bda
+    HEAD^2 = the PR head:                                f2c622c927840e15e47c1087133722d921e9464a
+
+==================================================================
+CASE A — actions/checkout DEFAULT fetch-depth: 1
+   MEASURED: in a depth-1 clone the parent OBJECTS are grafted away.
+   `git rev-parse HEAD^1` FAILS and `git rev-list --parents -n 1 HEAD`
+   prints the commit alone. The script's cat-file fallback covers this.
+==================================================================
+   is-shallow-repository: true
+   git rev-parse HEAD^1 -> fatal: ambiguous argument 'HEAD^1': unknown revision or path not in the working tree.
+   git rev-list --parents -n 1 HEAD -> 4fc396bec408aed08533e0038c435528502a1ad9
+
+provenance
+  event:                        pull_request
+  ref:                          refs/pull/9/merge
+  TESTED TREE (git rev-parse HEAD):  4fc396bec408aed08533e0038c435528502a1ad9
+      ^ this is what the commands in this job actually ran against
+  parent method:                cat-file (shallow clone: parent objects are not present)
+  base actually merged in (HEAD^1): 14224868c172047ac5027bcc58ddfd707c752bda
+  head actually merged in (HEAD^2): f2c622c927840e15e47c1087133722d921e9464a
+  PR head SHA (github.event.pull_request.head.sha): f2c622c927840e15e47c1087133722d921e9464a
+  github.sha:                   4fc396bec408aed08533e0038c435528502a1ad9
+
+  On a pull_request, actions/checkout with no `ref:` checks out refs/pull/N/merge:
+  the PR head merged into the CURRENT base tip. HEAD is therefore NEITHER the head SHA
+  nor the base SHA, and it changes whenever the base branch moves — with no change to
+  the pull request. github.event.pull_request.base.sha is NOT printed above because it
+  is the base as of the last synchronise and goes stale; HEAD^1 is the base that was
+  really merged in.
+  checked: HEAD^2 == the PR head SHA, so this really is the merge ref.
+
+  environment: Darwin/arm64, git version 2.50.1 (Apple Git-155)
+exit=0
+
+==================================================================
+CASE B — fetch-depth: 2, which is what these workflows now set, so the
+   `git rev-parse HEAD^1` path the finding names is the one that runs.
+   fetch-depth is NOT a `ref:` pin: refs/pull/N/merge is still the tree tested.
+==================================================================
+provenance
+  event:                        pull_request
+  ref:                          refs/pull/9/merge
+  TESTED TREE (git rev-parse HEAD):  4fc396bec408aed08533e0038c435528502a1ad9
+      ^ this is what the commands in this job actually ran against
+  parent method:                rev-parse
+  base actually merged in (HEAD^1): 14224868c172047ac5027bcc58ddfd707c752bda
+  head actually merged in (HEAD^2): f2c622c927840e15e47c1087133722d921e9464a
+  PR head SHA (github.event.pull_request.head.sha): f2c622c927840e15e47c1087133722d921e9464a
+  github.sha:                   4fc396bec408aed08533e0038c435528502a1ad9
+
+  On a pull_request, actions/checkout with no `ref:` checks out refs/pull/N/merge:
+  the PR head merged into the CURRENT base tip. HEAD is therefore NEITHER the head SHA
+  nor the base SHA, and it changes whenever the base branch moves — with no change to
+  the pull request. github.event.pull_request.base.sha is NOT printed above because it
+  is the base as of the last synchronise and goes stale; HEAD^1 is the base that was
+  really merged in.
+  checked: HEAD^2 == the PR head SHA, so this really is the merge ref.
+
+  environment: Darwin/arm64, git version 2.50.1 (Apple Git-155)
+exit=0
+
+==================================================================
+CASE C — NEGATIVE: the checkout PINNED to the head SHA (`ref:` set).
+   The brief forbids this, and the script REFUSES it rather than printing
+   plausible-looking numbers about a tree that is not the merge.
+==================================================================
+   HEAD here = f2c622c927840e15e47c1087133722d921e9464a (the head SHA itself, one parent)
+provenance
+  event:                        pull_request
+  ref:                          refs/pull/9/merge
+  TESTED TREE (git rev-parse HEAD):  f2c622c927840e15e47c1087133722d921e9464a
+      ^ this is what the commands in this job actually ran against
+  parent method:                rev-parse
+  base actually merged in (HEAD^1): 1407217ad0f87ddd921f925989b811b609e165e5
+  head actually merged in (HEAD^2): (none — HEAD is not a merge commit)
+  PR head SHA (github.event.pull_request.head.sha): f2c622c927840e15e47c1087133722d921e9464a
+  github.sha:                   f2c622c927840e15e47c1087133722d921e9464a
+
+  On a pull_request, actions/checkout with no `ref:` checks out refs/pull/N/merge:
+  the PR head merged into the CURRENT base tip. HEAD is therefore NEITHER the head SHA
+  nor the base SHA, and it changes whenever the base branch moves — with no change to
+  the pull request. github.event.pull_request.base.sha is NOT printed above because it
+  is the base as of the last synchronise and goes stale; HEAD^1 is the base that was
+  really merged in.
+::error::HEAD has no second parent, so this checkout is NOT refs/pull/N/merge — most
+likely `ref:` was pinned to the head. Pinning hides base-side breakage: the lane
+would then never test the merge that is about to land.
+
+  environment: Darwin/arm64, git version 2.50.1 (Apple Git-155)
+exit=1
+
+==================================================================
+CASE D — NEGATIVE: a merge ref whose HEAD^2 is NOT the reported head SHA
+   (the checkout is not the merge this PR is about). MUTATION: pass a head
+   SHA that does not match, everything else identical to CASE B.
+==================================================================
+  is the base as of the last synchronise and goes stale; HEAD^1 is the base that was
+  really merged in.
+::error::HEAD^2 (f2c622c927840e15e47c1087133722d921e9464a) is not the PR head SHA (0000000000000000000000000000000000000000). The checkout is not the
+merge ref this lane assumes, so nothing above describes what was tested.
+
+  environment: Darwin/arm64, git version 2.50.1 (Apple Git-155)
+exit=
+
+==================================================================
+CASE E — merge_group and push, both handled.
+==================================================================
+provenance
+  event:                        merge_group
+  ref:                          refs/heads/gh-readonly-queue/main/pr-9
+  TESTED TREE (git rev-parse HEAD):  4fc396bec408aed08533e0038c435528502a1ad9
+      ^ this is what the commands in this job actually ran against
+  parent method:                rev-parse
+  base actually merged in (HEAD^1): 14224868c172047ac5027bcc58ddfd707c752bda
+  head actually merged in (HEAD^2): f2c622c927840e15e47c1087133722d921e9464a
+  PR head SHA (github.event.pull_request.head.sha): (not a pull_request event)
+  github.sha:                   4fc396bec408aed08533e0038c435528502a1ad9
+
+  On merge_group, HEAD is the merge-queue commit GitHub built for this entry. That is
+exit=
+
+provenance
+  event:                        push
+  ref:                          refs/heads/main
+  TESTED TREE (git rev-parse HEAD):  4fc396bec408aed08533e0038c435528502a1ad9
+      ^ this is what the commands in this job actually ran against
+  parent method:                rev-parse
+  base actually merged in (HEAD^1): 14224868c172047ac5027bcc58ddfd707c752bda
+  head actually merged in (HEAD^2): f2c622c927840e15e47c1087133722d921e9464a
+  PR head SHA (github.event.pull_request.head.sha): (not a pull_request event)
+  github.sha:                   4fc396bec408aed08533e0038c435528502a1ad9
+
+  On push, HEAD is the pushed commit itself: no merge ref exists, and HEAD^1 above is
+exit=
+
+   NEGATIVE for merge_group: github.sha disagreeing with the checked-out tree
+::error::github.sha (0000000000000000000000000000000000000000) is not the checked-out tree (4fc396bec408aed08533e0038c435528502a1ad9).
+
+  environment: Darwin/arm64, git version 2.50.1 (Apple Git-155)
+exit=
+
+==================================================================
+EXIT CODES, recorded explicitly (the $PIPESTATUS captures above came out
+blank under this shell; these are measured directly, no pipe involved).
+==================================================================
+  A depth-1 merge ref, head SHA correct  exit=0
+  B depth-2 merge ref, head SHA correct  exit=0
+  C checkout PINNED to the head          exit=1
+  D merge ref, head SHA MISMATCHED       exit=1
+  E merge_group, github.sha agrees       exit=0
+  F merge_group, github.sha MISMATCHED   exit=1
+  G push, github.sha agrees              exit=0
+
+  0 = the lane may proceed and the printed provenance is self-consistent.
+  1 = the lane FAILS: what it would have printed does not describe what it tested.

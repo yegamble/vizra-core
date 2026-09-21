@@ -1,0 +1,52 @@
+# D1 — the retired-name production refusal, red against a controlled mutation
+Repo: vizra-core  Branch: chore/m0-hardening-a  Host: Darwin/arm64  go: go1.27.1
+Date: 2026-09-21T05:13:09Z
+
+== GREEN (unmutated) ==
+-- digest of internal/config/config.go --
+85f99646b164acef94a84618f915d83c2c84e1b7888308b7cc7cc4892fd754df  internal/config/config.go
+=== RUN   TestTheSearchSecretIsTheNameTheContractUses
+--- PASS: TestTheSearchSecretIsTheNameTheContractUses (0.00s)
+=== RUN   TestTheContractAndTheLoaderNameTheSameVariable
+--- PASS: TestTheContractAndTheLoaderNameTheSameVariable (0.00s)
+=== RUN   TestProductionRefusesARetiredKeyName
+=== RUN   TestProductionRefusesARetiredKeyName/refused_by_name,_with_the_replacement_in_the_message
+=== RUN   TestProductionRefusesARetiredKeyName/the_old_name_is_not_an_alias
+=== RUN   TestProductionRefusesARetiredKeyName/a_completely_empty_value_is_tolerated
+=== RUN   TestProductionRefusesARetiredKeyName/whitespace_is_refused,_not_trimmed_away
+=== RUN   TestProductionRefusesARetiredKeyName/every_retired_name:_VIZRA_SEARCH_HMAC_KEY
+--- PASS: TestProductionRefusesARetiredKeyName (0.00s)
+=== RUN   TestRetiredKeysAreTombstonedInTheTemplate
+--- PASS: TestRetiredKeysAreTombstonedInTheTemplate (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/config	0.261s
+exit=
+
+== MUTATION M-A: delete the RetiredKeys refusal loop from the production block ==
+-- digest AFTER mutation (must differ from the green digest above) --
+7a54b5cfd3e721ceb102733e26a026835ce8bf541109bcff1bb26d6de1d0ee59  internal/config/config.go
+-- the loop is gone: --
+0
+
+--- FAIL: TestProductionRefusesARetiredKeyName (0.00s)
+    --- FAIL: TestProductionRefusesARetiredKeyName/refused_by_name,_with_the_replacement_in_the_message (0.00s)
+        config_test.go:517: production with a leftover VIZRA_SEARCH_HMAC_KEY was ACCEPTED. The operator's file looks configured and the process booted with no search key at all. err = <nil>
+    --- FAIL: TestProductionRefusesARetiredKeyName/whitespace_is_refused,_not_trimmed_away (0.00s)
+        config_test.go:577: production accepted VIZRA_SEARCH_HMAC_KEY set to whitespace; got <nil>
+    --- FAIL: TestProductionRefusesARetiredKeyName/every_retired_name:_VIZRA_SEARCH_HMAC_KEY (0.00s)
+        config_test.go:590: production accepted the retired name VIZRA_SEARCH_HMAC_KEY; got <nil>
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/config	0.234s
+FAIL
+exit=
+
+== RESTORE ==
+-- digest after restore (must equal the green digest above) --
+85f99646b164acef94a84618f915d83c2c84e1b7888308b7cc7cc4892fd754df  internal/config/config.go
+ok  	github.com/yegamble/vizra-core/internal/config	0.211s
+exit=
+
+VERDICT: mutation applied (digest moved 85f99646… -> 7a54b5cf…), the check went RED naming
+the DECLARED reason ('production with a leftover VIZRA_SEARCH_HMAC_KEY was ACCEPTED. The
+operator's file looks configured and the process booted with no search key at all.'), and
+restoring the file (digest back to 85f99646…) returned it to GREEN.

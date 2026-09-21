@@ -34,6 +34,20 @@ Checks, all of which must pass:
                   ./... and every -run pattern is non-empty.
   6. RUNNER       every job runs on GitHub-hosted ubuntu-24.04.
   7. PINNED       every action is pinned to a 40-character commit SHA.
+  8. ANCHOR       every floor-lane job that invokes `make` runs
+                  scripts/make-integrity-guard.sh FIRST, as its own step,
+                  unconditionally and without continue-on-error — and neither
+                  the workflow nor the job overrides `defaults.run.shell`, which
+                  is the Actions analogue of `SHELL := /usr/bin/true`.
+  9. DIRECT       at least one floor lane runs `go test` over `./...` WITHOUT
+                  make, so a no-opped Makefile cannot make the suite silent.
+
+Checks 8 and 9 exist because every required lane here runs through `make`, and a
+verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true` or
+`MAKEFLAGS += -i` — makes every recipe exit 0 without running
+(docs/evidence/warroom/2026-09-20-vizra-search-pr2-revendor-VERIFY.md, FINDING
+8). No check written inside a Makefile can prevent that; these two say the
+out-of-make controls are present and armed.
 
 Usage:
     ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE]
@@ -157,6 +171,148 @@ def continue_on_error_sites(job: dict) -> list[str]:
     return sites
 
 
+MAKE_INTEGRITY_GUARD = "make-integrity-guard"
+# `make` as a command, not as a word inside one (`cmake`, `makefile`, `make-up`).
+MAKE_INVOCATION = re.compile(r"(?:^|[\s;&|(])make(?=\s|$)", re.M)
+
+
+def step_runs_make(step: dict) -> bool:
+    run = step.get("run")
+    return isinstance(run, str) and bool(MAKE_INVOCATION.search(run))
+
+
+def step_is_the_anchor(step: dict) -> bool:
+    run = step.get("run")
+    return isinstance(run, str) and MAKE_INTEGRITY_GUARD in run and not MAKE_INVOCATION.search(run)
+
+
+def check_anchor(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
+    """Check 8: the out-of-make guard runs before make, and can actually fail.
+
+    Four ways to remove the control without deleting the guard program, each of
+    which this refuses by name: deleting the step, giving it an `if:`, marking it
+    continue-on-error, or moving it after the first `make`.
+    """
+    steps = [s for s in (job.get("steps") or []) if isinstance(s, dict)]
+    make_at = next((i for i, s in enumerate(steps) if step_runs_make(s)), None)
+    if make_at is None:
+        g.ok(f"floor lane {lane!r} invokes no `make`, so it needs no make-integrity anchor")
+        return
+
+    anchor_at = next((i for i, s in enumerate(steps) if step_is_the_anchor(s)), None)
+    label = steps[make_at].get("name") or f"step {make_at}"
+    if anchor_at is None:
+        g.fail(
+            f"floor lane {lane!r} ({path.name}) invokes `make` (step {label!r}) with NO "
+            f"{MAKE_INTEGRITY_GUARD} step before it.",
+            "One line in the Makefile — `SHELL := /usr/bin/true` or `MAKEFLAGS += -i` — makes every",
+            "recipe exit 0 without running, and no check inside a Makefile can stop that, because the",
+            "neutering disarms that check too. The out-of-make step is the control; it must be present.",
+        )
+        return
+    if anchor_at > make_at:
+        g.fail(
+            f"floor lane {lane!r} ({path.name}) runs the {MAKE_INTEGRITY_GUARD} step at position "
+            f"{anchor_at}, AFTER `make` at position {make_at} ({label!r}).",
+            "A neutered `make` step would already have reported success by then.",
+        )
+        return
+
+    anchor = steps[anchor_at]
+    if "if" in anchor:
+        g.fail(
+            f"floor lane {lane!r} ({path.name}) makes the {MAKE_INTEGRITY_GUARD} step CONDITIONAL "
+            f"(if: {anchor['if']!r}).",
+            "A skipped step is not a control, and this guard cannot evaluate an Actions expression.",
+        )
+    for key in anchor:
+        if str(key).strip().lower().replace("_", "-") == "continue-on-error":
+            g.fail(
+                f"floor lane {lane!r} ({path.name}) marks the {MAKE_INTEGRITY_GUARD} step "
+                f"{key}: {anchor[key]!r}.",
+                "Its failure would be discarded. Present at all is the rule, whatever the value.",
+            )
+
+    # The Actions analogue of `SHELL := /usr/bin/true`: `defaults.run.shell`
+    # replaces the shell every `run:` step uses, the anchor's included.
+    for scope, holder in (("workflow", doc or {}), ("job", job)):
+        shell = ((holder.get("defaults") or {}).get("run") or {}).get("shell")
+        if shell is not None:
+            g.fail(
+                f"floor lane {lane!r} ({path.name}) sets a {scope}-level defaults.run.shell: {shell!r}.",
+                "It replaces the shell EVERY `run:` step uses, so it no-ops the anchor and every make",
+                "step at once — the Actions analogue of `SHELL := /usr/bin/true`.",
+            )
+
+    if not g.failed:
+        g.ok(f"floor lane {lane!r} runs the {MAKE_INTEGRITY_GUARD} anchor (step {anchor_at}) before "
+             f"`make` (step {make_at}), unconditionally and without continue-on-error")
+
+
+def expand_needs(lane: str, path: Path, doc: dict, job: dict, jobs_by_key: dict):
+    """The named job plus every job it transitively `needs`, within its workflow.
+
+    Returns [(label, (path, doc, job)), ...] with the named job first.
+    """
+    out = [(lane, (path, doc, job))]
+    seen = set()
+    queue = list(_needs_of(job))
+    while queue:
+        key = queue.pop(0)
+        if key in seen:
+            continue
+        seen.add(key)
+        entry = (jobs_by_key.get(path) or {}).get(key)
+        if entry is None:
+            continue
+        out.append((f"{lane} -> needs:{key}", entry))
+        queue.extend(_needs_of(entry[2]))
+    return out
+
+
+def _needs_of(job: dict) -> list[str]:
+    raw = job.get("needs")
+    if isinstance(raw, str):
+        return [raw]
+    if isinstance(raw, list):
+        return [str(x) for x in raw]
+    return []
+
+
+def check_direct_test_lane(g: Guard, required: list[str], jobs: dict) -> None:
+    """Check 9: at least one required lane runs the suite without make.
+
+    The anchor refuses a neutered Makefile BY NAME. This is the separate control
+    for what the anchor cannot cover: whatever make did, a real failing test must
+    still fail a required lane. Every other test invocation here goes through a
+    make recipe.
+    """
+    for name in required:
+        entry = jobs.get(name)
+        if entry is None:
+            continue
+        _, _, job = entry
+        for step in job.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            run = step.get("run")
+            if not isinstance(run, str):
+                continue
+            if "go test" not in run or MAKE_INVOCATION.search(run):
+                continue
+            if "./..." not in run:
+                continue
+            if "if" in step:
+                continue  # a conditional lane is not a floor
+            g.ok(f"required lane {name!r} runs the suite directly, without make: {run.strip()!r}")
+            return
+    g.fail(
+        "no required lane runs `go test ./...` directly; every test invocation goes through `make`.",
+        "A Makefile turned into a no-op would then make the whole suite SILENT rather than red, and",
+        "`ci-required` would be green with nothing tested. One lane must invoke `go test` itself.",
+    )
+
+
 def check_makefile_selection(g: Guard, makefile: Path) -> None:
     """Check 5: the lanes actually select something.
 
@@ -236,10 +392,15 @@ def main() -> int:
 
     # name -> (path, doc, job)
     jobs: dict[str, tuple[Path, dict, dict]] = {}
+    # workflow path -> {job KEY -> (path, doc, job)}. `needs:` names job KEYS,
+    # not display names, and is scoped to one workflow file.
+    jobs_by_key: dict[Path, dict[str, tuple[Path, dict, dict]]] = {}
     for path, doc in workflows.items():
+        jobs_by_key[path] = {}
         for key, job in (doc.get("jobs") or {}).items():
             if isinstance(job, dict):
                 jobs[job_display_name(key, job)] = (path, doc, job)
+                jobs_by_key[path][key] = (path, doc, job)
 
     # --- 1. floor ----------------------------------------------------------
     for lane in FLOOR_LANES:
@@ -285,6 +446,13 @@ def main() -> int:
         else:
             g.ok(f"floor lane {lane!r} runs on pull_request")
 
+        # A floor lane is often an AGGREGATE whose `needs:` leg does the work —
+        # `cache-matrix` needs `cache-matrix-leg`, and it is the LEG that runs
+        # `make test-integration`. Checking only the named job would leave the
+        # job that actually invokes make unanchored while this printed ok.
+        for label, entry2 in expand_needs(lane, path, doc, job, jobs_by_key):
+            check_anchor(g, label, entry2[0], entry2[1], entry2[2])
+
         sites = continue_on_error_sites(job)
         if sites:
             g.fail(
@@ -295,6 +463,9 @@ def main() -> int:
             )
         else:
             g.ok(f"floor lane {lane!r} carries no continue-on-error")
+
+    # --- 9. one required lane that does not go through make -----------------
+    check_direct_test_lane(g, required, jobs)
 
     # --- 5. the test selection the lanes actually run -----------------------
     if not args.skip_makefile:
