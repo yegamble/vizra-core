@@ -1,0 +1,27 @@
+### AFTER (this PR's Dockerfile), linux/arm64
+
+== loader list: runtime vs recorded
+  ok   79 loaders, runtime == recorded
+
+== not root
+  ok   uid 10001
+
+== media directory writable by the default user
+  ok   wrote and read back /var/lib/vizra/media
+
+== three entry points and the probe
+  ok   /usr/local/bin/vizra
+  ok   /usr/local/bin/vizra-api
+  ok   /usr/local/bin/vizra-worker
+  ok   vizra healthcheck --help runs in the image
+  ok   healthcheck exits 1 with no listener
+
+== toolchain absent
+  ok   no build tooling on PATH
+  ok   no -dev packages
+  ok   no /src
+
+== size
+  vzhcb-core:after — 232051189 bytes (221 MiB), linux/arm64
+
+RESULT for vzhcb-core:after: 0 failing assertion(s)

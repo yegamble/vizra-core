@@ -1,0 +1,130 @@
+==============================================================
+MUTATION: M5 — the scanner's own exit code is no longer judged
+target:   scripts/image-scan-verdict.py
+date:     2026-09-21T07:39:20Z
+branch:   feat/m0-healthcheck-runtime-image  HEAD=4a80a1e
+==============================================================
+-- digest BEFORE mutation: 8aa3cce2151642dbc7165b19b81829f106eee2936493e86d131a4800bccd0acd
+-- digest AFTER  mutation: 1cc4129842f5be4b904bd361d7bc5ba3e434ad340f060ffdd796e7eb3d5def8c
+-- the mutation APPLIED (digest changed)
+
+----- diff -----
+----------------
+
+##### RED RUN: go test -count=1 -v ./scripts/ -run ImageScan #####
+=== RUN   TestImageScanVerdictPassesAValidCleanScan
+--- PASS: TestImageScanVerdictPassesAValidCleanScan (0.04s)
+=== RUN   TestImageScanVerdictFailsOnFindings
+--- PASS: TestImageScanVerdictFailsOnFindings (0.04s)
+=== RUN   TestImageScanVerdictHonoursTheSeverityThreshold
+--- PASS: TestImageScanVerdictHonoursTheSeverityThreshold (0.08s)
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/scanner-error
+    imagescan_test.go:131: scanner-error: exited 0, want 3 (trivy exited 1: a scanner that errored reports no findings)
+          ok    the scanner exited 0 (recorded in trivy-exit-code.txt)
+          ok    the report is Trivy schema 2
+          ok    the report describes vizra-core:scan (container_image)
+          ok    the scanner identified the OS: debian 13.1
+          ok    2 result section(s), classes ['lang-pkgs', 'os-pkgs']
+        
+        Trivy, vizra-core:scan — findings by severity:
+          LOW: 1
+          MEDIUM: 1
+          TOTAL: 2
+        
+        A valid scan of vizra-core:scan found nothing at or above ['CRITICAL', 'HIGH'].
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/scanner-crashed
+    imagescan_test.go:131: scanner-crashed: exited 0, want 3 (trivy was killed (137))
+          ok    the scanner exited 0 (recorded in trivy-exit-code.txt)
+          ok    the report is Trivy schema 2
+          ok    the report describes vizra-core:scan (container_image)
+          ok    the scanner identified the OS: debian 13.1
+          ok    2 result section(s), classes ['lang-pkgs', 'os-pkgs']
+        
+        Trivy, vizra-core:scan — findings by severity:
+          LOW: 1
+          MEDIUM: 1
+          TOTAL: 2
+        
+        A valid scan of vizra-core:scan found nothing at or above ['CRITICAL', 'HIGH'].
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/missing-exit-code
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/blank-exit-code
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/missing-report
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/empty-report
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/malformed-report
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/no-schema
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/wrong-image
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/wrong-artifact-type
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/no-os-detected
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/null-results
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/empty-results
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/no-os-pkgs
+--- FAIL: TestImageScanVerdictRefusesEveryVacuousPass (0.61s)
+    --- FAIL: TestImageScanVerdictRefusesEveryVacuousPass/scanner-error (0.04s)
+    --- FAIL: TestImageScanVerdictRefusesEveryVacuousPass/scanner-crashed (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/missing-exit-code (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/blank-exit-code (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/missing-report (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/empty-report (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/malformed-report (0.06s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/no-schema (0.05s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/wrong-image (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/wrong-artifact-type (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/no-os-detected (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/null-results (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/empty-results (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/no-os-pkgs (0.04s)
+=== RUN   TestEveryImageScanFixtureIsExercised
+--- PASS: TestEveryImageScanFixtureIsExercised (0.00s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	0.957s
+FAIL
+##### RED RUN exit code: 1 #####
+
+-- digest AFTER restore:  8aa3cce2151642dbc7165b19b81829f106eee2936493e86d131a4800bccd0acd
+-- restored exactly
+
+##### GREEN RUN: go test -count=1 -v ./scripts/ -run ImageScan #####
+=== RUN   TestImageScanVerdictPassesAValidCleanScan
+--- PASS: TestImageScanVerdictPassesAValidCleanScan (0.04s)
+=== RUN   TestImageScanVerdictFailsOnFindings
+--- PASS: TestImageScanVerdictFailsOnFindings (0.04s)
+=== RUN   TestImageScanVerdictHonoursTheSeverityThreshold
+--- PASS: TestImageScanVerdictHonoursTheSeverityThreshold (0.08s)
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/scanner-error
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/scanner-crashed
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/missing-exit-code
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/blank-exit-code
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/missing-report
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/empty-report
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/malformed-report
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/no-schema
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/wrong-image
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/wrong-artifact-type
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/no-os-detected
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/null-results
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/empty-results
+=== RUN   TestImageScanVerdictRefusesEveryVacuousPass/no-os-pkgs
+--- PASS: TestImageScanVerdictRefusesEveryVacuousPass (0.55s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/scanner-error (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/scanner-crashed (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/missing-exit-code (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/blank-exit-code (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/missing-report (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/empty-report (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/malformed-report (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/no-schema (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/wrong-image (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/wrong-artifact-type (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/no-os-detected (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/null-results (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/empty-results (0.04s)
+    --- PASS: TestImageScanVerdictRefusesEveryVacuousPass/no-os-pkgs (0.04s)
+=== RUN   TestEveryImageScanFixtureIsExercised
+--- PASS: TestEveryImageScanFixtureIsExercised (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/scripts	0.932s
+##### GREEN RUN exit code: 0 #####
+
+VERDICT: red under mutation (exit 1), green when restored (exit 0).

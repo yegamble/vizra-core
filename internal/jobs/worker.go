@@ -65,6 +65,11 @@ type Options struct {
 	DrainGrace time.Duration
 	// WorkerID identifies the lease holder. Defaults to hostname+pid+random.
 	WorkerID string
+	// HealthStaleAfter overrides the readiness staleness bound for the claim
+	// loop. Zero derives it from PollInterval (see HealthStaleBound). This is a
+	// library knob for tests that must observe a stall without waiting the real
+	// bound; it is NOT an operator-facing configuration key.
+	HealthStaleAfter time.Duration
 }
 
 func (o *Options) applyDefaults() {
@@ -85,6 +90,9 @@ func (o *Options) applyDefaults() {
 	}
 	if o.DrainGrace <= 0 {
 		o.DrainGrace = 20 * time.Second
+	}
+	if o.HealthStaleAfter <= 0 {
+		o.HealthStaleAfter = HealthStaleBound(o.PollInterval, o.Timeout)
 	}
 	if o.Logger == nil {
 		o.Logger = slog.Default()
@@ -116,21 +124,31 @@ type Worker struct {
 	handlers map[Kind]Handler
 	opts     Options
 	metrics  *Metrics
+	health   *Health
 }
 
 // NewWorker builds the loop. pools must have one entry per site handle.
 func NewWorker(r *site.Resolver, pools map[string]*pgxpool.Pool, m *Metrics, opts Options) *Worker {
 	opts.applyDefaults()
+	handles := make([]string, 0, len(r.Sites()))
+	for _, s := range r.Sites() {
+		handles = append(handles, s.Handle)
+	}
 	w := &Worker{
 		resolver: r,
 		pools:    pools,
 		handlers: map[Kind]Handler{},
 		opts:     opts,
 		metrics:  m,
+		health:   NewHealth(handles, opts.HealthStaleAfter, nil),
 	}
 	w.Register(KindNoop, func(ctx context.Context, j Claimed) error { return nil })
 	return w
 }
+
+// Health is the worker's readiness state, served by HealthHandler on the
+// metrics listener. It is what `vizra healthcheck worker` reads.
+func (w *Worker) Health() *Health { return w.health }
 
 // Register adds a handler. Registering an unknown kind twice is a programming
 // error and panics at start-up rather than silently replacing a handler.
@@ -178,21 +196,45 @@ func (w *Worker) claimLoop(ctx context.Context, s site.Site, pool *pgxpool.Pool)
 	var inFlight sync.WaitGroup
 	log := w.opts.Logger.With("site", s.Handle, "worker", w.opts.WorkerID)
 
+	// The wait for a slot is BOUNDED, and that bound is what makes readiness
+	// measurable. Blocking here indefinitely is correct for throughput and
+	// fatal for a probe: with every slot busy on jobs that may legitimately run
+	// for Options.Timeout, the loop records no progress, and a staleness bound
+	// wide enough to tolerate that could not report a wedged loop inside a
+	// deploy window. Waking once per poll interval to say "alive, saturated"
+	// costs one timer per second on a fully busy worker. See health.go.
+	slot := time.NewTimer(w.opts.PollInterval)
+	defer slot.Stop()
+
 loop:
 	for {
+		if !slot.Stop() {
+			select {
+			case <-slot.C:
+			default:
+			}
+		}
+		slot.Reset(w.opts.PollInterval)
+
 		select {
 		case sem <- struct{}{}:
 		case <-ctx.Done():
 			break loop
+		case <-slot.C:
+			w.health.Saturated(s.Handle)
+			continue
 		}
 
+		w.health.LoopAlive(s.Handle)
 		claimed, err := w.claim(ctx, pool)
 		if err != nil {
 			<-sem
+			w.health.ClaimFailed(s.Handle)
 			log.Warn("jobs: claim failed", "error", safeError(err.Error()))
 			w.sleep(ctx, w.opts.PollInterval)
 			continue
 		}
+		w.health.ClaimOK(s.Handle)
 		if claimed == nil {
 			<-sem
 			w.sleep(ctx, w.opts.PollInterval)

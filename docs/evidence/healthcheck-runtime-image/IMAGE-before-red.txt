@@ -1,0 +1,27 @@
+### BEFORE (origin/main Dockerfile at 4a80a1e), linux/arm64 — the SAME assertions
+
+== loader list: runtime vs recorded
+  ok   79 loaders, runtime == recorded
+
+== not root
+  ok   uid 10001
+
+== media directory writable by the default user
+  FAIL could not write /var/lib/vizra/media: sh: 1: cannot create /var/lib/vizra/media/probe.txt: Directory nonexistent
+
+== three entry points and the probe
+  ok   /usr/local/bin/vizra
+  ok   /usr/local/bin/vizra-api
+  ok   /usr/local/bin/vizra-worker
+  ok   vizra healthcheck --help runs in the image
+  ok   healthcheck exits 1 with no listener
+
+== toolchain absent
+  FAIL build tooling present: pkg-config pkgconf
+  FAIL -dev packages present: linux-libc-dev
+  FAIL /src is still in the image
+
+== size
+  vzhcb-core:before — 942759402 bytes (899 MiB), linux/arm64
+
+RESULT for vzhcb-core:before: 4 failing assertion(s)

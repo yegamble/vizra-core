@@ -73,6 +73,33 @@ RUN set -eux; \
       echo "REFUSED: an excluded codec is present in the loader list" >&2; exit 1; \
     fi
 
+# --- what the runtime actually needs ------------------------------------------
+# The runtime stage is built from a CLEAN base (see below), so it must install
+# the shared libraries libvips links against. That list is DERIVED here rather
+# than typed by hand: a hand-typed list is a second source of truth that drifts
+# silently the day libvips gains or drops a dependency, and the symptom is a
+# runtime image whose `vips` cannot load a format the loader list promises.
+#
+# This stage exists separately from `vips` so the `vips` stage's bytes do not
+# move when this derivation changes — the libvips compile is the expensive layer
+# and it stays cacheable.
+FROM vips AS vipsmeta
+RUN set -eux; \
+    mkdir -p /out; \
+    find /usr/local/lib -name 'libvips*.so*' -type f > /tmp/vipslibs; \
+    test -s /tmp/vipslibs; \
+    { xargs ldd < /tmp/vipslibs; ldd /usr/local/bin/vips; } \
+      | awk '$3 ~ /^\// {print $3}' | sort -u > /tmp/deps; \
+    test -s /tmp/deps; \
+    grep -v '^/usr/local/' /tmp/deps > /tmp/systemdeps; \
+    test -s /tmp/systemdeps; \
+    xargs readlink -f < /tmp/systemdeps | sort -u > /tmp/real; \
+    xargs dpkg-query -S < /tmp/real \
+      | sed 's/:[^:]*$//' | tr ',' '\n' | sed 's/:[a-z0-9-]*$//' \
+      | tr -d ' ' | sort -u > /out/runtime-packages.txt; \
+    test -s /out/runtime-packages.txt; \
+    echo "--- runtime packages ---"; cat /out/runtime-packages.txt
+
 # --- Go build ----------------------------------------------------------------
 # This stage is BELOW libvips in build order and depends on nothing from it, so
 # editing Go code reuses the libvips layers.
@@ -106,14 +133,55 @@ RUN set -eux; \
     CGO_ENABLED=0 go build -trimpath -ldflags "${LDFLAGS}" -o /out/vizra        ./cmd/vizra
 
 # --- runtime -----------------------------------------------------------------
-FROM vips AS runtime
+# FROM A CLEAN BASE, not `FROM vips`.
+#
+# It used to be `FROM vips`, i.e. the image that compiled libvips, with the
+# toolchain purged afterwards. Two things were wrong with that, and the second
+# is the one that matters:
+#
+#  1. `apt-get purge --auto-remove … || true` cannot fail. A purge that stops
+#     working — a renamed package, a dependency that pins one of them — leaves
+#     meson, ninja, gcc, curl and the whole -dev set in the SHIPPING image, and
+#     the build stays green. There is no `|| true` anywhere in this file now,
+#     and there is nothing left to purge: a clean base never had a toolchain.
+#  2. Even a purge that works leaves the layers it removed FROM. A deleted file
+#     in a later layer still ships its bytes in the earlier one, so `docker save`
+#     and every registry copy carried the compiler regardless. Starting from a
+#     clean base is the only way that is actually not there.
+#
+# What is carried across is exactly: the libvips install tree, the three Go
+# binaries, and the licence/build metadata. The shared libraries libvips needs
+# are installed from the distribution, from the list the vipsmeta stage derived
+# with ldd + dpkg-query.
+#
+# debian:13-slim, the SAME digest the vips stage uses — so the two stages agree
+# on the distribution the libraries came from, which is the assumption ldd's
+# answer is only valid under.
+FROM debian@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runtime
 
-# Runtime needs the shared libraries, not the toolchain.
+ENV DEBIAN_FRONTEND=noninteractive
+COPY --from=vipsmeta /out/runtime-packages.txt /tmp/runtime-packages.txt
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates tini; \
-    apt-get purge -y --auto-remove meson ninja-build build-essential pkg-config curl xz-utils || true; \
-    rm -rf /var/lib/apt/lists/* /src
+    apt-get install -y --no-install-recommends \
+        ca-certificates tini \
+        $(tr '\n' ' ' < /tmp/runtime-packages.txt); \
+    rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt
+
+# The libvips install tree. `include/` and the static/libtool archives are build
+# inputs, not runtime ones, and are not copied or are removed here; `bin/`
+# carries `vips` itself, which is the only thing in the image that LOADS these
+# libraries and therefore the only available proof that they work at runtime.
+COPY --from=vips /usr/local/lib/ /usr/local/lib/
+COPY --from=vips /usr/local/bin/ /usr/local/bin/
+RUN set -eux; \
+    find /usr/local/lib -name '*.a' -delete; \
+    find /usr/local/lib -name '*.la' -delete; \
+    rm -rf /usr/local/lib/pkgconfig; \
+    find /usr/local/lib -maxdepth 2 -type d -name pkgconfig -exec rm -rf {} +; \
+    ldconfig; \
+    vips --version; \
+    vips -l > /dev/null
 
 # Licence obligations travel with the image (ADR-001 § Licence table;
 # DEFINITION_OF_DONE requires the notices preserved). libvips is LGPL-2.1+, so
@@ -127,19 +195,40 @@ COPY --from=build /out/vizra-worker /usr/local/bin/vizra-worker
 COPY --from=build /out/vizra        /usr/local/bin/vizra
 
 # Never root. The api writes nothing to the filesystem.
+#
+# /var/lib/vizra/media EXISTS HERE, owned by the runtime uid, before any code
+# writes to it. The compose tree mounts a volume there, and Docker creates a
+# mountpoint that is ABSENT from the image as root:root — so the first upload on
+# a fresh host would fail with EACCES, on first boot, in front of the owner
+# (meta PR #4, `vizra-infrastructure` seat, FINDING 5). Declaring it here costs
+# nothing and is the only place it can be declared before the storage slice
+# lands.
 RUN set -eux; \
     groupadd --system --gid 10001 vizra; \
-    useradd --system --uid 10001 --gid vizra --home /var/lib/vizra --create-home vizra
+    useradd --system --uid 10001 --gid vizra --home /var/lib/vizra --create-home vizra; \
+    mkdir -p /var/lib/vizra/media; \
+    chown 10001:10001 /var/lib/vizra/media; \
+    chmod 0750 /var/lib/vizra/media
 USER 10001:10001
 
 ENV VIZRA_LISTEN_ADDR=:8080 \
     VIZRA_METRICS_ADDR=127.0.0.1:9090
 EXPOSE 8080
 
-# The healthcheck uses the binary that is already in the image rather than
-# adding curl to the runtime surface.
-HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/vizra", "version"]
+# A probe that CANNOT PASS while the service is broken: it requests the api's
+# own /readyz over the loopback interface and exits non-zero on refused,
+# timed-out or non-2xx (see internal/healthcheck). The previous
+# `["CMD","/usr/local/bin/vizra","version"]` exited 0 whether or not anything
+# was listening and whether or not PostgreSQL was reachable.
+#
+# This is the IMAGE default, which matches the image's default CMD (vizra-api).
+# A worker container overrides both: `vizra healthcheck worker` reads the
+# worker's readiness on its metrics listener. The compose tree sets that.
+#
+# --timeout=3s against the probe's own 2s deadline, so the probe always gets to
+# report its reason instead of being killed by the runtime.
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
+    CMD ["/usr/local/bin/vizra", "healthcheck", "api"]
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/usr/local/bin/vizra-api"]

@@ -69,9 +69,33 @@ func run() error {
 	registry := prometheus.NewRegistry()
 	metrics := jobs.NewMetrics(registry)
 
+	w := jobs.NewWorker(resolver, byHandle, metrics, jobs.Options{
+		Lease:       cfg.JobLease,
+		Timeout:     cfg.JobTimeout,
+		Concurrency: cfg.WorkerConcurrency,
+		DrainGrace:  cfg.ShutdownGrace,
+		Logger:      log,
+	})
+
+	// The worker has no API listener, so readiness lives on the metrics
+	// listener it already runs. This is what `vizra healthcheck worker` reads,
+	// and it is the replacement for a container probe that could not fail
+	// (meta PR #4, `vizra-infrastructure` seat, FINDING 3).
+	//
+	// promhttp stays mounted at "/" so nothing that scrapes this listener today
+	// changes; ServeMux prefers the more specific "/readyz" and "/healthz".
+	pingers := make(map[string]jobs.Pinger, len(byHandle))
+	for handle, pool := range byHandle {
+		pingers[handle] = pool
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/", promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
+	mux.Handle("/readyz", jobs.HealthHandler(w.Health(), pingers))
+	mux.Handle("/healthz", jobs.LivenessHandler())
+
 	metricsSrv := &http.Server{
 		Addr:              cfg.MetricsAddr,
-		Handler:           promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}),
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {
@@ -84,14 +108,6 @@ func run() error {
 		defer cancel()
 		_ = metricsSrv.Shutdown(sctx)
 	}()
-
-	w := jobs.NewWorker(resolver, byHandle, metrics, jobs.Options{
-		Lease:       cfg.JobLease,
-		Timeout:     cfg.JobTimeout,
-		Concurrency: cfg.WorkerConcurrency,
-		DrainGrace:  cfg.ShutdownGrace,
-		Logger:      log,
-	})
 
 	log.Info("vizra-worker running", "kinds", w.Kinds())
 	err = w.Run(ctx)

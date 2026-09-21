@@ -10,7 +10,7 @@ precedence. Read that first; read this before editing anything here.
 |---|---|---|
 | `cmd/api` | the HTTP API | **never decodes pixels** (ADR-002, Q-034) |
 | `cmd/worker` | durable jobs, and the only process that runs libvips | every handler is idempotent |
-| `cmd/vizra` | the operator CLI: setup, doctor, migrate, backup, restore | `doctor` performs real checks only |
+| `cmd/vizra` | the operator CLI: setup, doctor, migrate, backup, restore, **healthcheck** | `doctor` performs real checks only; `healthcheck` cannot pass while the service it probes is broken |
 
 It also owns three things the other repositories consume and must never edit:
 `api/openapi.yaml`, `api/search-internal.openapi.yaml`, and `migrations/`.
@@ -102,6 +102,14 @@ CI adds two lanes `make ci` cannot run locally: `append-only`, which diffs the
 migration manifest against the merge base (a merge-base diff needs the history,
 not a working tree), and `docker-build`.
 
+`image-scan` also runs on every pull request and is **deliberately not in the
+required set**. The reason is in `.github/required-checks.txt` and is not a
+dodge: a scan's result depends on the world, and a required lane that goes red
+on its own is how a team learns to merge past red. Its refusals are not
+weakened by that — `scripts/image-scan-verdict.py` fails on a scanner ERROR, on
+an empty or `null` result set, on an unrecognised OS, on a report about another
+image, and on an exit code nothing recorded, each with its own fixture.
+
 Integration tests need real services and are behind `-tags=integration`:
 
 ```
@@ -148,6 +156,9 @@ decision it protects.
 | A crash-looping job is dead-lettered, not left at the head of the claim order | `SweepExpiredLeases`, `TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue` |
 | A merged migration's bytes are frozen | the `append-only` CI job (merge-base diff) + `migration-manifest.sh` + CODEOWNERS |
 | Every doctor verdict is tested | `internal/doctor` (the checks are pure; `cmd/vizra` only does I/O) |
+| The container healthcheck cannot pass while the service it probes is broken | `internal/healthcheck` (the probe reads the service's own `/readyz`, never its own opinion) and `internal/jobs.HealthHandler` (the worker's readiness is the claim loop's progress plus a probe-time PostgreSQL ping, not "the process exists"). Demonstrated end to end in `internal/integration/healthcheck_test.go`, which runs the SHIPPED binaries as separate processes against real PostgreSQL and reads their exit codes |
+| An image-scan lane cannot pass vacuously — scanner error, empty or `null` results, an unrecognised OS, a report about another image, a swallowed exit | `scripts/image-scan-verdict.py`, with its own exit code 3 for "there was no valid scan"; 16 fixtures under `scripts/testdata/imagescan/`, `scripts/imagescan_test.go` |
+| The runtime image carries no toolchain, and the libraries it ships actually load | the runtime stage is `FROM` a clean digest-pinned base (never `FROM vips`, never a purge, no `\|\| true` anywhere in the `Dockerfile`); `docker-build` asserts the toolchain is absent, that `/var/lib/vizra/media` is writable by uid 10001, and that the loader list `vips -l` produces IN THE RUNTIME IMAGE equals the one recorded at build time |
 | migrate-lint, the gate guard and the import lint have their own negative cases | `scripts/scripts_test.go` against `scripts/testdata/` |
 | `last_error` is redacted before it is truncated | `internal/jobs`, `TestLastErrorIsRedactedBeforeItIsStored` |
 | PostgreSQL is the SINGLE clock authority for job eligibility: a "run now" enqueue takes `run_after` from the database, never from the application host | `EnqueueJob`'s `COALESCE(…, now())`, `TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost` |
@@ -215,12 +226,78 @@ the live registry on 2026-09-20, not recalled.
 | Valkey (managed) | 9.1.2, digest-pinned | workflows |
 | Redis (CI matrix leg only) | 7.2, digest-pinned | workflows |
 | libvips | 8.18.6, checksummed source tarball | `Dockerfile` |
-| Debian base | 13, digest-pinned | `Dockerfile` |
+| Debian base | 13, digest-pinned — the SAME digest in the build and runtime stages | `Dockerfile` |
+| Trivy | 0.70.0, digest-pinned image `aquasec/trivy@sha256:be1190af…`; digest resolved from registry-1.docker.io on 2026-09-21 | `.github/workflows/image-scan.yml` |
 
 `govips` and `minio-go` are ADR-001 pins that M0 does not yet link; they enter
 `go.mod` with the slice that uses them (VZ-MEDIA-001, VZ-STORAGE-002). Listing
 them in `go.mod` before then would fail `go mod tidy -diff`, so the pin lives in
 ADR-001 and in `NOTICE` until the code arrives.
+
+## The container healthcheck (what a compose file should use)
+
+`vizra healthcheck TARGET` is the probe. It talks to the service's own listener
+over loopback, reads the service's own readiness verdict, makes **exactly one**
+request and never retries — a container runtime's `--interval` and `--retries`
+already supply retries, and a probe that retries inside its own `--timeout` gets
+killed by the runtime with no message at all.
+
+| exit | meaning |
+|---|---|
+| `0` | ready. Any 2xx, **including `degraded`** — see below. The status is printed, so `degraded` is visible in the health log rather than flattened into "healthy". |
+| `1` | NOT ready: connection refused, timed out, or a non-2xx answer. |
+| `64` | usage error. Never a verdict about the service. (Docker reserves 2.) |
+
+`degraded` maps to **0 on purpose, and the semantics are core's existing ones,
+not a new stricter rule.** `/readyz` 503s for exactly one condition —
+PostgreSQL unreachable — and returns 200 `degraded` when the cache is down,
+search is unreachable, or the queue is past its age threshold, so a degraded
+instance keeps serving reads instead of being pulled from rotation and taking
+the site down with it (ADR-002 § Probes). A probe that failed on `degraded`
+would remove every api from rotation during a Redis blip.
+
+The **worker** has no API listener, so its readiness is served on the metrics
+listener it already runs (`VIZRA_METRICS_ADDR`, loopback by default) at
+`/readyz`. It reports, per site: PostgreSQL pinged **at probe time**, and the
+claim loop's **last progress** against a staleness bound. `not_started` until
+the loop's first iteration — the window between the listener opening and the
+worker actually working is not reported ready; `--start-period` is what covers
+that window, not a lying probe.
+
+**The staleness bound is 15s** with the default 1s poll interval
+(`HealthStaleBound` = 5 × poll, floor 15s). It is deliberately NOT derived from
+the per-job timeout: with every slot busy the claim loop makes no database round
+trip, and a job may legitimately run for `VIZRA_JOB_TIMEOUT` (5 minutes), so a
+bound wide enough to tolerate that could not report a wedged loop inside a
+deploy window. Instead the loop's wait for a slot is **bounded**, and a
+saturated worker records progress of its own — which is also reported, so an
+operator watching a slow queue can see that every slot is busy.
+
+The lines a compose file should use (the healthcheck timeout is 3s against the
+probe's own 2s deadline, so the probe always gets to report its reason):
+
+```yaml
+  api:
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/vizra", "healthcheck", "api"]
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+
+  worker:
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/vizra", "healthcheck", "worker"]
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+```
+
+No `CMD-SHELL`, no `/dev/tcp`, no `curl`: the runtime image has no shell
+dependency baked in for this, which is the chair's ruling on meta PR #4
+FINDING 3. The image's own `HEALTHCHECK` is the `api` form, matching its default
+`CMD`; a worker container overrides both.
 
 ## Contract ownership
 

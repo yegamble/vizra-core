@@ -98,6 +98,27 @@ var RetiredKeys = []RetiredKey{
 	},
 }
 
+// DefaultFor returns the registry default for name, or "" when the key has no
+// default or does not exist.
+//
+// It exists so a tool that legitimately reads ONE key — `vizra healthcheck`
+// needs the address its service binds and nothing else — gets the SAME default
+// the service would have got, without calling Load. Load is fail-secure: in
+// production it refuses a process with no VIZRA_MFA_KEY_KEK, which is correct
+// for a service and wrong for a probe, whose answer would then be "unhealthy"
+// for a reason that has nothing to do with the service's health.
+//
+// This is not a second home for a key. The registry above is still the single
+// home; this only reads it.
+func DefaultFor(name string) string {
+	for _, k := range Registry {
+		if k.Name == name {
+			return k.Default
+		}
+	}
+	return ""
+}
+
 // AllKeys returns the registry followed by the escape hatches: the complete set
 // of names LoadFrom consults. Retired names are NOT here — LoadFrom does not
 // read them; it refuses them.

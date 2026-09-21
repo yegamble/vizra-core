@@ -20,3 +20,23 @@ cache-matrix
 fixtures
 govulncheck
 docker-build
+
+# DELIBERATELY ABSENT: image-scan.yml's `image-scan`.
+#
+# Not an oversight and not a dodge. The guard forbids `continue-on-error` on a
+# floor lane on purpose — a lane that hides its own failures is worse than no
+# lane — but a vulnerability scan's result depends on the WORLD: a CVE published
+# against an unfixed Debian package turns it red with no change to this
+# repository, and a required lane that goes red on its own is how a team learns
+# to merge past red.
+#
+# So it runs on every pull request, fails loudly, publishes its report, and is
+# read by a human. Promoting it is an owner-reviewed change to BOTH this file
+# and FLOOR_LANES in scripts/ci-required-guard.py, and that PR should carry a
+# baseline that has been clean for a sustained period and an agreed route for an
+# unfixed upstream CVE — a reviewed, expiring .trivyignore.yaml entry — so that
+# "red for reasons outside the repository" has an answer that is not
+# continue-on-error.
+#
+# Its own anti-vacuity controls do not depend on being required: see
+# scripts/image-scan-verdict.py and scripts/testdata/imagescan/.

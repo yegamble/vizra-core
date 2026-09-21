@@ -1,0 +1,304 @@
+==============================================================
+MUTATION: M2 — the worker's staleness bound is never applied
+target:   internal/jobs/health.go
+date:     2026-09-21T07:37:44Z
+branch:   feat/m0-healthcheck-runtime-image  HEAD=4a80a1e
+==============================================================
+-- digest BEFORE mutation: f04e36c2a2792b711aef136b408123884909e5490738513d220b2c0b8e4c07e9
+-- digest AFTER  mutation: f3ffb6a2a350c5c968ee93e71745d236732d0361830aa42c68aa2657f9e93bd0
+-- the mutation APPLIED (digest changed)
+
+----- diff -----
+----------------
+
+##### RED RUN: go test -count=1 -v -tags=integration ./internal/jobs/ ./internal/integration/ -run Stall|Claim|Worker|Health|Ready|Saturated|Site|Report|Handler|Bound #####
+=== RUN   TestAWorkerWhoseClaimLoopNeverStartedIsNotReady
+--- PASS: TestAWorkerWhoseClaimLoopNeverStartedIsNotReady (0.00s)
+=== RUN   TestAClaimLoopStalledPastTheBoundIsNotReady
+    health_test.go:82: a claim loop last alive 15.001s ago reported READY against a 15s bound
+--- FAIL: TestAClaimLoopStalledPastTheBoundIsNotReady (0.00s)
+=== RUN   TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun
+--- PASS: TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun (0.00s)
+=== RUN   TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick
+--- PASS: TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick (0.00s)
+=== RUN   TestAMissingPingerIsNotReadyRatherThanAssumedHealthy
+--- PASS: TestAMissingPingerIsNotReadyRatherThanAssumedHealthy (0.00s)
+=== RUN   TestEverySiteMustBeReadyForTheWorkerToBeReady
+--- PASS: TestEverySiteMustBeReadyForTheWorkerToBeReady (0.00s)
+=== RUN   TestTheReportNeverCarriesACredential
+--- PASS: TestTheReportNeverCarriesACredential (0.00s)
+=== RUN   TestTheHandlerAnswers503WhenTheWorkerIsNotReady
+--- PASS: TestTheHandlerAnswers503WhenTheWorkerIsNotReady (0.00s)
+=== RUN   TestTheHandlerBoundsAHangingPing
+--- PASS: TestTheHandlerBoundsAHangingPing (1.50s)
+=== RUN   TestTheStalenessBoundIsTightAndDoesNotScaleWithTheJobTimeout
+--- PASS: TestTheStalenessBoundIsTightAndDoesNotScaleWithTheJobTimeout (0.00s)
+=== RUN   TestASecretStraddlingTheTruncationBoundaryIsRedacted
+--- PASS: TestASecretStraddlingTheTruncationBoundaryIsRedacted (0.00s)
+=== RUN   TestSafeErrorStillBoundsAndStillReads
+--- PASS: TestSafeErrorStillBoundsAndStillReads (0.00s)
+=== RUN   TestEveryErrorLogSiteInTheWorkerIsRedacted
+    logsites_test.go:88: 11 error log sites in worker.go, all going through safeError
+--- PASS: TestEveryErrorLogSiteInTheWorkerIsRedacted (0.00s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/jobs	1.795s
+=== RUN   TestConcurrentClaimsNeverTakeTheSameJob
+--- PASS: TestConcurrentClaimsNeverTakeTheSameJob (0.06s)
+=== RUN   TestWorkerRunsAndCompletesAJob
+--- PASS: TestWorkerRunsAndCompletesAJob (0.04s)
+=== RUN   TestClaimPlanDoesNotSortTheBacklog
+    golden_test.go:1051: claim plan:
+        [
+          {
+            "Plan": {
+              "Node Type": "Limit",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 0.29,
+              "Total Cost": 0.59,
+              "Plan Rows": 1,
+              "Plan Width": 26,
+              "Disabled": false,
+              "Plans": [
+                {
+                  "Node Type": "Index Scan",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Scan Direction": "Forward",
+                  "Index Name": "jobs_claim",
+                  "Relation Name": "jobs",
+                  "Alias": "jobs",
+                  "Startup Cost": 0.29,
+                  "Total Cost": 1011.84,
+                  "Plan Rows": 3333,
+                  "Plan Width": 26,
+                  "Disabled": false,
+                  "Index Cond": "(run_after <= now())",
+                  "Filter": "((kind = ANY ('{noop}'::text[])) AND (attempts < max_attempts))"
+                }
+              ]
+            }
+          }
+        ]
+--- PASS: TestClaimPlanDoesNotSortTheBacklog (0.12s)
+=== RUN   TestClaimIndexExcludesTerminalRows
+    golden_test.go:1070: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
+--- PASS: TestClaimIndexExcludesTerminalRows (0.04s)
+=== RUN   TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
+2026/09/21 03:37:48 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
+2026/09/21 03:37:48 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+2026/09/21 03:37:48 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+2026/09/21 03:37:48 WARN jobs: claim failed site=default worker=recovery-worker error="context canceled"
+--- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.45s)
+=== RUN   TestSitesIsASingleton
+--- PASS: TestSitesIsASingleton (0.04s)
+=== RUN   TestAWorkerWithAPlainHandlerLogsNoCredentials
+    golden_test.go:1685: 1664 log bytes across three branches, all seven credential classes absent
+--- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.15s)
+=== RUN   TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 0 in 772ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 22ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 9ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 18ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 21ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 20ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 21ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 23ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 19ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 23ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49635/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 1 in 21ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — HTTP 503 unavailable (127.0.0.1:49635/readyz, 3ms)
+--- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops (9.08s)
+=== RUN   TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent
+    healthcheck_test.go:365: vizra healthcheck api [--timeout=2s] -> exit 1 in 9ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:49660/readyz, 0s)
+--- PASS: TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent (0.01s)
+=== RUN   TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 9ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:49665/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 15ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:49665/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 0 in 9ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49665/readyz, 2ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 1 in 7ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:49665/readyz, 0s)
+--- PASS: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops (0.59s)
+=== RUN   TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine
+    healthcheck_test.go:447: vizra healthcheck worker [] -> exit 0 in 9ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49677/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:467: vizra healthcheck worker [] -> exit 0 in 25ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49677/readyz, 3ms)
+          stderr: 
+    healthcheck_test.go:469: a worker whose claim loop has stopped reported exit 0. That is exactly the `vizra version` failure this replaces.
+--- FAIL: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine (2.07s)
+=== RUN   TestHealthcheckUsageErrorsAreDistinctFromAVerdict
+--- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict (0.02s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	13.028s
+FAIL
+##### RED RUN exit code: 1 #####
+
+-- digest AFTER restore:  f04e36c2a2792b711aef136b408123884909e5490738513d220b2c0b8e4c07e9
+-- restored exactly
+
+##### GREEN RUN: go test -count=1 -v -tags=integration ./internal/jobs/ ./internal/integration/ -run Stall|Claim|Worker|Health|Ready|Saturated|Site|Report|Handler|Bound #####
+=== RUN   TestAWorkerWhoseClaimLoopNeverStartedIsNotReady
+--- PASS: TestAWorkerWhoseClaimLoopNeverStartedIsNotReady (0.00s)
+=== RUN   TestAClaimLoopStalledPastTheBoundIsNotReady
+--- PASS: TestAClaimLoopStalledPastTheBoundIsNotReady (0.00s)
+=== RUN   TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun
+--- PASS: TestASaturatedWorkerStaysReadyForLongerThanAJobCanRun (0.00s)
+=== RUN   TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick
+--- PASS: TestAnUnreachableDatabaseIsNotReadyEvenWithAFreshTick (0.00s)
+=== RUN   TestAMissingPingerIsNotReadyRatherThanAssumedHealthy
+--- PASS: TestAMissingPingerIsNotReadyRatherThanAssumedHealthy (0.00s)
+=== RUN   TestEverySiteMustBeReadyForTheWorkerToBeReady
+--- PASS: TestEverySiteMustBeReadyForTheWorkerToBeReady (0.00s)
+=== RUN   TestTheReportNeverCarriesACredential
+--- PASS: TestTheReportNeverCarriesACredential (0.00s)
+=== RUN   TestTheHandlerAnswers503WhenTheWorkerIsNotReady
+--- PASS: TestTheHandlerAnswers503WhenTheWorkerIsNotReady (0.00s)
+=== RUN   TestTheHandlerBoundsAHangingPing
+--- PASS: TestTheHandlerBoundsAHangingPing (1.50s)
+=== RUN   TestTheStalenessBoundIsTightAndDoesNotScaleWithTheJobTimeout
+--- PASS: TestTheStalenessBoundIsTightAndDoesNotScaleWithTheJobTimeout (0.00s)
+=== RUN   TestASecretStraddlingTheTruncationBoundaryIsRedacted
+--- PASS: TestASecretStraddlingTheTruncationBoundaryIsRedacted (0.00s)
+=== RUN   TestSafeErrorStillBoundsAndStillReads
+--- PASS: TestSafeErrorStillBoundsAndStillReads (0.00s)
+=== RUN   TestEveryErrorLogSiteInTheWorkerIsRedacted
+    logsites_test.go:88: 11 error log sites in worker.go, all going through safeError
+--- PASS: TestEveryErrorLogSiteInTheWorkerIsRedacted (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/jobs	1.791s
+=== RUN   TestConcurrentClaimsNeverTakeTheSameJob
+--- PASS: TestConcurrentClaimsNeverTakeTheSameJob (0.06s)
+=== RUN   TestWorkerRunsAndCompletesAJob
+--- PASS: TestWorkerRunsAndCompletesAJob (0.03s)
+=== RUN   TestClaimPlanDoesNotSortTheBacklog
+    golden_test.go:1051: claim plan:
+        [
+          {
+            "Plan": {
+              "Node Type": "Limit",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 0.29,
+              "Total Cost": 0.59,
+              "Plan Rows": 1,
+              "Plan Width": 26,
+              "Disabled": false,
+              "Plans": [
+                {
+                  "Node Type": "Index Scan",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Scan Direction": "Forward",
+                  "Index Name": "jobs_claim",
+                  "Relation Name": "jobs",
+                  "Alias": "jobs",
+                  "Startup Cost": 0.29,
+                  "Total Cost": 1011.84,
+                  "Plan Rows": 3333,
+                  "Plan Width": 26,
+                  "Disabled": false,
+                  "Index Cond": "(run_after <= now())",
+                  "Filter": "((kind = ANY ('{noop}'::text[])) AND (attempts < max_attempts))"
+                }
+              ]
+            }
+          }
+        ]
+--- PASS: TestClaimPlanDoesNotSortTheBacklog (0.08s)
+=== RUN   TestClaimIndexExcludesTerminalRows
+    golden_test.go:1070: jobs_claim = CREATE INDEX jobs_claim ON public.jobs USING btree (priority, run_after) WHERE (state = 'queued'::text)
+--- PASS: TestClaimIndexExcludesTerminalRows (0.03s)
+=== RUN   TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
+2026/09/21 03:38:02 WARN jobs: swept elapsed leases site=default worker=recovery-worker requeued=1 dead_lettered=0
+--- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted (0.44s)
+=== RUN   TestSitesIsASingleton
+--- PASS: TestSitesIsASingleton (0.04s)
+=== RUN   TestAWorkerWithAPlainHandlerLogsNoCredentials
+    golden_test.go:1685: 1664 log bytes across three branches, all seven credential classes absent
+--- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials (0.14s)
+=== RUN   TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops
+    healthcheck_test.go:340: vizra healthcheck api [] -> exit 0 in 717ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 18ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 7ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 7ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 7ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 7ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 8ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 0s)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 0 in 7ms
+          stdout: vizra healthcheck api: ready — HTTP 200 ok (127.0.0.1:49711/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:346: vizra healthcheck api [] -> exit 1 in 8ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — HTTP 503 unavailable (127.0.0.1:49711/readyz, 2ms)
+--- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops (8.25s)
+=== RUN   TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent
+    healthcheck_test.go:365: vizra healthcheck api [--timeout=2s] -> exit 1 in 7ms
+          stdout:   stderr: vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:49729/readyz, 0s)
+--- PASS: TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent (0.01s)
+=== RUN   TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 7ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:49734/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 1 in 7ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — dial: connect: connection refused (127.0.0.1:49734/readyz, 0s)
+    healthcheck_test.go:400: vizra healthcheck worker [] -> exit 0 in 9ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49734/readyz, 2ms)
+          stderr: 
+    healthcheck_test.go:403: vizra healthcheck worker [] -> exit 1 in 7ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:49734/readyz, 1ms)
+--- PASS: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops (0.58s)
+=== RUN   TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine
+    healthcheck_test.go:447: vizra healthcheck worker [] -> exit 0 in 8ms
+          stdout: vizra healthcheck worker: ready — HTTP 200 ok (127.0.0.1:49744/readyz, 1ms)
+          stderr: 
+    healthcheck_test.go:467: vizra healthcheck worker [] -> exit 1 in 23ms
+          stdout:   stderr: vizra healthcheck worker: NOT READY — HTTP 503 unavailable (127.0.0.1:49744/readyz, 2ms)
+--- PASS: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine (2.08s)
+=== RUN   TestHealthcheckUsageErrorsAreDistinctFromAVerdict
+--- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict (0.02s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	12.112s
+##### GREEN RUN exit code: 0 #####
+
+VERDICT: red under mutation (exit 1), green when restored (exit 0).
