@@ -106,12 +106,14 @@ Three things about this corpus are load-bearing and easy to break by accident:
    across versions and build options, and exiftool stamps its own version and a
    timestamp). ADR-001 permits this: "a pure-Go decoder path exists only to
    generate fixtures."
-2. **Two pins move the bytes**, and the manifest records both: the Go toolchain,
-   and go.mod's `go` directive, which sets the GODEBUG compatibility defaults the
-   standard library runs under. Building this generator with the same go1.27.1
-   under `go 1.26.0` and under `go 1.26.2` produces different deflate output.
-   Changing either without `make fixtures-manifest` turns `fixtures-verify` red
-   by name.
+2. **The Go toolchain moves the bytes**, and this is measured, not assumed: the
+   same generator source over the same raster produces `ae627ab…` under go1.26.2
+   and `73d5acb…` under go1.27.1 (`docs/evidence/fixtures/2026-09-21-determinism.md`).
+   The manifest pins it, and go.mod's `go` directive beside it — no byte
+   difference has been observed from that directive alone, but under
+   `GOTOOLCHAIN=auto` raising it is a way to make a different toolchain run the
+   generator. Changing either without `make fixtures-manifest` turns
+   `fixtures-verify` red by name.
 3. **AVIF and WebM are committed generator inputs** under
    `internal/fixtures/codec/`, because AV1 and VP8 have no pure-Go encoder. They
    were encoded once from a PNG this generator produced; `NOTICE` and the

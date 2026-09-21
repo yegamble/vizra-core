@@ -56,21 +56,31 @@ type GeneratorInfo struct {
 }
 
 type ToolchainInfo struct {
-	// Go is the toolchain that ran the generator. compress/flate, image/jpeg,
-	// image/gif and image/png are what write the bytes, and they are stable in
-	// practice but not contractually frozen across Go releases. The verifier
-	// refuses to compare against a manifest made by another toolchain, rather
-	// than reporting a difference it cannot explain.
-	Go string `json:"go"`
-	// GoMod is go.mod's `go` directive — the module's LANGUAGE version, which
-	// sets the GODEBUG compatibility defaults the standard library runs under.
+	// Go is the toolchain that ran the generator, and it is DEMONSTRABLY
+	// byte-influencing, not a theoretical pin: the same generator source over
+	// the same raster produces
 	//
-	// This is not a theoretical pin. Building this exact generator source with
-	// the same go1.27.1 toolchain under `go 1.26.0` and under `go 1.26.2`
-	// produces DIFFERENT deflate output and therefore different PNG bytes;
-	// that is how the discrepancy that first broke this corpus was found
-	// (docs/evidence/fixtures/2026-09-21-determinism.md). Pinning the toolchain
-	// alone would have left a way for the corpus to move with a green lane.
+	//     go1.26.2  sha256 ae627abc8e4de10d640663eb520ef2e2c2193a29372a537b4bc72061c5d9d35d
+	//     go1.27.1  sha256 73d5acba4491a2b9069a0f7a29d16a12c31cb3d91fdc2b83ce89657f910f3ff2
+	//
+	// for the 64x64 codec source PNG (transcript:
+	// docs/evidence/fixtures/2026-09-21-determinism.md). compress/flate,
+	// image/jpeg, image/gif and image/png are what write these bytes and none
+	// of them is contractually frozen across Go releases. The verifier refuses
+	// to compare against a manifest made by another toolchain rather than
+	// reporting a difference it cannot explain.
+	Go string `json:"go"`
+	// GoMod is go.mod's `go` directive.
+	//
+	// No byte difference has been OBSERVED between `go 1.26.0` and `go 1.26.2`
+	// with the toolchain held at go1.27.1, and this field does not claim one.
+	// It is recorded for two reasons that do hold: the directive sets the
+	// GODEBUG compatibility defaults the standard library runs under, which is
+	// a mechanism by which stdlib behaviour can change without the toolchain
+	// moving; and under the default GOTOOLCHAIN=auto, raising the directive is
+	// itself a way to make a DIFFERENT toolchain run the generator — which is
+	// exactly the difference shown above. Pinning it costs one line and closes
+	// both paths.
 	GoMod string `json:"go_mod_language_version"`
 }
 
@@ -252,9 +262,9 @@ func VerifyAgainstManifest(repoRoot, scratch string) ([]Problem, error) {
 		probs = append(probs, Problem{
 			Kind: "toolchain-pin",
 			Detail: fmt.Sprintf("go.mod's language version is %s, the manifest records %s. "+
-				"That directive sets the GODEBUG compatibility defaults the standard library encoders run under, "+
-				"and it demonstrably changes the deflate output: re-pin with `make fixtures-manifest` and review "+
-				"which fixture hashes moved.", goMod, m.Toolchain.GoMod),
+				"That directive sets the standard library's GODEBUG compatibility defaults, and under GOTOOLCHAIN=auto "+
+				"it also selects which toolchain runs the generator — and the toolchain demonstrably changes these bytes. "+
+				"Re-pin with `make fixtures-manifest` and review which fixture hashes moved.", goMod, m.Toolchain.GoMod),
 		})
 	}
 

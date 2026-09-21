@@ -4,7 +4,7 @@
   "generator": {
     "name": "fixturegen",
     "version": "1",
-    "source_sha256": "88c1ca0e80127cefac1893046076f132ee7b17c25cf6fe3bcdb307016a270ba5",
+    "source_sha256": "a34db2c4f1bf9c7ed1a6cc17e871af7418bc3a15a64fee88d7547f733d011463",
     "source_files": [
       "internal/fixtures/codec.go",
       "internal/fixtures/fixtures.go",

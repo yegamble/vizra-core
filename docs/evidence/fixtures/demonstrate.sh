@@ -57,11 +57,11 @@ make fixtures-verify
 echo "exit=$?"
 
 rule "RED 3: a pinned byte-influencing version bumped without a re-pin"
-echo "--- 3a. go.mod language version (a REAL bump: it changes deflate output) ---"
+echo "--- 3a. the go.mod pin raised without re-pinning the corpus ---"
 sed -i.bak 's/^go 1\.26\.0$/go 1.26.2/' go.mod && rm -f go.mod.bak
 grep -E '^go ' go.mod
 make fixtures-verify
-echo "exit=$?  (expected non-zero: toolchain-pin, and the PNG/GIF fixture bytes move)"
+echo "exit=$?  (expected non-zero: toolchain-pin)"
 restore go.mod
 
 echo "--- 3b. the recorded codec tool version, with the bytes left alone ---"
