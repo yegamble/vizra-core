@@ -1,4 +1,5 @@
 append-only
 cache-matrix
+fixtures
 govulncheck
 docker-build

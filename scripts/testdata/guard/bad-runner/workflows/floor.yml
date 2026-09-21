@@ -21,6 +21,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - run: echo ok
+  fixtures:
+    name: fixtures
+    runs-on: ubuntu-24.04
+    steps:
+      - run: make fixtures-verify
   govulncheck:
     name: govulncheck
     runs-on: ubuntu-latest
