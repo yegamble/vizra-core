@@ -36,3 +36,38 @@ red is quoted with the reason it printed, not merely its exit code.
 acceptance platform, and none of it is a verification. Implementation state and
 verification state are different things (AGENTS.md § Evidence); this PR is
 READY_FOR_REVIEW.
+
+---
+
+## Note, 2026-09-21 (round 2, docs-only commit)
+
+The verifier's PASS at `f56dc03` came with four disclosure findings. They were
+addressed in a documentation-and-comments-only commit on top; **no code, test,
+workflow, fixture or manifest byte changed** (the two `.py` files' executable
+ASTs are identical with docstrings stripped — see the commit message).
+
+One consequence for a reader comparing digests: `D3-make-integrity.txt` line 9
+records
+
+```
+      3421fd3e75d321b7  scripts/make-integrity-guard.py
+```
+
+as the baseline digest of the file **at `f56dc03`**, which is the SHA that
+transcript was produced at and the right value for it. The docstring gained a
+residual bullet in the next commit, so that file's digest at the branch head is
+no longer `3421fd3e…`. Nothing pins or enforces it — it is a transcript of a
+historical run, and it has deliberately not been rewritten. The demonstration's
+before/after digest PAIRS inside the transcript are internally consistent and
+unaffected: each mutation is compared against the baseline captured in that same
+run.
+
+The residual list those findings produced now lives, identically, in three
+places: `AGENTS.md` ("What these two controls do NOT give you"), the
+"WHAT IT DOES NOT GUARANTEE" docstring of `scripts/make-integrity-guard.py`, and
+the PR body. The short version: **one word on a workflow line**
+(`run: make -i ci`, `make SHELL=/usr/bin/true ci`, `make MAKEFLAGS=-i ci`, or a
+step-level `env: MAKEFLAGS: -i`) still no-ops every make-driven lane with both
+guards green; control 2 covers the **unit** suite only and does not fail on zero
+tests run; and `append-only` has no provenance step. All are queued for core
+hardening sweep B and none is implemented in this PR.

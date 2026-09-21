@@ -40,7 +40,9 @@ Checks, all of which must pass:
                   the workflow nor the job overrides `defaults.run.shell`, which
                   is the Actions analogue of `SHELL := /usr/bin/true`.
   9. DIRECT       at least one floor lane runs `go test` over `./...` WITHOUT
-                  make, so a no-opped Makefile cannot make the suite silent.
+                  make, so a no-opped Makefile cannot make the UNIT suite
+                  silent. UNIT only: that lane carries no `-tags=integration`,
+                  and every integration invocation here goes through make.
 
 Checks 8 and 9 exist because every required lane here runs through `make`, and a
 verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true` or
@@ -48,6 +50,20 @@ verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true` or
 (docs/evidence/warroom/2026-09-20-vizra-search-pr2-revendor-VERIFY.md, FINDING
 8). No check written inside a Makefile can prevent that; these two say the
 out-of-make controls are present and armed.
+
+What checks 8 and 9 do NOT cover, stated so nobody infers it:
+
+  * Neither check reads the TEXT of a make step's `run:`, nor its step-level
+    `env:`. `run: make -i ci`, `run: make SHELL=/usr/bin/true ci`,
+    `run: make MAKEFLAGS=-i ci` and `env: MAKEFLAGS: -i` all leave BOTH guards
+    exiting 0 while every make-driven lane goes silent (measured at f56dc03).
+    Everything but the unit suite is in the blast radius, both integration
+    lanes and both cache-matrix legs included. Queued for core hardening
+    sweep B.
+  * Check 9 does not assert that any test EXECUTED: with every `*_test.go`
+    moved aside the lane exits 0 on `[no test files]`. Queued for sweep B.
+  * `append-only` is a floor lane that prints a merge-base SHA and has no
+    provenance step. Queued.
 
 Usage:
     ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE]
@@ -280,12 +296,17 @@ def _needs_of(job: dict) -> list[str]:
 
 
 def check_direct_test_lane(g: Guard, required: list[str], jobs: dict) -> None:
-    """Check 9: at least one required lane runs the suite without make.
+    """Check 9: at least one required lane runs the UNIT suite without make.
 
     The anchor refuses a neutered Makefile BY NAME. This is the separate control
-    for what the anchor cannot cover: whatever make did, a real failing test must
-    still fail a required lane. Every other test invocation here goes through a
-    make recipe.
+    for what the anchor cannot cover: whatever make did, a real failing UNIT test
+    must still fail a required lane. Every other test invocation here goes
+    through a make recipe.
+
+    Scope, because the name of this check is broader than what it enforces: it
+    accepts a `go test` over `./...` with no make. It does NOT require
+    `-tags=integration` (so the integration suite is not covered), and it does
+    not assert that any test actually ran. Both are queued for sweep B.
     """
     for name in required:
         entry = jobs.get(name)
