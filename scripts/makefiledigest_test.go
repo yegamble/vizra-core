@@ -871,8 +871,24 @@ func TestEveryRefusedSpellingIsRefusedBeforeMake(t *testing.T) {
 		{"override define SHELL", "override define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def},
 		{"define MAKEFLAGS", "define MAKEFLAGS\n-i\nendef\n", "assigns MAKEFLAGS " + def},
 		{"private SHELL", "private SHELL := /usr/bin/true\n", "sets SHELL to something other than the approved value"},
-		// Controls: a pattern-specific assignment of an ordinary variable, and a
-		// comment-free tree, are NOT refused.
+		// Slice B5b (R2-F1): .IGNORE / .DEFAULT / .EXTRA_PREREQS in every form.
+		{"ignore bare", ".IGNORE:\n", "names `.IGNORE`"},
+		{"ignore per-target", ".IGNORE: ci\n", "names `.IGNORE`"},
+		{"ignore double colon", ".IGNORE::\n", "names `.IGNORE`"},
+		{"ignore among targets", ".PHONY .IGNORE: ci\n", "names `.IGNORE`"},
+		{"default rule", ".DEFAULT:\n\t@true\n", "names `.DEFAULT`"},
+		{"default one-line recipe", ".DEFAULT: ; @true\n", "names `.DEFAULT`"},
+		{"extra-prereqs :=", ".EXTRA_PREREQS := Makefile\n", "names `.EXTRA_PREREQS`"},
+		{"extra-prereqs target-specific", "ci: .EXTRA_PREREQS := Makefile\n", "names `.EXTRA_PREREQS`"},
+		{"extra-prereqs override", "override .EXTRA_PREREQS += Makefile\n", "names `.EXTRA_PREREQS`"},
+		// Slice B5b (R2-F2).
+		{"pattern rule", "%.done:\n\t@echo pattern\n", "is a PATTERN rule"},
+		{"pattern rule double colon", "%.done::\n\t@echo pattern\n", "is a PATTERN rule"},
+		{"sub-make ${MAKE}", "ci-sub:\n\t${MAKE} other\n.PHONY: ci-sub\nci: ci-sub\n", "starts a sub-make"},
+		// Controls: a pattern-specific assignment of an ordinary variable, a
+		// `.DEFAULT_GOAL` (which `.DEFAULT` is a prefix of), and a comment-free
+		// tree, are NOT refused.
+		{"control: .DEFAULT_GOAL", ".DEFAULT_GOAL := ci\n", ""},
 		{"control: pattern-specific ordinary variable", "%: FOO := bar\n", ""},
 		{"control: nothing added", "", ""},
 	}

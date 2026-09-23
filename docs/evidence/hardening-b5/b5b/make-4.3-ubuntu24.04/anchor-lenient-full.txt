@@ -1,0 +1,104 @@
+make-integrity-guard: /src
+  gate targets: ci, tidy-check, build, test-integration, test-integration-shuffle, fixtures, fixtures-verify, govulncheck
+  ok    make runs only on REVIEWED bytes: the 1 file(s) it will read (Makefile) match the sha256 pins in .github/pinned-makefiles.yml, checked before make was invoked. Those bytes are not inert — reading them runs the reviewed parse-time call(s) Makefile:22 `COMMIT      ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)`; Makefile:23 `BUILT_AT    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)`. Review of a Makefile together with its pin is the control; CODEOWNERS is advisory.
+  ok    [local parity (allowlist)] every MAKEFLAGS/GNUMAKEFLAGS/MFLAGS word is one make exports itself; MAKEFILES/BASH_ENV/ENV unset; SHELL is a real shell
+  ok    `make` resolves to /usr/bin/make (type -t: file; real file /usr/bin/make, named make, in an approved system directory). This does not inspect the program's CONTENT: a forwarding stub planted there by an earlier step is outside what this guard can see.
+  ok    [local parity] the environment may set these makefile variables: ['BUILT_AT', 'COMMIT', 'GO', 'GOFLAGS', 'RELEASE', 'SQLC']
+  closure: 17 target(s); 9 reached through prerequisites (fmt-check, vet, lint-imports, migrate-lint, config-template-check, openapi-verify, sqlc-verify, ci-guard, test-race)
+  ok    make will read 1 makefile(s), from the pinned bytes: Makefile
+  ok    the root Makefile pins SHELL and .SHELLFLAGS to the approved values, and nothing else assigns them
+  ok    gate target `ci` is defined exactly once (Makefile:38)
+  ok    gate target `tidy-check` is defined exactly once (Makefile:194)
+  ok    gate target `build` is defined exactly once (Makefile:203)
+  ok    gate target `test-integration` is defined exactly once (Makefile:162)
+  ok    gate target `test-integration-shuffle` is defined exactly once (Makefile:170)
+  ok    gate target `fixtures` is defined exactly once (Makefile:126)
+  ok    gate target `fixtures-verify` is defined exactly once (Makefile:131)
+  ok    gate target `govulncheck` is defined exactly once (Makefile:185)
+  ok    gate target `fmt-check` is defined exactly once (Makefile:43)
+  ok    gate target `vet` is defined exactly once (Makefile:59)
+  ok    gate target `lint-imports` is defined exactly once (Makefile:65)
+  ok    gate target `migrate-lint` is defined exactly once (Makefile:70)
+  ok    gate target `config-template-check` is defined exactly once (Makefile:79)
+  ok    gate target `openapi-verify` is defined exactly once (Makefile:84)
+  ok    gate target `sqlc-verify` is defined exactly once (Makefile:89)
+  ok    gate target `ci-guard` is defined exactly once (Makefile:103)
+  ok    gate target `test-race` is defined exactly once (Makefile:157)
+  ok    every one of the 17 gate closure target(s) has one explicit rule and is declared .PHONY, so make searches no implicit, pattern or .DEFAULT rule for any of them
+  ok    `make -q Makefile` (every pinned makefile a goal, so -q applies to each) reports none would be remade; every later make command names them as goals so -n applies to them. -q runs no ordinary recipe — only `+`/`$(MAKE)` lines, which can come only from the pinned bytes
+  ok    make's own MAKEFILE_LIST ['Makefile'] is exactly the pinned set
+  ok    `ci`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `ci`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `ci`: `.ONESHELL:` is not in effect
+  ok    `ci`: .RECIPEPREFIX is not set
+  ok    `ci`: `.SECONDEXPANSION:` is not in effect
+  ok    `ci`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `ci`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `ci`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `ci`: make reports no duplicate-definition override
+  ok    `tidy-check`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `tidy-check`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `tidy-check`: `.ONESHELL:` is not in effect
+  ok    `tidy-check`: .RECIPEPREFIX is not set
+  ok    `tidy-check`: `.SECONDEXPANSION:` is not in effect
+  ok    `tidy-check`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `tidy-check`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `tidy-check`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `tidy-check`: make reports no duplicate-definition override
+  ok    `build`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `build`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `build`: `.ONESHELL:` is not in effect
+  ok    `build`: .RECIPEPREFIX is not set
+  ok    `build`: `.SECONDEXPANSION:` is not in effect
+  ok    `build`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `build`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `build`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `build`: make reports no duplicate-definition override
+  ok    `test-integration`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `test-integration`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `test-integration`: `.ONESHELL:` is not in effect
+  ok    `test-integration`: .RECIPEPREFIX is not set
+  ok    `test-integration`: `.SECONDEXPANSION:` is not in effect
+  ok    `test-integration`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `test-integration`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `test-integration`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `test-integration`: make reports no duplicate-definition override
+  ok    `test-integration-shuffle`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `test-integration-shuffle`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `test-integration-shuffle`: `.ONESHELL:` is not in effect
+  ok    `test-integration-shuffle`: .RECIPEPREFIX is not set
+  ok    `test-integration-shuffle`: `.SECONDEXPANSION:` is not in effect
+  ok    `test-integration-shuffle`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `test-integration-shuffle`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `test-integration-shuffle`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `test-integration-shuffle`: make reports no duplicate-definition override
+  ok    `fixtures`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `fixtures`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `fixtures`: `.ONESHELL:` is not in effect
+  ok    `fixtures`: .RECIPEPREFIX is not set
+  ok    `fixtures`: `.SECONDEXPANSION:` is not in effect
+  ok    `fixtures`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `fixtures`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `fixtures`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `fixtures`: make reports no duplicate-definition override
+  ok    `fixtures-verify`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `fixtures-verify`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `fixtures-verify`: `.ONESHELL:` is not in effect
+  ok    `fixtures-verify`: .RECIPEPREFIX is not set
+  ok    `fixtures-verify`: `.SECONDEXPANSION:` is not in effect
+  ok    `fixtures-verify`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `fixtures-verify`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `fixtures-verify`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `fixtures-verify`: make reports no duplicate-definition override
+  ok    `govulncheck`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `govulncheck`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `govulncheck`: `.ONESHELL:` is not in effect
+  ok    `govulncheck`: .RECIPEPREFIX is not set
+  ok    `govulncheck`: `.SECONDEXPANSION:` is not in effect
+  ok    `govulncheck`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`
+  ok    `govulncheck`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `govulncheck`: no expanded gate command ends in a `|| true`-family suffix
+  ok    `govulncheck`: make reports no duplicate-definition override
+  ok    no gate recipe line expands to a `-` or `+` prefix (62 line(s), leading variable references resolved from make's database)
+  ok    make's own .PHONY list covers all 17 gate closure target(s)
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)

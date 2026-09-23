@@ -68,12 +68,19 @@ shasum -a 256 Makefile      # paste into .github/pinned-makefiles.yml, same diff
 Before make, on the pinned text, it refuses: a `SHELL` / `.SHELLFLAGS` /
 `MAKEFLAGS` / `GNUMAKEFLAGS` / `MFLAGS` assignment in any form (global with any
 modifier, `define`, target- or pattern-specific) other than the two approved
-global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX` or `.SECONDEXPANSION`;
-a LITERAL `-`/`@-`/`+` prefix or `|| true`-family suffix on a gate recipe line;
-and a duplicate or conditional gate target — over the prerequisite closure.
+global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`,
+`.IGNORE`, `.DEFAULT` (whole word) or `.EXTRA_PREREQS`; a pattern rule; a
+LITERAL `-`/`@-`/`+` prefix, `|| true`-family suffix or `$(MAKE)` on a gate
+recipe line; a duplicate or conditional gate target; and a gate closure target
+with no explicit rule or not declared `.PHONY`. The recipe scan covers the
+EXPLICIT rules of the prerequisite closure — and because every closure target
+must have one and be phony, make reaches no implicit, pattern or `.DEFAULT`
+recipe through it (GNU make skips implicit-rule search for phony targets).
 After make has run on the pinned bytes, the resolver refuses what only make can
-see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` or
-declares `.SECONDEXPANSION`, a `-`/`+` prefix a leading variable expands to (a
+see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` /
+`.EXTRA_PREREQS` or declares `.SECONDEXPANSION` / `.IGNORE` / a `.DEFAULT`
+recipe, a closure target missing from make's own `.PHONY` list, a `-`/`+`
+prefix a leading variable expands to (a
 leading function or target-specific variable is refused as undeterminable), a
 `|| true` suffix in the expanded dry-run command, and a `MAKEFILE_LIST` that is
 not the pinned set. The value of any OTHER variable (`GO`, `PKGS`, …) in the
@@ -233,3 +240,17 @@ Same host (GNU Make 3.81, go1.27.1); CI could not run (billing).
 | `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
 | `./scripts/ci-required-guard.sh` | 0 | |
 | GNU Make 4.3 (`ubuntu:24.04` container): both anchors, ci-required-guard, D0–D7, C7, C10, C10b, P1, all 46 makeguard fixtures | 0 / 0 / 0 / as expected | `docs/evidence/hardening-b5/make-4.3-ubuntu24.04/` |
+
+### Slice B5b (special targets; the closure reaches only explicit, phony rules), measured on scripts/ tree `6e3ed51e…`
+
+Same host (GNU Make 3.81, go1.27.1). Not pushed at the time of measurement (the chair holds it until PR #10 merges).
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| direct unit step + `go-test-report.py` | 0 | **1230 executed, 0 failed, 0 skipped**, floor 943; `scripts` 310 |
+| `go test -race -count=1 ./scripts/` | 0 | 310 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `docs/evidence/hardening-b5/b5b/demo.sh` + `measure.sh` on 3.81 | 0 | D rows HELD; C15–C21 red, green after restore |
+| GNU Make 4.3 (`ubuntu:24.04` container): D rows, C15/C15b, `measure.sh`, both anchors, ci-required-guard, all 57 makeguard fixtures | as expected | `docs/evidence/hardening-b5/b5b/make-4.3-ubuntu24.04/`; 55 red, 2 green |

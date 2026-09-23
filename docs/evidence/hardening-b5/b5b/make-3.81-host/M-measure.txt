@@ -1,0 +1,11 @@
+GNU Make 3.81
+clean              raw make ci exit=2 | db: 
+ignore-bare        raw make ci exit=0 | db: .IGNORE:;
+ignore-per-target  raw make ci exit=0 | db: .IGNORE: ci;
+ignore-computed    raw make ci exit=0 | db: .IGNORE:;
+default-recipe     raw make ci exit=2 | db: .DEFAULT has a recipe;
+default-computed   raw make ci exit=2 | db: .DEFAULT has a recipe;
+extra-prereqs      raw make ci exit=2 | db: .EXTRA_PREREQS := Makefile;
+phony-with-pattern-and-default       make ci -> make: Nothing to be done for `ci'. 
+notphony-with-pattern-and-default    make ci -> PATTERN-RECIPE-RAN-for-ci 
+phony-with-ruleless-prerequisite     make ci -> DEFAULT-RECIPE-RAN-for-helper 

@@ -1,0 +1,37 @@
+# C17 the pre-make .EXTRA_PREREQS refusal removed
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 83fef729833370c1530f467cfe3636e6830472d7  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 6e3ed51e4e9b0669c8f4433f7b02b6504670b5a8
+
+==============================================================
+MUTATION: C17 the pre-make .EXTRA_PREREQS refusal removed
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C17
+  check:  gotest 'TestMakeIntegrityGuardFixtures/extra-prereqs|TestEveryRefusedSpellingIsRefusedBeforeMake/extra'
+--------------------------------------------------------------
+  sha256 BEFORE: 090455c70cd01be7d44c90a7e70cffde4ca07b6afd968ec7e7b7389f7376a52b
+  sha256 AFTER:  f953c94d19b7e9bc879c3f50c555f104a9bfa6f751d3e363086ceb8d0c747786
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+--- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake (0.00s)
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/extra-prereqs_target-specific (0.87s)
+        makefiledigest_test.go:913: extra-prereqs target-specific: the refusal does not name "names `.EXTRA_PREREQS`":
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/extra-prereqs_override (1.02s)
+        makefiledigest_test.go:913: extra-prereqs override: the refusal does not name "names `.EXTRA_PREREQS`":
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/extra-prereqs_:= (1.07s)
+        makefiledigest_test.go:913: extra-prereqs :=: the refusal does not name "names `.EXTRA_PREREQS`":
+--- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/extra-prereqs (0.89s)
+        scripts_test.go:429: the failure does not mention "names `.EXTRA_PREREQS`", so an author would not know what to fix:
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	2.513s
+FAIL
+go test exit=1
+------------------------------------
+  sha256 RESTORED: 090455c70cd01be7d44c90a7e70cffde4ca07b6afd968ec7e7b7389f7376a52b
+  restore byte-identical: yes
+  RESULT: C17 the pre-make .EXTRA_PREREQS refusal removed -> exit 1
+
+== after restore ==
+ok  	github.com/yegamble/vizra-core/scripts	1.745s
+go test exit=0

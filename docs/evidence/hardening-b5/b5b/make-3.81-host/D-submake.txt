@@ -1,0 +1,14 @@
+# D-submake: the committed fixture, gate stub failing
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 83fef729833370c1530f467cfe3636e6830472d7  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 6e3ed51e4e9b0669c8f4433f7b02b6504670b5a8
+
+fixture submake: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:7 — gate target `ci` starts a sub-make: `$(MAKE) other`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:7 — gate target `ci` starts a sub-make: `$(MAKE) other`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario submake: control HELD (exit 0)
+fixture_scenario exit=0

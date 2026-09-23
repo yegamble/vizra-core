@@ -1,0 +1,58 @@
+GNU Make 4.3
+at-dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `@-./run-the-real-tests.sh`
+closure-not-phony exit=1 notinv=1   FAIL  gate closure target(s) not declared `.PHONY` in the pinned bytes: ci
+conditional-target exit=1 notinv=1   FAIL  Makefile:6 defines the gate target `ci` inside a make conditional.
+dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `-./run-the-real-tests.sh`
+default-recipe exit=1 notinv=1   FAIL  Makefile:8 names `.DEFAULT`: `.DEFAULT:`
+define-shell exit=1 notinv=1   FAIL  Makefile:8 assigns SHELL with `define`: `define SHELL`
+digest-mismatch exit=1 notinv=1   FAIL  Makefile: sha256 bdf444022bc26ade2b4fadbd5afa178337636ba9b2f3996f40406a2c47901f3c does not match .gith
+duplicate-target exit=1 notinv=1   FAIL  gate target `ci` is defined 2 times: Makefile:5, Makefile:9
+eval-in-pinned-bytes exit=1 notinv=1   FAIL  Makefile:8 calls $(eval …) or $(guile …), which can manufacture an include the static reading cann
+extra-prereqs exit=1 notinv=1   FAIL  Makefile:8 names `.EXTRA_PREREQS`: `.EXTRA_PREREQS := Makefile`
+gnumakefile-present exit=1 notinv=1   FAIL  GNUmakefile exists beside the Makefile. With no -f, GNU make reads GNUmakefile INSTEAD of Makefile, so
+gnumakeflags exit=1 notinv=1   FAIL  Makefile:1 assigns GNUMAKEFLAGS: `GNUMAKEFLAGS := -k`
+good exit=0 notinv=0 
+ignore-bare exit=1 notinv=1   FAIL  Makefile:8 names `.IGNORE`: `.IGNORE:`
+ignore-per-target exit=1 notinv=1   FAIL  Makefile:8 names `.IGNORE`: `.IGNORE: ci`
+include-computed exit=1 notinv=1   FAIL  Makefile:9 `include $(INC)` names a file make COMPUTES; which file it reads cannot be determined witho
+include-outside exit=1 notinv=1   FAIL  Makefile:8 `-include /usr/local/include/vizra.mk` reads a file outside the repository.
+include-pinned-good exit=0 notinv=0 
+include-unpinned exit=1 notinv=1   FAIL  make would read inc.mk, which has no entry in .github/pinned-makefiles.yml.
+included-makeflags exit=1 notinv=1   FAIL  inc.mk:1 assigns MAKEFLAGS: `MAKEFLAGS += -i`
+included-shell exit=1 notinv=1   FAIL  inc.mk:1 assigns SHELL, but only the root Makefile may: `SHELL := /usr/bin/true`
+make-q-parse-error exit=1 notinv=0   FAIL  `make -q Makefile` failed (exit 2): make reported an ERROR, not "up to date" and not "would remake".
+makefile-symlink exit=1 notinv=1   FAIL  Makefile is not a regular file (a symlink, FIFO or device is refused): make would read whatever it poi
+makeflags-ignore exit=1 notinv=1   FAIL  Makefile:1 assigns MAKEFLAGS: `MAKEFLAGS += -i`
+missing-prerequisite exit=1 notinv=1   FAIL  `no-such-file-and-no-rule`, a prerequisite in the gate closure, has no explicit rule in the pinned byt
+missing-target exit=1 notinv=1   FAIL  gate target `ci` is not defined in any makefile make will read.
+no-shell-pin exit=1 notinv=1   FAIL  the root Makefile does not carry BOTH approved assignments.
+oneshell exit=1 notinv=1   FAIL  Makefile:3 declares `.ONESHELL`: `.ONESHELL:`
+or-true exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line ending `|| true`: `./run-the-real-tests.sh || true`
+pattern-rule exit=1 notinv=1   FAIL  Makefile:8 is a PATTERN rule: `%.done:`
+pattern-specific-shell exit=1 notinv=1   FAIL  Makefile:8 is a target- or pattern-specific assignment of SHELL: `%: SHELL := /usr/bin/true`
+pin-empty exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
+pin-malformed exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml:2: not a `  <path>: <64 lowercase hex sha256>` entry: '  "Makefile": 6b27
+pin-missing exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml does not exist. It is the list of Makefile bytes make may read; without i
+pin-without-makefile exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml does not pin `Makefile`, the file make reads first.
+plus-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `+`: `+echo "forced to run even under -n"`
+prefix-from-chained-variable exit=1 notinv=0   FAIL  Makefile:10 — gate target `ci`: `@$(EMPTY) $(IGNORE_FAILURE)./run-the-real-tests.sh` expands to a re
+prefix-from-function exit=1 notinv=0   FAIL  Makefile:7 — gate target `ci`: the recipe prefix of `$(if yes,-)./run-the-real-tests.sh` cannot be d
+prefix-from-pattern-specific exit=1 notinv=0   FAIL  Makefile:9 — gate target `ci`: the recipe prefix of `$(IGNORE_FAILURE)./run-the-real-tests.sh` canno
+prefix-from-variable exit=1 notinv=0   FAIL  Makefile:8 — gate target `ci`: `$(IGNORE_FAILURE)./run-the-real-tests.sh` expands to a recipe line p
+recipeprefix exit=1 notinv=1   FAIL  Makefile:3 names `.RECIPEPREFIX`: `.RECIPEPREFIX := >`
+resolver-cannot-resolve exit=1 notinv=0   FAIL  `make -pn ci` failed (exit 2); the lane's real shape could not be established.
+resolver-computed-default exit=1 notinv=0   FAIL  `.DEFAULT` has a recipe while resolving `ci`.
+resolver-computed-extra-prereqs exit=1 notinv=0   FAIL  make resolves .EXTRA_PREREQS to 'Makefile' while resolving `ci`.
+resolver-computed-ignore exit=1 notinv=0   FAIL  `.IGNORE:` is in effect while resolving `ci`.
+resolver-computed-makeflags exit=1 notinv=0   FAIL  make resolves MAKEFLAGS to 'inp' while resolving `ci`.
+resolver-computed-recipeprefix exit=1 notinv=0   FAIL  make resolves .RECIPEPREFIX to '>' while resolving `ci`.
+resolver-computed-secondexpansion exit=1 notinv=0   FAIL  `.SECONDEXPANSION:` is in effect while resolving `ci`.
+resolver-computed-shell exit=1 notinv=0   FAIL  make resolves SHELL to '/usr/bin/true' while resolving `ci`, not '/usr/bin/env bash'.
+secondexpansion exit=1 notinv=1   FAIL  Makefile:8 names `.SECONDEXPANSION`: `.SECONDEXPANSION:`
+semicolon-true exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line ending `; true`: `./run-the-real-tests.sh ; true`
+shell-colon exit=1 notinv=1   FAIL  Makefile:1 sets SHELL to something other than the approved value: `SHELL := :`
+shell-override exit=1 notinv=1   FAIL  Makefile:1 sets SHELL to something other than the approved value: `SHELL := /usr/bin/true`
+shellflags-neutered exit=1 notinv=1   FAIL  Makefile:2 sets .SHELLFLAGS to something other than the approved value: `.SHELLFLAGS := -c`
+stale-pin-entry exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml pins old.mk, which make would NOT read from the pinned bytes.
+submake exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` starts a sub-make: `$(MAKE) other`
+suffix-from-variable exit=1 notinv=0   FAIL  `ci`: make's own dry run prints command(s) whose exit status is discarded:
