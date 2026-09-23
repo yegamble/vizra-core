@@ -28,7 +28,7 @@ trap 'rm -f "$REC"' EXIT
 
 header() {
   echo "# $1"
-  echo "# host: $(uname -sm)  make: $(make --version | head -1)  python3: $(python3 --version 2>&1)  go: $(go version | awk '{print $3}')"
+  echo "# host: $(uname -sm)  make: $(make --version | head -1)  python3: $(python3 --version 2>&1)  go: $(go version 2>/dev/null | awk '{print $3}')"
   echo "# tree: $(git rev-parse HEAD)  ($(git status --porcelain | wc -l | tr -d ' ') uncommitted path(s) before the run)"
   echo
 }
@@ -97,6 +97,37 @@ export REC
     "anchor --workflow; anchor; guard"
   echo "== after restore =="; anchor --workflow
 } > "$out/D4-pin-entry-deleted.txt" 2>&1
+
+{
+  header "D5 a newer SIBLING Makefile.sh beside the Makefile (make's builtin rule \`%: %.sh\` would remake the Makefile)"
+  scratch="$(mktemp -d)"
+  echo "== raw make, in a scratch dir holding only a 3-line Makefile and a newer copy of it plus one comment =="
+  ( cd "$scratch" && printf '.PHONY: ci\nci:\n\t@echo gate\n' > Makefile && touch -t 202001010000 Makefile \
+      && { cat Makefile; echo '# sibling copy, one comment longer'; } > Makefile.sh \
+      && b="$(shasum -a 256 Makefile | cut -d' ' -f1)" \
+      && make -q Makefile; echo "make -q Makefile exit=$? ; Makefile unchanged: $([ "$(shasum -a 256 Makefile | cut -d' ' -f1)" = "$b" ] && echo yes || echo NO)" \
+      && make -pn ci > p.txt 2>&1; echo "make -pn ci exit=$? ; Makefile unchanged: $([ "$(shasum -a 256 Makefile | cut -d' ' -f1)" = "$b" ] && echo yes || echo NO) ; recipe lines make ran/printed: $(grep -c '^cat Makefile.sh >Makefile' p.txt)" )
+  rm -rf "$scratch"
+  echo "== the anchor, on this tree, with the same kind of sibling =="
+  before="$(shasum -a 256 Makefile | cut -d' ' -f1)"
+  { cat Makefile; echo '# sibling copy, one comment longer'; } > Makefile.sh
+  touch -t 202001010000 Makefile
+  echo "  added Makefile.sh sha256 $(shasum -a 256 Makefile.sh | cut -d' ' -f1); Makefile sha256 $before (mtime set older)"
+  anchor --workflow
+  anchor
+  after="$(shasum -a 256 Makefile | cut -d' ' -f1)"
+  echo "  Makefile after the anchor: $after  byte-identical: $([ "$after" = "$before" ] && echo yes || echo NO)"
+  rm -f Makefile.sh
+  touch Makefile
+  echo "== sibling removed =="
+  anchor --workflow
+} > "$out/D5-remake-sibling.txt" 2>&1
+
+if [ "${DEMO_ONLY:-}" = "D" ]; then
+  echo "DEMO_ONLY=D: code mutations (C*) skipped; they need go."
+  echo "tree after the byte demonstrations: $(git status --porcelain | wc -l | tr -d ' ') uncommitted path(s)"
+  exit 0
+fi
 
 # ----------------------------------------------------------------- C: code ---
 # go test's OWN exit code is the check's exit code; the grep only trims the log
