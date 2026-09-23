@@ -83,53 +83,64 @@
     "0 skipped. The generator's formula calls for internal/httpapi 66 -> 85 (measured 100),",
     "internal/obs 14 -> 36 (measured 42) and internal/search 110 -> 112 (measured 132) in both suites,",
     "and min_tests unit 1028 -> 1070, integration 1171 -> 1214; applied. Every other per-package",
-    "floor already equals the generator's output. Nothing was lowered."
+    "floor already equals the generator's output. Nothing was lowered.",
+    "",
+    "Queue 2t (M1-A sentinel follow-ups S-0002..S-0007, S-0009, S-0010) added tests to",
+    "internal/{config,httpapi,ownerclaim,integration}. Measured at 6090b64 (on a6bc77d, which also",
+    "carries core #13's scripts tests), go1.27.1, darwin/arm64, `go test -race -count=1 -json`:",
+    "unit 1575 executed; integration 1769 executed on BOTH cache images (PostgreSQL 18.6; Valkey 9.1.2",
+    "and Redis 7.2.16), plain and shuffled, 0 skipped. The chair's ruling applies the formula to every",
+    "package, so every proposal from that run is applied: internal/config 86 -> 94 (measured 110),",
+    "internal/httpapi 85 -> 86 (101), internal/ownerclaim 16 -> 18 (21), internal/integration",
+    "144 -> 165 (194, integration only), and scripts 161 -> 419 (493; that growth is core #13's, not",
+    "this slice's), and min_tests unit 1070 -> 1339, integration 1214 -> 1504. Every other",
+    "per-package floor already equals the generator's output. Nothing was lowered."
   ],
   "suites": {
     "unit": {
-      "min_tests": 1070,
+      "min_tests": 1339,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 10,
         "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 7,
-        "github.com/yegamble/vizra-core/internal/config": 86,
+        "github.com/yegamble/vizra-core/internal/config": 94,
         "github.com/yegamble/vizra-core/internal/credential": 4,
         "github.com/yegamble/vizra-core/internal/doctor": 33,
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
-        "github.com/yegamble/vizra-core/internal/httpapi": 85,
+        "github.com/yegamble/vizra-core/internal/httpapi": 86,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 36,
-        "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
+        "github.com/yegamble/vizra-core/internal/ownerclaim": 18,
         "github.com/yegamble/vizra-core/internal/search": 112,
         "github.com/yegamble/vizra-core/internal/site": 4,
-        "github.com/yegamble/vizra-core/scripts": 161
+        "github.com/yegamble/vizra-core/scripts": 419
       },
       "allowed_skips": {}
     },
     "integration": {
-      "min_tests": 1214,
+      "min_tests": 1504,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 10,
         "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 7,
-        "github.com/yegamble/vizra-core/internal/config": 86,
+        "github.com/yegamble/vizra-core/internal/config": 94,
         "github.com/yegamble/vizra-core/internal/credential": 4,
         "github.com/yegamble/vizra-core/internal/doctor": 33,
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
-        "github.com/yegamble/vizra-core/internal/httpapi": 85,
-        "github.com/yegamble/vizra-core/internal/integration": 144,
+        "github.com/yegamble/vizra-core/internal/httpapi": 86,
+        "github.com/yegamble/vizra-core/internal/integration": 165,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 36,
-        "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
+        "github.com/yegamble/vizra-core/internal/ownerclaim": 18,
         "github.com/yegamble/vizra-core/internal/search": 112,
         "github.com/yegamble/vizra-core/internal/site": 4,
-        "github.com/yegamble/vizra-core/scripts": 161
+        "github.com/yegamble/vizra-core/scripts": 419
       },
       "allowed_skips": {}
     }
