@@ -1,0 +1,39 @@
+# R2 — the ANCHOR's own process assertions (chair ruling item 3).
+# tree: e710c3cff18bd63c87a692937b608fa762627d99 (working tree)
+# The anchor now runs IMMEDIATELY before every make step, so a $GITHUB_ENV or
+# $GITHUB_PATH write by an earlier step lands in ITS process exactly as it would
+# in make's. Adjacency is what makes these assertions mean anything.
+
+== control ==
+  unmodified environment                 EXIT=0 (expect 0)
+
+== $GITHUB_ENV writes — DEFAULT-DENY, not a blacklist ==
+  MAKEFLAGS=-i                           EXIT=1  the environment sets MAKEFLAGS='-i', and this guard is not
+  MAKEFLAGS=--no-such-flag               EXIT=1  the environment sets MAKEFLAGS='--no-such-flag', and this 
+  GNUMAKEFLAGS=-i                        EXIT=1  the environment sets GNUMAKEFLAGS='-i', and this guard is 
+  MFLAGS=-i                              EXIT=1  the environment sets MFLAGS='-i', and this guard is not ru
+  MAKEFILES=/tmp/evil.mk                 EXIT=1  the environment sets MAKEFILES='/tmp/evil.mk'.
+  BASH_ENV=/tmp/fn.sh                    EXIT=1  the environment sets BASH_ENV='/tmp/fn.sh'.
+  ENV=/tmp/fn.sh                         EXIT=1  the environment sets ENV='/tmp/fn.sh'.
+  SHELL=/usr/bin/true                    EXIT=1  the environment sets SHELL='/usr/bin/true', which is not a
+
+  'MAKEFLAGS=--no-such-flag' is the point: a BLACKLIST would pass it. Out of make
+  these must be UNSET, whatever they say.
+
+== $GITHUB_PATH write: a stub `make` earlier on PATH ==
+  PATH=/tmp/vzb2-shadow:$PATH            EXIT=1  `make` resolves to '/private/tmp/vzb2-shadow/make', which is not in ['/usr/bin
+
+== a shell FUNCTION named make (survives via BASH_ENV/export -f) ==
+  export -f make                         EXIT=1  `make` is a function, not a program on disk (`type -t make` says 'func
+
+== parity: `make ci-guard` runs the SAME script UNDER make ==
+  make sets MAKEFLAGS for its recipes, so strictness is keyed on MAKELEVEL and
+  falls back to the flag test there. The fallback still refuses -i/-k/-t/-q, and
+  the WORKFLOW anchor — the invocation that is the control — never runs under make.
+  make ci-guard                          EXIT=0 (expect 0)
+  make ci-guard with MAKEFLAGS=-i        EXIT=0  <-- and this is the whole reason the
+    anchor is an OUT-OF-MAKE workflow step. `-i` tells make to ignore the recipe's
+    failure, so the guard inside DOES go red and make reports 0 anyway. A control
+    invoked through the thing it is checking is not a control; AGENTS.md has said so
+    since sweep A. The workflow anchor runs outside make, where MAKEFLAGS=-i is
+    refused outright (the first row of this transcript).
