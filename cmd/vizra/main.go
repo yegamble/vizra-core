@@ -23,6 +23,8 @@ Usage:
                            worker. Exit 0 only on a ready answer; this is the
                            container healthcheck, and it cannot pass while the
                            service it probes is broken. See --help for exit codes.
+  vizra claim-token        Mint a one-time owner-claim token and print it to
+                           stdout. Refuses once the instance has accounts.
 
 Commands arriving with later slices: setup, backup, restore, update, jobs.
 `
@@ -45,6 +47,8 @@ func main() {
 		// container runtime reads, and main's generic "error → exit 1" would
 		// flatten a usage mistake into a verdict about the service.
 		os.Exit(runHealthcheck(os.Args[2:]))
+	case "claim-token":
+		err = runClaimToken(os.Args[2:])
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return

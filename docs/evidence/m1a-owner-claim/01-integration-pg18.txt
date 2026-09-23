@@ -1,0 +1,84 @@
+src: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a (round 4, the limiter fix). The next commit, 2ad370e, changes only scripts/test-floors.json (integration 140->144, min_tests 1147->1150); the same event streams re-judged against it: ok (see the end of 01).
+# Integration suite exactly as build-test's direct step runs it, on BOTH cache images
+
+## valkey
+HEAD: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a  tree-clean: yes  date: 2026-09-23T10:58:40Z  load: 42.67 158.52 170.20
+cache: valkey (Valkey server v=9.1.2 sha=0000)  db: PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)
+go test (integration) exited 0
+go-test-report: suite 'integration' from r4-int-valkey.json
+  packages ok:              18
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1353  (floor: 1147)
+    top-level:              341
+    passed:                 1353
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+  github.com/yegamble/vizra-core/cmd/api: 1 test(s) (floor: 1)
+  github.com/yegamble/vizra-core/cmd/vizra: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/audit: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/authz: 502 test(s) (floor: 427)
+  github.com/yegamble/vizra-core/internal/cache: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/config: 101 test(s) (floor: 86)
+  github.com/yegamble/vizra-core/internal/credential: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/doctor: 39 test(s) (floor: 33)
+  github.com/yegamble/vizra-core/internal/fixtures: 42 test(s) (floor: 36)
+  github.com/yegamble/vizra-core/internal/healthcheck: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 48)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 140)
+  github.com/yegamble/vizra-core/internal/jobs: 30 test(s) (floor: 26)
+  github.com/yegamble/vizra-core/internal/obs: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/ownerclaim: 19 test(s) (floor: 16)
+  github.com/yegamble/vizra-core/internal/search: 129 test(s) (floor: 110)
+  github.com/yegamble/vizra-core/internal/site: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/scripts: 189 test(s) (floor: 161)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1147 met
+report exit=0
+
+## redis
+HEAD: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a  tree-clean: yes  date: 2026-09-23T11:02:21Z  load: 20.14 93.32 139.55
+cache: redis (Redis server v=7.2.16 sha=0000)  db: PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)
+go test (integration) exited 0
+go-test-report: suite 'integration' from r4-int-redis.json
+  packages ok:              18
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1353  (floor: 1147)
+    top-level:              341
+    passed:                 1353
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+  github.com/yegamble/vizra-core/cmd/api: 1 test(s) (floor: 1)
+  github.com/yegamble/vizra-core/cmd/vizra: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/audit: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/authz: 502 test(s) (floor: 427)
+  github.com/yegamble/vizra-core/internal/cache: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/config: 101 test(s) (floor: 86)
+  github.com/yegamble/vizra-core/internal/credential: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/doctor: 39 test(s) (floor: 33)
+  github.com/yegamble/vizra-core/internal/fixtures: 42 test(s) (floor: 36)
+  github.com/yegamble/vizra-core/internal/healthcheck: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 48)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 140)
+  github.com/yegamble/vizra-core/internal/jobs: 30 test(s) (floor: 26)
+  github.com/yegamble/vizra-core/internal/obs: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/ownerclaim: 19 test(s) (floor: 16)
+  github.com/yegamble/vizra-core/internal/search: 129 test(s) (floor: 110)
+  github.com/yegamble/vizra-core/internal/site: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/scripts: 189 test(s) (floor: 161)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1147 met
+report exit=0
+
+## the same two event streams re-judged against 2ad370e's floors
+go-test-report: suite 'integration' from r4-int-valkey.json
+  tests executed:           1353  (floor: 1150)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 144)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1150 met
+report exit=0
+go-test-report: suite 'integration' from r4-int-redis.json
+  tests executed:           1353  (floor: 1150)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 144)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1150 met
+report exit=0

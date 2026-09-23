@@ -34,6 +34,17 @@ servers:
         default: http://localhost:8080
 
 tags:
+  - name: setup
+    description: |
+      First-run owner claim (VZ-INSTALL-003). Unauthenticated by design: before
+      an owner exists there is no principal to authenticate. The credential is
+      the one-time claim token carried in the request body, never ambient, so
+      these operations are not protected by a session or a CSRF token but by
+      token entropy, single use enforced by a database constraint, a
+      failure-keyed rate limit, and a strict content-type and origin posture.
+
+      While the instance is unclaimed these two operations and the four probes
+      are the ONLY reachable routes; everything else answers 403.
   - name: probes
     description: |
       Liveness, readiness, build identity and schema state. These operations are
@@ -133,8 +144,192 @@ paths:
               schema:
                 $ref: "#/components/schemas/SchemaResponse"
 
+  /api/v1/setup/claim-status:
+    get:
+      tags: [setup]
+      operationId: getSetupClaimStatus
+      summary: Whether this instance has an owner yet
+      description: |
+        Returns exactly one bit. It deliberately does NOT report when a token was
+        minted, when it expires, its generation, whether one is currently live, a
+        user count, or the owner's identity: the claim page needs one bit to
+        choose between the form and the "already claimed" screen, and every other
+        field would be secret material, a freshness oracle for a token-guessing
+        attacker, or an enumeration aid.
+
+        `claimed: false` does advertise an unclaimed instance, but so does the
+        public claim page and an empty gallery; concealment there would be
+        illusory while the token remains the real control.
+      security: []
+      responses:
+        "200":
+          description: The claim state of this instance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupClaimStatus"
+        "429":
+          description: |
+            Too many requests to this route. It carries its own hard ceiling,
+            separate from the claim endpoint's, so a flood here can never spend
+            the budget a claim needs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The instance state could not be read.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/setup/claim-owner:
+    post:
+      tags: [setup]
+      operationId: claimOwner
+      summary: Redeem the one-time token and create the owner account
+      description: |
+        Exchanges the one-time claim token for THE owner account, exactly once.
+        The operator obtains a token with `vizra claim-token` (whose output goes
+        to their terminal, not to the container log).
+
+        NO SESSION IS ESTABLISHED at this milestone: sessions arrive with
+        VZ-AUTH-001, and this response therefore sets no cookie. A client must
+        send the new owner to the sign-in page. `Set-Cookie` will be added to
+        this same operation by that slice, which is a backward-compatible change.
+
+        `Content-Type` must be `application/json`; unknown properties are
+        refused; the body is bounded at 8 KiB. If `Origin` is present it must
+        equal the instance's configured public origin, and if `Sec-Fetch-Site` is
+        present it must be `same-origin` or `none` — absence of both is allowed
+        so non-browser clients work.
+
+        A refused token returns ONE message for every cause — mistyped,
+        malformed, already redeemed, superseded by a re-mint, expired, or never
+        minted. The server cannot distinguish them from a digest comparison, and
+        separate messages would be both inaccurate and an oracle.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimOwnerRequest"
+      responses:
+        "201":
+          description: The owner account was created. No session is established.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimOwnerResponse"
+        "400":
+          description: A field is missing, unknown or outside its bounds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: |
+            The claim token was not accepted (`forbidden`), or the request Origin
+            did not match this instance's public origin (`origin_mismatch`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: This instance already has an owner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: The request body exceeded 8 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: The request was not `application/json`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many failed attempts, or the hard request ceiling was reached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The database was unreachable, or hashing capacity was exhausted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   schemas:
+    SetupClaimStatus:
+      type: object
+      additionalProperties: false
+      required: [claimed]
+      properties:
+        claimed:
+          type: boolean
+          description: Whether this instance already has an owner account.
+
+    ClaimOwnerRequest:
+      type: object
+      additionalProperties: false
+      required: [token, username, email, password]
+      properties:
+        token:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: |
+            The one-time claim token: 64 hexadecimal characters (256 bits).
+            Surrounding whitespace is trimmed and the value is case-insensitive.
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{2,29}$"
+          description: |
+            3 to 30 characters: letters, numbers, hyphen or underscore, starting
+            with a letter or number. Compared case-insensitively for uniqueness.
+        email:
+          type: string
+          maxLength: 254
+          pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+          description: |
+            At most 254 BYTES — the server bound is `octet_length`, not a
+            character count, so a non-ASCII address may be refused before it
+            reaches 254 characters. Stored for later account recovery; this
+            release sends no email.
+        password:
+          type: string
+          minLength: 12
+          maxLength: 256
+          description: |
+            At least 12 characters and at most 256, and at most 1024 BYTES.
+            Hashed with argon2id as raw UTF-8 with no Unicode normalisation.
+
+    ClaimOwnerResponse:
+      type: object
+      additionalProperties: false
+      required: [username, role]
+      properties:
+        username:
+          type: string
+          description: |
+            The owner's username, which is the public handle for an account.
+            The internal identifier is deliberately not returned.
+        role:
+          type: string
+          enum: [owner]
+
+
     HealthResponse:
       type: object
       additionalProperties: false

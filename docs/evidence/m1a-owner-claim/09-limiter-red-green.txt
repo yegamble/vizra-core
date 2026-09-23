@@ -1,0 +1,47 @@
+src: working tree on 37601f5 (fix staged, uncommitted); only internal/cache/ratelimit.go differs between the two runs below
+# R4-A red/green: the four fixed-window limiter tests, Valkey 9.1.2 and Redis 7.2.16
+
+## RED — internal/cache/ratelimit.go as at 37601f5 (INCR + unconditional EXPIRE)
+$ go test -tags=integration -count=1 -v -run 'TestTheCacheLimiter|TestTheCacheAndFallbackLimitersAgree' ./internal/integration/   (once per cache)
+=== cache VALKEY — ratelimit.go as at 37601f5 (BEFORE the fix)
+    ratelimit_test.go:91: 1.5s and three requests later the TTL is 9.999s (it was 10s): a request REFRESHED the window, so a caller who keeps sending can hold a limited key closed for ever
+--- FAIL: TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow (1.51s)
+    ratelimit_test.go:119: a request 3.302s after the window opened (window 3s) was refused: the refused request inside the window extended it
+--- FAIL: TestTheCacheLimiterReopensWhenTheWindowRolls (3.31s)
+--- PASS: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne (0.01s)
+    ratelimit_test.go:233: step 4 (+6.3s): [cache up] allowed=false, want true (fixed window: 2 per 6s from the FIRST request of the window)
+    ratelimit_test.go:233: step 5 (+6.4s): [cache up] allowed=false, want true (fixed window: 2 per 6s from the FIRST request of the window)
+--- FAIL: TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics (11.54s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	17.119s
+FAIL
+=== cache REDIS — ratelimit.go as at 37601f5 (BEFORE the fix)
+    ratelimit_test.go:91: 1.5s and three requests later the TTL is 9.999s (it was 9.977s): a request REFRESHED the window, so a caller who keeps sending can hold a limited key closed for ever
+--- FAIL: TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow (1.55s)
+    ratelimit_test.go:119: a request 3.308s after the window opened (window 3s) was refused: the refused request inside the window extended it
+--- FAIL: TestTheCacheLimiterReopensWhenTheWindowRolls (3.32s)
+--- PASS: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne (0.10s)
+    ratelimit_test.go:233: step 4 (+6.3s): [cache up] allowed=false, want true (fixed window: 2 per 6s from the FIRST request of the window)
+    ratelimit_test.go:233: step 5 (+6.4s): [cache up] allowed=false, want true (fixed window: 2 per 6s from the FIRST request of the window)
+--- FAIL: TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics (11.39s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	17.250s
+FAIL
+
+NOTE: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne PASSES on the old code by construction (it set a TTL on
+every call). It cannot be red there; it guards the fix against the naive alternative, and MUT-63 in
+02-mutations.txt shows it red against that (TTL set only when INCR returns 1).
+
+## GREEN — with INCR + EXPIRE key window NX in one MULTI/EXEC
+=== cache VALKEY — with the fix (EXPIRE ... NX)
+--- PASS: TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow (1.54s)
+--- PASS: TestTheCacheLimiterReopensWhenTheWindowRolls (3.35s)
+--- PASS: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne (0.17s)
+--- PASS: TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics (11.65s)
+ok  	github.com/yegamble/vizra-core/internal/integration	17.617s
+=== cache REDIS — with the fix (EXPIRE ... NX)
+--- PASS: TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow (1.53s)
+--- PASS: TestTheCacheLimiterReopensWhenTheWindowRolls (3.33s)
+--- PASS: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne (0.03s)
+--- PASS: TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics (11.75s)
+ok  	github.com/yegamble/vizra-core/internal/integration	17.500s

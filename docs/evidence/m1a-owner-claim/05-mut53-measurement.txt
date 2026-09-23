@@ -1,0 +1,17 @@
+src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
+# MUT-53 (review-only) re-measured against the closing slice's code
+# The previous measurement (at 95afb62, before classifyRefusal existed) is in this file's git history.
+
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  date: 2026-09-23T08:01:58Z  cache: valkey 9.1.2  db: PostgreSQL 18.6  shell: bash
+MUT-53: delete ONLY the in-transaction AnyUserExists gate in ownerclaim.Claim (the redeem statement's users guard stays)
+file sha256 before/after: (this line was garbled by a quoting defect in the wrapper;
+  recomputed afterwards by applying the same perl mutation to a COPY: before c4e72cbcdc5f8586..., after d8eb0689017748e8...;
+  the git diff --stat below, taken during the run, shows the 7-line deletion applied)
+ internal/ownerclaim/ownerclaim.go | 7 -------
+ 1 file changed, 7 deletions(-)
+$ go test -race -count=1 -tags=integration ./internal/integration/ ./internal/ownerclaim/ ./internal/httpapi/
+ok  	github.com/yegamble/vizra-core/internal/integration	125.381s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	2.415s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	4.790s
+exit=0  (0 = nothing reddened: the deletion is not observable, as declared)
+restored: c4e72cbcdc5f8586…  tree clean: yes

@@ -1,0 +1,119 @@
+src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
+# TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation — stress runs (closing slice)
+
+Each run executes the test binary with -test.count=N -test.v and counts the
+`--- PASS/FAIL` line of every isolation sub-test. One iteration = 32 concurrent
+claimants under EACH of the three server default isolations (read committed,
+repeatable read, serializable), on a fresh database schema per sub-test.
+
+Binaries: `integ-655f46a-norace.test` = `go test -tags=integration -c` of
+`git archive 655f46a` (the head CI failed on); `integ-a42ca76.test` /
+`integ-a42ca76-race.test` = the same without / with -race at a42ca76 (the fix).
+`git diff a42ca76 c79c4d2 -- internal cmd migrations api store go.mod go.sum` is
+empty, so these binaries test the same product and test code as the pushed head.
+
+The non-race binary is used for the 200x runs for throughput (5-14 s per
+iteration versus 26-75 s under -race on this host, as measured below); two -race runs of 20 follow.
+Services: PostgreSQL 18.6, Valkey 9.1.2, Redis 7.2.16 (the CI digests), one
+database per concurrent run. Host: darwin/arm64, 8 CPUs, shared with other work
+(load averages are recorded per run; "contended" adds 16 busy loops on top).
+"contention" labels in the first runs were printed by an earlier version of the
+script as "0/1 (16 busy-loop processes ...)"; they are normalised below and the
+counts are untouched.
+
+------------------------------------------------------------------------
+label:     baseline655-valkey-contended
+binary:    integ-655f46a-norace.test
+cache:     valkey (Valkey server v=9.1.2 sha=00000000:0 mal)
+count:     200   contention: 16 busy-loop processes added on 8 CPUs
+start:     2026-09-23T04:29:55Z   load: 127.83 293.34 290.67
+exit:      1   elapsed: 2522s   end load: 320.19 339.53 341.46
+  read_committed: pass=200 fail=0
+  repeatable_read: pass=199 fail=1
+  serializable: pass=199 fail=1
+  top-level: pass=198 fail=2
+  failure lines:
+    owner_claim_test.go:392: claimant 5 got an unexpected 403: map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]]
+    owner_claim_test.go:392: claimant 13 got an unexpected 403: map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]]
+    owner_claim_test.go:392: claimant 26 got an unexpected 403: map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]]
+    owner_claim_test.go:399: 28 claimants were declined, want 31
+    owner_claim_test.go:392: claimant 28 got an unexpected 403: map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]]
+    owner_claim_test.go:399: 30 claimants were declined, want 31
+------------------------------------------------------------------------
+label:     a42ca76-valkey-noextra
+binary:    integ-a42ca76.test
+cache:     valkey (Valkey server v=9.1.2 sha=00000000:0 mal)
+database:  vizra_s1 (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2))
+count:     200   contention: none added by this run (host load from other work only)
+start:     2026-09-23T05:39:58Z   load: 141.43 172.89 254.89
+exit:      0   elapsed: 1397s   end load: 155.35 162.03 190.33
+  read_committed: pass=200 fail=0
+  repeatable_read: pass=200 fail=0
+  serializable: pass=200 fail=0
+  top-level: pass=200 fail=0
+  failure lines:
+------------------------------------------------------------------------
+label:     a42ca76-valkey-contended
+binary:    integ-a42ca76.test
+cache:     valkey (Valkey server v=9.1.2 sha=00000000:0 mal)
+database:  vizra_s1 (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2))
+count:     200   contention: 16 busy-loop processes added on 8 CPUs
+start:     2026-09-23T06:03:35Z   load: 135.09 156.84 187.81
+exit:      0   elapsed: 1890s   end load: 305.42 314.08 295.28
+  read_committed: pass=200 fail=0
+  repeatable_read: pass=200 fail=0
+  serializable: pass=200 fail=0
+  top-level: pass=200 fail=0
+  failure lines:
+------------------------------------------------------------------------
+label:     a42ca76-redis-noextra
+binary:    integ-a42ca76.test
+cache:     redis (Redis server v=7.2.16 sha=00000000:0 mal)
+database:  vizra_s2 (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2))
+count:     200   contention: none added by this run (host load from other work only)
+start:     2026-09-23T05:28:54Z   load: 331.08 364.16 361.69
+exit:      0   elapsed: 1092s   end load: 228.14 223.78 249.56
+  read_committed: pass=200 fail=0
+  repeatable_read: pass=200 fail=0
+  serializable: pass=200 fail=0
+  top-level: pass=200 fail=0
+  failure lines:
+------------------------------------------------------------------------
+label:     a42ca76-redis-contended
+binary:    integ-a42ca76.test
+cache:     redis (Redis server v=7.2.16 sha=00000000:0 mal)
+database:  vizra_s2 (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2))
+count:     200   contention: 16 busy-loop processes added on 8 CPUs
+start:     2026-09-23T04:42:45Z   load: 306.49 288.74 286.42
+exit:      0   elapsed: 2761s   end load: 347.56 368.39 363.13
+  read_committed: pass=200 fail=0
+  repeatable_read: pass=200 fail=0
+  serializable: pass=200 fail=0
+  top-level: pass=200 fail=0
+  failure lines:
+------------------------------------------------------------------------
+label:     a42ca76-redis-race
+binary:    integ-a42ca76-race.test
+cache:     redis (Redis server v=7.2.16 sha=00000000:0 mal)
+database:  vizra_s2 (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2))
+count:     20   contention: none added by this run (host load from other work only)
+start:     2026-09-23T05:49:01Z   load: 179.00 208.31 240.28
+exit:      0   elapsed: 1507s   end load: 232.56 225.31 209.70
+  read_committed: pass=20 fail=0
+  repeatable_read: pass=20 fail=0
+  serializable: pass=20 fail=0
+  top-level: pass=20 fail=0
+  failure lines:
+------------------------------------------------------------------------
+label:     a42ca76-valkey-race
+binary:    integ-a42ca76-race.test
+cache:     valkey (Valkey server v=9.1.2 sha=00000000:0 mal)
+database:  vizra_s1 (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2))
+count:     20   contention: none added by this run (host load from other work only)
+start:     2026-09-23T07:49:12Z   load: 223.93 194.10 204.57
+exit:      0   elapsed: 513s   end load: 141.06 154.03 180.46
+  read_committed: pass=20 fail=0
+  repeatable_read: pass=20 fail=0
+  serializable: pass=20 fail=0
+  top-level: pass=20 fail=0
+  failure lines:
