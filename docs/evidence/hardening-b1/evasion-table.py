@@ -64,6 +64,26 @@ ROWS = [
     ("R1",  "wrapper script ADDED early in the job (not replacing)",  "early", "./scripts/wrap.sh"),
     ("R2",  "an arbitrary EARLY step rewrites a test file on disk",    "early", "echo 'package obs' > internal/obs/obs_test.go"),
     ("R3",  "an arbitrary EARLY step writes MAKEFLAGS to $GITHUB_ENV", "early", 'echo \'MAKEFLAGS=-i\' >> "$GITHUB_ENV"'),
+    # ---- fix round 2: the verifier's re-verification rows (N1-N5, J4, P9) ----
+    ("N1",  "the anchor step runs the guard THEN writes MAKEFLAGS to $GITHUB_ENV", "anchor",
+            '      - name: Refuse a neutered Makefile\n        run: ./scripts/make-integrity-guard.sh --workflow && echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"\n'),
+    ("N2",  "real anchor, then a look-alike step that writes, then make ci", "anchor",
+            '      - name: Refuse a neutered Makefile\n        run: ./scripts/make-integrity-guard.sh --workflow\n'
+            '      - name: Refuse a neutered Makefile, again\n        run: |\n          : make-integrity-guard\n          echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"\n'),
+    ("N3",  "earlier write; the adjacent 'anchor' is ': make-integrity-guard'", "anchor",
+            '      - name: prepare\n        run: echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"\n'
+            "      - name: Refuse a neutered Makefile\n        run: ': make-integrity-guard'\n"),
+    ("N4",  "the anchor step runs the guard THEN writes a stub dir to $GITHUB_PATH", "anchor",
+            '      - name: Refuse a neutered Makefile\n        run: ./scripts/make-integrity-guard.sh --workflow && echo /tmp/sh >> "$GITHUB_PATH"\n'),
+    ("N5",  "the anchor step writes MAKELEVEL + MAKEFLAGS for the next step", "anchor",
+            "      - name: Refuse a neutered Makefile\n        run: |\n          ./scripts/make-integrity-guard.sh --workflow\n"
+            "          printf 'MAKELEVEL=1\\nMAKEFLAGS=-ki\\n' >> \"$GITHUB_ENV\"\n"),
+    ("N6",  "the round-2 anchor form, without --workflow (lenient mode)", "anchor",
+            "      - name: Refuse a neutered Makefile\n        run: ./scripts/make-integrity-guard.sh\n"),
+    ("J4",  "job-level env: MAKELEVEL: '1'",                   "jobenv", ("MAKELEVEL", "'1'")),
+    ("J6",  "job-level env: GO: 'true' (the Makefile's GO ?= go)", "jobenv", ("GO", "'true'")),
+    ("P9",  "duplicate key: run: make -i ci, then run: make ci", "raw",
+            "      - name: make ci\n        run: make -i ci\n        run: make ci\n"),
 ]
 
 def sha(p): return hashlib.sha256(io.open(p,'rb').read()).hexdigest()
@@ -95,6 +115,21 @@ def apply(tmp, kind, payload):
                             + payload + "\n", 1)
         io.open(p, "w").write(text)
         return before, sha(p)
+    elif kind == "anchor":
+        # Replace the anchor step immediately before `make ci` with the payload.
+        anch = ("      - name: Refuse a neutered Makefile\n"
+                "        run: ./scripts/make-integrity-guard.sh --workflow\n" + target)
+        assert text.count(anch) == 1, "anchor+make text not unique"
+        io.open(p, "w").write(text.replace(anch, payload + target, 1))
+        return before, sha(p)
+    elif kind == "jobenv":
+        k, v = payload
+        m = "    env:\n      VIZRA_TEST_DATABASE_URL"   # build-test's job env comes first
+        assert m in text
+        io.open(p, "w").write(text.replace(m, f"    env:\n      {k}: {v}\n      VIZRA_TEST_DATABASE_URL", 1))
+        return before, sha(p)
+    elif kind == "raw":
+        new = payload
     elif kind == "insert":
         new = ("      - name: prepare\n        run: " + payload + "\n") + target
     elif kind == "job":
@@ -133,6 +168,9 @@ for rid, desc, kind, payload in ROWS:
         if "job-level env sets" in out or "workflow-level env sets" in out: rules.append("8b env")
         if "cannot be tokenised" in out: rules.append("8b untokenisable")
         if "direct test step" in out or "runs the unit suite" in out: rules.append("9 direct")
+        if "not byte-equal to the pinned anchor" in out: rules.append("8 anchor pin")
+        if "duplicate key" in out: rules.append("R-4 duplicate key")
+        if "takes FROM the" in out: rules.append("8b env (?=)")
         results.append((rid, desc, "RED", ", ".join(rules) or "other"))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -145,3 +183,66 @@ for rid, desc, res, rule in results:
 print()
 print("GREEN rows:", [r[0] for r in results if r[2] == "GREEN"])
 print("ABORT rows:", [r[0] for r in results if r[2] == "ABORT"])
+
+
+# =============================================================================
+# RUNTIME: the anchor itself, invoked EXACTLY as the pinned step invokes it
+# (`./scripts/make-integrity-guard.sh --workflow`), in the environment a later
+# step would inherit. GitHub's documented $GITHUB_ENV / $GITHUB_PATH semantics
+# are SIMULATED, not run on a live runner: a writer step's lines go to a file;
+# for the NEXT step, `NAME=value` lines become environment variables and each
+# path line is prepended to PATH.
+# =============================================================================
+ANCHOR = ["./scripts/make-integrity-guard.sh", "--workflow"]
+CLEAN = {k: v for k, v in os.environ.items() if k not in {
+    "MAKEFLAGS", "GNUMAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKE_RESTARTS", "MAKEOVERRIDES",
+    "MAKECMDGOALS", "MAKEFILES", "BASH_ENV", "ENV", "GO", "SQLC", "GOFLAGS", "RELEASE",
+    "COMMIT", "BUILT_AT"}}
+
+def runtime_row(rid, desc, github_env="", github_path_stub=False, direct_env=None):
+    env = dict(CLEAN)
+    stub = None
+    for line in github_env.splitlines():            # the $GITHUB_ENV file, applied
+        if "=" in line:
+            k, v = line.split("=", 1); env[k] = v
+    if github_path_stub:                             # the $GITHUB_PATH file, applied
+        stub = tempfile.mkdtemp(prefix="vzb3stub.")
+        io.open(os.path.join(stub, "make"), "w").write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(stub, "make"), 0o755)
+        env["PATH"] = stub + ":" + env["PATH"]
+    env.update(direct_env or {})
+    r = subprocess.run(ANCHOR, capture_output=True, text=True, env=env)
+    if stub: shutil.rmtree(stub, ignore_errors=True)
+    why = next((l.strip()[6:].strip() for l in (r.stdout + r.stderr).splitlines()
+                if l.strip().startswith("FAIL")), "")
+    return (rid, desc, "RED" if r.returncode else "GREEN", why[:88] or "—")
+
+RUNTIME = [
+    runtime_row("C0", "control: clean environment"),
+    # the verifier's four MAKELEVEL spellings (R-2), as an earlier step would inject them
+    runtime_row("M1", "$GITHUB_ENV: MAKELEVEL=1, MAKEFLAGS=-ki", "MAKELEVEL=1\nMAKEFLAGS=-ki\n"),
+    runtime_row("M2", "$GITHUB_ENV: MAKELEVEL=1, MAKEFLAGS=n", "MAKELEVEL=1\nMAKEFLAGS=n\n"),
+    runtime_row("M3", "$GITHUB_ENV: MAKELEVEL= (empty), MAKEFLAGS=--ign", "MAKELEVEL=\nMAKEFLAGS=--ign\n"),
+    runtime_row("M4", "$GITHUB_ENV: MAKELEVEL=1, GNUMAKEFLAGS=-ki", "MAKELEVEL=1\nGNUMAKEFLAGS=-ki\n"),
+    # the static counter-row R3, now checked where it can be seen
+    runtime_row("R3", "$GITHUB_ENV (early step): MAKEFLAGS=-i", "MAKEFLAGS=-i\n"),
+    runtime_row("R3b", "$GITHUB_ENV (early step): MAKEFLAGS=--no-such-flag", "MAKEFLAGS=--no-such-flag\n"),
+    runtime_row("A19b", "$GITHUB_PATH (early step): a stub dir with `make` in it", github_path_stub=True),
+    # found while fixing round 2: the Makefile's `?=` variables
+    runtime_row("G1", "$GITHUB_ENV (early step): GO=true", "GO=true\n"),
+    runtime_row("G2", "$GITHUB_ENV (early step): GOFLAGS=-run=^$", "GOFLAGS=-run=^$\n"),
+    runtime_row("E1", "$GITHUB_ENV (early step): MAKEFILES=/tmp/x.mk", "MAKEFILES=/tmp/x.mk\n"),
+    runtime_row("E2", "$GITHUB_ENV (early step): BASH_ENV=/tmp/fn.sh", "BASH_ENV=/tmp/fn.sh\n"),
+    # the stated boundary: a variable OUTSIDE the anchor's list is not refused
+    runtime_row("B1", "$GITHUB_ENV (early step): GOTOOLCHAIN=local (outside the list)", "GOTOOLCHAIN=local\n"),
+]
+
+print()
+print("RUNTIME — the anchor, as the pinned step invokes it")
+w = max(len(d) for _, d, _, _ in RUNTIME)
+print(f"| {'#':5s} | {'what reaches the anchor':{w}s} | result | refusal |")
+print(f"|{'-'*7}|{'-'*(w+2)}|--------|---------|")
+for rid, desc, res, why in RUNTIME:
+    print(f"| {rid:5s} | {desc:{w}s} | {res:6s} | {why} |")
+print()
+print("RUNTIME GREEN rows:", [r[0] for r in RUNTIME if r[2] == "GREEN"])

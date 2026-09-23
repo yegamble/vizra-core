@@ -1,76 +1,108 @@
-# R1 — the PR#9 verifier's ENTIRE evasion table, re-run against the redesigned control.
+# R1 — the PR#9 verifier's evasion tables, re-run against the round-3 control.
 #
-# Harness: docs/evidence/hardening-b1/evasion-table.py (run: python3 <it>, from any clone).
-# Each row is substituted into a COPY of the real .github/ tree; the harness ABORTS if
-# the digest did not move; the repository itself is never modified.
-# source: 8fa04b18cd51d1f40ba85b1ce9632e029d123475 (commit 8fa04b1, clean .github/ and scripts/), 2026-09-23T01:19:10Z
+# Harness: docs/evidence/hardening-b1/evasion-table.py (python3 <it>, from any clone).
+# STATIC rows: each is applied to a COPY of the real .github/ tree; the harness ABORTS
+# if the digest did not move; the repository itself is never modified.
+# RUNTIME rows: the anchor run EXACTLY as the pinned step runs it
+# (./scripts/make-integrity-guard.sh --workflow), with GitHub's $GITHUB_ENV /
+# $GITHUB_PATH carry-over SIMULATED (written to a file, applied to the next process) —
+# not run on a live runner.
+# source: fc4885bab980660edae8783d32815133e676966a (clean .github/ and scripts/), 2026-09-23T03:15:42Z
 # host: Darwin/arm64, Python 3.9.6
 #
-# B1-B10: the builder's round-1 spellings.  A*: the verifier's.  The THIRTEEN that were
-# GREEN-and-UNLISTED at e710c3c:  A16 A17 A18 A18b A19 A20 A21 A22 A24 A25 A1 A2 A33
-# (A19b, the $GITHUB_PATH variant the chair named, is added.)
-# R1-R3: the honest counter-rows — what this control does NOT refuse.
+# B1-B10: the builder's round-1 spellings.  A*: the verifier's round-1 rows; the thirteen
+# that were green-and-unlisted at e710c3c are A16 A17 A18 A18b A19 A20 A21 A22 A24 A25 A1
+# A2 A33 (+ A19b, $GITHUB_PATH).  N1-N6, J4, J6, P9: the round-2 re-verification rows
+# (N6 = the round-2 anchor form without --workflow; J6 = found by me, see R5).  R1-R3:
+# the honest counter-rows — what the STATIC guard does not refuse.
 
-| #     | evasion                                                 | result | refused by |
-|-------|---------------------------------------------------------|--------|------------|
-| B1    | run: make -i ci                                         | RED    | 8b pin, 8c present |
-| B2    | run: make SHELL=/usr/bin/true ci                        | RED    | 8b pin, 8c present |
-| B3    | run: make ci SHELL=/usr/bin/true (after target)         | RED    | 8b pin, 8c present |
-| B4    | run: make --ign ci (long abbreviation)                  | RED    | 8b pin, 8c present |
-| B5    | run: make -srik ci (short cluster)                      | RED    | 8b pin, 8c present |
-| B6    | run: bash -c "make -i ci"                               | RED    | 8b pin, 8c present |
-| B7    | run: env MAKEFLAGS=-i make ci                           | RED    | 8b pin, 8c present |
-| B8    | step env: MAKEFLAGS: -i                                 | RED    | 8b keys |
-| B9    | run: make -C build ci                                   | RED    | 8b pin, 8c present |
-| B10   | run: go build ./... && make --keep-going ci             | RED    | 8b pin, 8c present |
-| A3    | run: eval "make -i ci"                                  | RED    | 8b pin, 8c present |
-| A4    | run: echo ci | xargs make -i                            | RED    | 8b pin, 8c present |
-| A5    | run: nice make -i ci                                    | RED    | 8b pin, 8c present |
-| A6    | run: time make -i ci                                    | RED    | 8b pin, 8c present |
-| A8    | run: exec make -i ci                                    | RED    | 8b pin, 8c present |
-| A9    | here-doc feeding sh                                     | RED    | 8b pin, 8c present |
-| A10   | line continuation splitting -i                          | RED    | 8b pin, 8c present |
-| A12   | run: make ci -i (flag after target)                     | RED    | 8b pin, 8c present |
-| A13   | run: make --ignore-errors=yes ci                        | RED    | 8b pin, 8c present |
-| A14   | run: make -ki ci                                        | RED    | 8b pin, 8c present |
-| A15   | run: make -j4 -i ci                                     | RED    | 8b pin, 8c present |
-| A28   | run: make -e ci                                         | RED    | 8b pin, 8c present |
-| A29   | run: make -f Makefile -i ci                             | RED    | 8b pin, 8c present |
-| A31   | untokenisable run: (unbalanced quote)                   | RED    | 8b pin, 8c present |
-| A32   | run: make -E bogus -i ci                                | RED    | 8b pin, 8c present |
-| A34   | run: echo $(make -i ci)                                 | RED    | 8b pin, 8c present |
-| A23   | job continue-on-error: ${{ true }}                      | RED    | 4 coe |
-| A7    | run: sudo -E make ci  (does NOT neuter)                 | RED    | 8b pin, 8c present |
-| A11   | run: make -- -i ci   (does NOT neuter)                  | RED    | 8b pin, 8c present |
-| A16   | run: make -j -i ci                                      | RED    | 8b pin, 8c present |
-| A17   | run: make -l -i ci                                      | RED    | 8b pin, 8c present |
-| A18   | export MAKEFLAGS=-i above make ci                       | RED    | 8b pin, 8c present |
-| A18b  | export GNUMAKEFLAGS=-i above make ci                    | RED    | 8b pin, 8c present |
-| A19   | $GITHUB_ENV write by an earlier step                    | RED    | 8b adjacency |
-| A19b  | $GITHUB_PATH write by an earlier step                   | RED    | 8b adjacency |
-| A20   | step shell: bash -c '{0} || true'                       | RED    | 8b keys |
-| A21   | step working-directory: build/other                     | RED    | 8b keys |
-| A22   | step if: always() && false                              | RED    | 8b keys |
-| A24   | make() { :; } then make ci                              | RED    | 8b pin, 8c present |
-| A25   | PATH shadow: stub make earlier on PATH                  | RED    | 8b pin, 8c present |
-| A1    | M=make then $M -i ci                                    | RED    | 8c present |
-| A2    | ${MAKE:-make} -i ci                                     | RED    | 8c present |
-| A33   | echo `make -i ci` (backticks)                           | RED    | 8b pin, 8c present |
-| A26   | wrapper script ./scripts/wrap.sh running make -i ci     | RED    | 8c present |
-| A27   | alias make='make -i' (did not neuter)                   | RED    | 8b pin, 8c present |
-| R1    | wrapper script ADDED early in the job (not replacing)   | GREEN  | — |
-| R2    | an arbitrary EARLY step rewrites a test file on disk    | GREEN  | — |
-| R3    | an arbitrary EARLY step writes MAKEFLAGS to $GITHUB_ENV | GREEN  | — |
+| #     | evasion                                                               | result | refused by |
+|-------|-----------------------------------------------------------------------|--------|------------|
+| B1    | run: make -i ci                                                       | RED    | 8b pin, 8c present |
+| B2    | run: make SHELL=/usr/bin/true ci                                      | RED    | 8b pin, 8c present |
+| B3    | run: make ci SHELL=/usr/bin/true (after target)                       | RED    | 8b pin, 8c present |
+| B4    | run: make --ign ci (long abbreviation)                                | RED    | 8b pin, 8c present |
+| B5    | run: make -srik ci (short cluster)                                    | RED    | 8b pin, 8c present |
+| B6    | run: bash -c "make -i ci"                                             | RED    | 8b pin, 8c present |
+| B7    | run: env MAKEFLAGS=-i make ci                                         | RED    | 8b pin, 8c present |
+| B8    | step env: MAKEFLAGS: -i                                               | RED    | 8b keys |
+| B9    | run: make -C build ci                                                 | RED    | 8b pin, 8c present |
+| B10   | run: go build ./... && make --keep-going ci                           | RED    | 8b pin, 8c present |
+| A3    | run: eval "make -i ci"                                                | RED    | 8b pin, 8c present |
+| A4    | run: echo ci | xargs make -i                                          | RED    | 8b pin, 8c present |
+| A5    | run: nice make -i ci                                                  | RED    | 8b pin, 8c present |
+| A6    | run: time make -i ci                                                  | RED    | 8b pin, 8c present |
+| A8    | run: exec make -i ci                                                  | RED    | 8b pin, 8c present |
+| A9    | here-doc feeding sh                                                   | RED    | 8b pin, 8c present |
+| A10   | line continuation splitting -i                                        | RED    | 8b pin, 8c present |
+| A12   | run: make ci -i (flag after target)                                   | RED    | 8b pin, 8c present |
+| A13   | run: make --ignore-errors=yes ci                                      | RED    | 8b pin, 8c present |
+| A14   | run: make -ki ci                                                      | RED    | 8b pin, 8c present |
+| A15   | run: make -j4 -i ci                                                   | RED    | 8b pin, 8c present |
+| A28   | run: make -e ci                                                       | RED    | 8b pin, 8c present |
+| A29   | run: make -f Makefile -i ci                                           | RED    | 8b pin, 8c present |
+| A31   | untokenisable run: (unbalanced quote)                                 | RED    | 8b pin, 8c present |
+| A32   | run: make -E bogus -i ci                                              | RED    | 8b pin, 8c present |
+| A34   | run: echo $(make -i ci)                                               | RED    | 8b pin, 8c present |
+| A23   | job continue-on-error: ${{ true }}                                    | RED    | 4 coe |
+| A7    | run: sudo -E make ci  (does NOT neuter)                               | RED    | 8b pin, 8c present |
+| A11   | run: make -- -i ci   (does NOT neuter)                                | RED    | 8b pin, 8c present |
+| A16   | run: make -j -i ci                                                    | RED    | 8b pin, 8c present |
+| A17   | run: make -l -i ci                                                    | RED    | 8b pin, 8c present |
+| A18   | export MAKEFLAGS=-i above make ci                                     | RED    | 8b pin, 8c present |
+| A18b  | export GNUMAKEFLAGS=-i above make ci                                  | RED    | 8b pin, 8c present |
+| A19   | $GITHUB_ENV write by an earlier step                                  | RED    | 8b adjacency |
+| A19b  | $GITHUB_PATH write by an earlier step                                 | RED    | 8b adjacency |
+| A20   | step shell: bash -c '{0} || true'                                     | RED    | 8b keys |
+| A21   | step working-directory: build/other                                   | RED    | 8b keys |
+| A22   | step if: always() && false                                            | RED    | 8b keys |
+| A24   | make() { :; } then make ci                                            | RED    | 8b pin, 8c present |
+| A25   | PATH shadow: stub make earlier on PATH                                | RED    | 8b pin, 8c present |
+| A1    | M=make then $M -i ci                                                  | RED    | 8c present |
+| A2    | ${MAKE:-make} -i ci                                                   | RED    | 8c present |
+| A33   | echo `make -i ci` (backticks)                                         | RED    | 8b pin, 8c present |
+| A26   | wrapper script ./scripts/wrap.sh running make -i ci                   | RED    | 8c present |
+| A27   | alias make='make -i' (did not neuter)                                 | RED    | 8b pin, 8c present |
+| R1    | wrapper script ADDED early in the job (not replacing)                 | GREEN  | — |
+| R2    | an arbitrary EARLY step rewrites a test file on disk                  | GREEN  | — |
+| R3    | an arbitrary EARLY step writes MAKEFLAGS to $GITHUB_ENV               | GREEN  | — |
+| N1    | the anchor step runs the guard THEN writes MAKEFLAGS to $GITHUB_ENV   | RED    | 8b adjacency, 8 anchor pin |
+| N2    | real anchor, then a look-alike step that writes, then make ci         | RED    | 8b adjacency, 8 anchor pin |
+| N3    | earlier write; the adjacent 'anchor' is ': make-integrity-guard'      | RED    | 8b adjacency, 8 anchor pin |
+| N4    | the anchor step runs the guard THEN writes a stub dir to $GITHUB_PATH | RED    | 8b adjacency, 8 anchor pin |
+| N5    | the anchor step writes MAKELEVEL + MAKEFLAGS for the next step        | RED    | 8b adjacency, 8 anchor pin |
+| N6    | the round-2 anchor form, without --workflow (lenient mode)            | RED    | 8b adjacency, 8 anchor pin |
+| J4    | job-level env: MAKELEVEL: '1'                                         | RED    | 8b env |
+| J6    | job-level env: GO: 'true' (the Makefile's GO ?= go)                   | RED    | 8b env, 8b env (?=) |
+| P9    | duplicate key: run: make -i ci, then run: make ci                     | RED    | R-4 duplicate key |
 
 GREEN rows: ['R1', 'R2', 'R3']
 ABORT rows: []
 
-== R3 is GREEN at the guard and RED at the ANCHOR, at runtime ==
-The guard reads workflow text only. An EARLY $GITHUB_ENV write lands in the process of
-every LATER step — the anchor's included, because the anchor is adjacent to each make step:
-      FAIL  the environment sets MAKEFLAGS='-i', and this guard is not running under make.
-    anchor EXIT=1 with MAKEFLAGS=-i in its environment
+RUNTIME — the anchor, as the pinned step invokes it
+| #     | what reaches the anchor                                        | result | refusal |
+|-------|----------------------------------------------------------------|--------|---------|
+| C0    | control: clean environment                                     | GREEN  | — |
+| M1    | $GITHUB_ENV: MAKELEVEL=1, MAKEFLAGS=-ki                        | RED    | the environment has MAKELEVEL='1', and this is the WORKFLOW anchor. |
+| M2    | $GITHUB_ENV: MAKELEVEL=1, MAKEFLAGS=n                          | RED    | the environment has MAKELEVEL='1', and this is the WORKFLOW anchor. |
+| M3    | $GITHUB_ENV: MAKELEVEL= (empty), MAKEFLAGS=--ign               | RED    | the environment has MAKELEVEL='', and this is the WORKFLOW anchor. |
+| M4    | $GITHUB_ENV: MAKELEVEL=1, GNUMAKEFLAGS=-ki                     | RED    | the environment has MAKELEVEL='1', and this is the WORKFLOW anchor. |
+| R3    | $GITHUB_ENV (early step): MAKEFLAGS=-i                         | RED    | the environment sets MAKEFLAGS='-i', and this is the WORKFLOW anchor. |
+| R3b   | $GITHUB_ENV (early step): MAKEFLAGS=--no-such-flag             | RED    | the environment sets MAKEFLAGS='--no-such-flag', and this is the WORKFLOW anchor. |
+| A19b  | $GITHUB_PATH (early step): a stub dir with `make` in it        | RED    | `make` resolves to '/private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/vzb3stub.8q |
+| G1    | $GITHUB_ENV (early step): GO=true                              | RED    | the environment sets GO='true', and this is the WORKFLOW anchor. |
+| G2    | $GITHUB_ENV (early step): GOFLAGS=-run=^$                      | RED    | the environment sets GOFLAGS='-run=^$', and this is the WORKFLOW anchor. |
+| E1    | $GITHUB_ENV (early step): MAKEFILES=/tmp/x.mk                  | RED    | the environment sets MAKEFILES='/tmp/x.mk'. |
+| E2    | $GITHUB_ENV (early step): BASH_ENV=/tmp/fn.sh                  | RED    | the environment sets BASH_ENV='/tmp/fn.sh'. |
+| B1    | $GITHUB_ENV (early step): GOTOOLCHAIN=local (outside the list) | GREEN  | — |
 
-R1 and R2 are the REVIEW-ONLY residual, named in AGENTS.md and both guard docstrings:
-an arbitrary step earlier in a floor lane may run a wrapper script or rewrite files on
-disk. The anchor observes what its own assertions cover and nothing else.
+RUNTIME GREEN rows: ['C0', 'B1']
+
+== the GREEN rows, each accounted for ==
+STATIC R1  a wrapper script added EARLY in a lane      REVIEW-ONLY; AGENTS.md names it
+STATIC R2  an EARLY step rewrites a test file on disk   REVIEW-ONLY; AGENTS.md names it
+STATIC R3  an EARLY step writes MAKEFLAGS to GITHUB_ENV  static guard cannot see it;
+           RED at RUNTIME — rows R3, R3b and M1-M4 (the two-line MAKELEVEL+MAKEFLAGS write)
+RUNTIME C0 the clean control
+RUNTIME B1 GOTOOLCHAIN — a variable OUTSIDE the anchor's list; AGENTS.md states that
+           the anchor checks a named set of variables, not the whole environment
