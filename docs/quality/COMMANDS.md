@@ -143,9 +143,9 @@ CI `ubuntu-24.04` is.**
 | `make ci` | 0 | 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
 | `./scripts/make-integrity-guard.sh` | 0 | `passed (8 gate target(s))` |
 | `./scripts/ci-required-guard.sh` | 0 | `passed (6 required check(s))` |
-| unit suite + report | 0 | **1071 executed, 0 skipped**, floor 910; per-package floors for all 14 packages |
-| integration suite + report | 0 | **1116 executed, 0 skipped**, floor 949; per-package floors for all 15; `internal/integration` 45, floor 40 |
-| `go test -race -count=1 ./scripts/` | 0 | 65 guard + 12 gotest + 6 fakedocker + 16 imagescan fixtures |
+| unit suite + report | 0 | **1109 executed, 0 skipped**, floor 943; per-package floors for all 14 packages (CI, `d435cd8`) |
+| integration suite + report | 0 | **1154 executed, 0 skipped**, floor 981; per-package floors for all 15; `internal/integration` 45, floor 40 (CI, `d435cd8`) |
+| `go test -race -count=1 ./scripts/` | 0 | 75 guard + 12 gotest + 6 fakedocker + 16 imagescan fixtures; `TestMakeIntegrityGuardEnvironment` 27 rows |
 
 The red/green transcripts for every control are in
 `docs/evidence/hardening-b1/`, produced by `mutate.sh`, which aborts unless the
