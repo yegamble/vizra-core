@@ -62,6 +62,21 @@ func (l *FallbackLimiter) Degraded() bool {
 // Allow fails OPEN on a cache error, after switching to the in-process counter.
 // Failing closed would turn a cache outage into a total outage; the in-process
 // counter still bounds a single replica, and readiness reports the weakening.
+//
+// It is a FIXED window: the TTL is set when the window STARTS and never moved.
+// The previous version ran an unconditional EXPIRE on every call, so every
+// request — a refused one included — pushed the window's end out by a full
+// window. That made it a sliding lockout: after one burst, a single request per
+// window held a key closed for ever, and the in-process fallback (a true fixed
+// window) behaved differently from the cache path it stands in for.
+//
+// `EXPIRE key window NX` sets the expiry ONLY when the key has none, which
+// covers both the first request of a window (INCR just created the key) and a
+// counter found WITHOUT a TTL for any reason — a key with no expiry never resets,
+// which is a permanent lockout. INCR and EXPIRE NX go in one MULTI/EXEC, so the
+// server applies both or neither: no crash between them can leave a TTL-less
+// key behind. NX needs Redis >= 7.0; ADR-001 sets the supported floor at
+// Redis/Valkey >= 7.2 and CI runs Valkey 9.1.2 and Redis 7.2.
 func (l *FallbackLimiter) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, int) {
 	if l.c == nil {
 		return l.fallback.Allow(ctx, key, limit, window)
@@ -69,7 +84,7 @@ func (l *FallbackLimiter) Allow(ctx context.Context, key string, limit int, wind
 	k := l.c.Key("rl", key)
 	pipe := l.c.rdb.TxPipeline()
 	incr := pipe.Incr(ctx, k)
-	pipe.Expire(ctx, k, window)
+	pipe.ExpireNX(ctx, k, window)
 	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
 		l.setDegraded(true)
 		return l.fallback.Allow(ctx, key, limit, window)

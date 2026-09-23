@@ -10,6 +10,7 @@
 | `06-unit.txt` | the unit suite exactly as `build-test`'s direct step runs it (`-json` + `scripts/go-test-report.py`, floors enforced) |
 | `07-race-stress.txt` | closing slice: `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation` repeated with `-count`, on Valkey 9.1.2 and Redis 7.2.16, with and without CPU contention, plus the baseline at `655f46a` |
 | `08-shuffle-seeds.txt` | closing slice: the shuffled integration suite with RECORDED seeds — CI's failing `1790134723139270269` on Valkey (the leg that failed), plus `20260923` and `424242` |
+| `09-limiter-red-green.txt` | round 4 (verifier R4-A): the four fixed-window limiter tests on Valkey 9.1.2 and Redis 7.2.16, red against the unfixed `ratelimit.go` and green with `EXPIRE ... NX` |
 | `demonstrate.sh` | the harness that produced `02-mutations.txt`, re-runnable by a verifier |
 
 Every transcript was produced on the tested tree recorded in its own `src:` header line. Runs that failed for an environmental reason (the `internal/fixtures` 10-minute default timeout on a heavily loaded shared host) are kept in the transcript, labelled "recorded, not counted", beside the run that counts. The pushed
@@ -216,3 +217,27 @@ losers.
   hard ceiling (claim 600, status 3000 per 15 minutes) as an accepted residual that
   CAN answer a valid token 429 until the window rolls, pending M1-B's concurrency
   bound — which `allowSetupRequest`'s comment already said AGENTS.md recorded.
+  **Corrected in round 4 (verifier R4-A):** "until the window rolls" was false at
+  the time. The cache path refreshed the window's TTL on every request, so it was a
+  sliding lockout that one request per window held closed indefinitely. See the
+  round-4 section below.
+
+### Round 4 — the limiter is now a fixed window (verifier R4-A)
+
+`FallbackLimiter.Allow` ran `INCR` and then an unconditional `EXPIRE key window` on
+every call. Each request, a refused one included, therefore pushed the window's
+end a full window out. The verifier measured it through the real handler on
+Valkey: after a 600-request burst, one request every <=15 minutes held
+claim-owner closed indefinitely, and the operator's own retries extended the
+lockout. Every other bucket had the same fault. The in-process fallback was
+already a true fixed window, so the semantics depended on cache health. The fix
+is `INCR` + `EXPIRE key window NX` in one MULTI/EXEC: the TTL is set only when
+the key has none, and the server applies both commands or neither.
+
+The four integration tests were run red against the unfixed code and green with
+the fix, on Valkey 9.1.2 AND Redis 7.2.16 (`09-limiter-red-green.txt`).
+`TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne` is the exception, and the
+transcript says so: it cannot be red on the old code, which set a TTL on every
+call. It guards the fix against the obvious wrong one (set the TTL only when
+INCR returns 1), and MUT-63 shows it red against that. MUT-62 restores the
+unconditional EXPIRE and reddens the other three.

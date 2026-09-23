@@ -401,6 +401,18 @@ run_case MUT-59 "let the handler decide 409-vs-403 for an empty redeem again" \
   "$HND" 'TestTheHandlerDoesNotDecideBetween409And403' "$UNI_API" \
   perl -0pi -e 's/\tcase errors\.Is\(err, credential\.ErrBusy\):/\tcase err.Error() == "no rows in result set":\n\t\treturn s.refuseToken(c)\n\n\tcase errors.Is(err, credential.ErrBusy):/' "$HND"
 
+# --- the limiter is a FIXED window (verifier R4-A) ------------------------------
+RL=internal/cache/ratelimit.go
+run_case MUT-62 "restore the unconditional EXPIRE (every request refreshes the window)" \
+  "$RL" 'TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow|TestTheCacheLimiterReopensWhenTheWindowRolls|TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics' "$INT" \
+  perl -0pi -e 's/\tpipe\.ExpireNX\(ctx, k, window\)/\tpipe.Expire(ctx, k, window)/' "$RL"
+
+# The naive fix: set the TTL only when INCR returned 1, outside the MULTI. A key
+# found WITHOUT a TTL is then never given one — a permanent lockout.
+run_case MUT-63 "set the TTL only when INCR returns 1 (a TTL-less key never gets one)" \
+  "$RL" 'TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne' "$INT" \
+  perl -0pi -e 's/\tpipe\.ExpireNX\(ctx, k, window\)\n//; s/\tn := int\(incr\.Val\(\)\)\n/\tn := int(incr.Val())\n\tif n == 1 {\n\t\tl.c.rdb.Expire(ctx, k, window)\n\t}\n/' "$RL"
+
 # --- per-package floors (backend seat NEW-B): deleting a test file must be RED --
 #
 # run_floor_case <id> <description> <suite> <package> <files...>

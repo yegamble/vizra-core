@@ -67,10 +67,14 @@ func (s *Server) claimLimiterKeys(c *echo.Context) (perOrigin string, global str
 // credentials. Unlike the failure budget, this one CAN refuse a request carrying
 // a valid token — stated rather than hidden, and bounded to that route.
 //
-// ACCEPTED RESIDUAL, recorded rather than implied: this is a FIXED-WINDOW count,
-// so N requests inside one window answer even a valid token 429 until the window
-// rolls. The guard the pool actually wants is a CONCURRENCY bound, which is
-// M1-B's; until then the number and this consequence are written down here and
+// ACCEPTED RESIDUAL, recorded rather than implied: this is a FIXED-WINDOW count
+// (the window starts at its first request and its end never moves; see
+// cache.FallbackLimiter.Allow), so once `limit` requests arrive inside one window
+// even a valid token is answered 429 until that window rolls. An attacker who
+// spends the whole budget at the start of EVERY window — 600 claim-owner requests
+// per 15 minutes — therefore holds the route closed for as long as they keep
+// doing it. The guard the pool actually wants is a CONCURRENCY bound, which is
+// M1-B's; until then the numbers and this consequence are written down here and
 // in AGENTS.md.
 func (s *Server) allowSetupRequest(c *echo.Context, bucket string, limit int) bool {
 	if s.deps.Limiter == nil {
