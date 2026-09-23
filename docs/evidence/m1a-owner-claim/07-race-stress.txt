@@ -12,8 +12,8 @@ Binaries: `integ-655f46a-norace.test` = `go test -tags=integration -c` of
 `git diff a42ca76 c79c4d2 -- internal cmd migrations api store go.mod go.sum` is
 empty, so these binaries test the same product and test code as the pushed head.
 
-The non-race binary is used for the 200x runs for throughput (~3-10 s per
-iteration versus ~75 s under -race on this host); two -race runs of 20 follow.
+The non-race binary is used for the 200x runs for throughput (5-14 s per
+iteration versus 26-75 s under -race on this host, as measured below); two -race runs of 20 follow.
 Services: PostgreSQL 18.6, Valkey 9.1.2, Redis 7.2.16 (the CI digests), one
 database per concurrent run. Host: darwin/arm64, 8 CPUs, shared with other work
 (load averages are recorded per run; "contended" adds 16 busy loops on top).
