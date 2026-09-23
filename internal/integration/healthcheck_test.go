@@ -52,6 +52,9 @@ var (
 func binaries(t *testing.T) string {
 	t.Helper()
 	buildOnce.Do(func() {
+		// Under the package's testtmp root (main_test.go): removed when the run
+		// ends, and swept by the next run if this one is killed. Before that,
+		// nothing removed it — ~74 MB per run (sentinel S-0001).
 		dir, err := os.MkdirTemp("", "vizra-healthcheck-bin-")
 		if err != nil {
 			buildErr = err

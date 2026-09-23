@@ -237,7 +237,7 @@ jobs:
         run: |
           set -uo pipefail
           rc=0
-          go test -race -count=1 -json ./... > unit-events.json || rc=$?
+          go test -race -count=1 -timeout 8m -json ./... > unit-events.json || rc=$?
           echo "$rc" > unit-exit.txt
           echo "go test (unit) exited $rc"
           python3 scripts/go-test-report.py \
@@ -284,7 +284,7 @@ jobs:
       # under any make evasion a failing INTEGRATION test — the migrator against
       # real PostgreSQL 18, the permanent Valkey/Redis-7.2 matrix ADR-001 Q-004
       # exists for — was SILENT, not red (PR#6 VERIFY, FINDING 2). This is the
-      # same package set (`./...`), the same flags (`-race -count=1
+      # same package set (`./...`), the same flags (`-race -count=1 -timeout 8m
       # -tags=integration`) and the same services as the `test-integration`
       # recipe; that recipe keeps its own required coverage in both cache-matrix
       # legs below, so nothing is traded away. It costs NO extra runtime: this
@@ -297,7 +297,7 @@ jobs:
             exit 1
           fi
           rc=0
-          go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+          go test -race -count=1 -timeout 8m -tags=integration -json ./... > int-events.json || rc=$?
           echo "$rc" > int-exit.txt
           echo "go test (integration) exited $rc"
           python3 scripts/go-test-report.py \
@@ -314,7 +314,7 @@ jobs:
         run: |
           set -uo pipefail
           rc=0
-          go test -race -count=1 -shuffle=on -tags=integration -json ./... > int-shuffle-events.json || rc=$?
+          go test -race -count=1 -timeout 8m -shuffle=on -tags=integration -json ./... > int-shuffle-events.json || rc=$?
           echo "$rc" > int-shuffle-exit.txt
           echo "go test (integration, shuffled) exited $rc"
           python3 scripts/go-test-report.py \

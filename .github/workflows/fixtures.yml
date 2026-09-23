@@ -133,7 +133,7 @@ jobs:
         run: make fixtures-verify
 
       - name: Every fixture is what it claims to be, and the checks can fail
-        run: go test -race -count=1 -v ./internal/fixtures/
+        run: go test -race -count=1 -timeout 8m -v ./internal/fixtures/
 
       # The declared load corpus is a different artefact with a different
       # lifetime (VZ-OPS-007). A small dry run keeps its generator honest

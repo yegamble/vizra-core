@@ -1,0 +1,22 @@
+# R0: the leak tests overlaid on main 3994893 WITHOUT the fix (fixtures/integration TestMain and binaries() are main's)
+# host: Darwin arm64 go1.27.1 load: 13.99 30.69 34.24
+# tree: 399489381cd36ff4d1e74c6c7ae54590ec0d24ab; overlay from d817f339b402c90648f3a678a88547ad6c7b6451:
+#   ?? internal/fixtures/tmpleak_test.go
+#   ?? internal/integration/tmpleak_test.go
+#   ?? internal/testtmp/
+
+    tmpleak_test.go:39: killed the child once /vizra-fixtures-shared-1343504364 existed
+    tmpleak_test.go:43: the killed run left [vizra-fixtures-shared-1343504364]
+    tmpleak_test.go:51: the next run of this package did not remove what a killed run left: [vizra-fixtures-shared-1343504364]
+--- FAIL: TestTheFixturesTestsLeaveNoTemporaryEntry (1.06s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/fixtures	1.419s
+FAIL
+fixtures go test exit=1
+
+    tmpleak_test.go:51: a normal run of the integration tests left [vizra-healthcheck-bin-2307322172] in its TMPDIR
+--- FAIL: TestTheIntegrationTestsLeaveNoTemporaryEntry (10.34s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	10.736s
+FAIL
+integration go test exit=1
