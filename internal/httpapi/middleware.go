@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/yegamble/vizra-core/internal/obs"
 	"github.com/yegamble/vizra-core/internal/site"
 )
 
@@ -163,8 +164,15 @@ func errorHandler(log *slog.Logger) echo.HTTPErrorHandler {
 
 		reqID, _ := c.Get(string(headerRequestID)).(string)
 		if status >= 500 {
-			log.Error("http: request failed", "error", err.Error(), "request_id", reqID,
-				"path", c.Request().URL.Path, "method", c.Request().Method)
+			// Every value is redacted HERE, not left to the handler: Deps.Logger
+			// falls back to slog.Default(), which redacts nothing unless the
+			// process installed obs.NewLogger. An unmapped error is exactly where
+			// a driver error quoting a DSN, or a storage error quoting a presigned
+			// URL, arrives (security review of core #8, N-7 / F-1), and the path
+			// is attacker-chosen text. TestEveryLogSiteInTheAPIIsRedacted counts
+			// this; TestTheErrorHandlerRedactsTheCauseOfA500 drives it.
+			log.Error("http: request failed", "error", obs.Redact(err.Error()), "request_id", obs.Redact(reqID),
+				"path", obs.Redact(c.Request().URL.Path), "method", obs.Redact(c.Request().Method))
 		}
 		_ = c.JSON(status, errorBody{Error: errorDetail{Code: code, Message: message, RequestID: reqID}})
 	}
