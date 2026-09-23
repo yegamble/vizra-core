@@ -1,0 +1,9 @@
+# F-3 on the PR head 96b8999 (before the fix): go1.27.1
+$ GOOS=windows go vet ./internal/fixtures/
+package github.com/yegamble/vizra-core/internal/fixtures (test)
+	imports github.com/yegamble/vizra-core/internal/testtmp: build constraints exclude all Go files in <clone>/internal/testtmp
+exit=1
+$ GOOS=windows go vet -tags=integration ./internal/integration/
+package github.com/yegamble/vizra-core/internal/integration (test)
+	imports github.com/yegamble/vizra-core/internal/testtmp: build constraints exclude all Go files in <clone>/internal/testtmp
+exit=1

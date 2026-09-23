@@ -88,7 +88,12 @@
     "Test stability (sentinel S-0016 / S-0001): the new package internal/testtmp runs 2 tests",
     "(its Sweep and liveness checks) in both suites; the formula (15% or 2 tests of slack, never",
     "below 1) gives 1, in both. internal/fixtures gains one test and internal/integration two",
-    "(the temporary-file leak checks); their floors are unchanged. Nothing was lowered."
+    "(the temporary-file leak checks). Fix round 1 (verifier F-4): measured at 8f96cd6, go1.27.1,",
+    "darwin/arm64, the pinned bodies: unit 1566 executed; integration 1737 on BOTH cache images (plain",
+    "and shuffled), 0 skipped. The generator's formula gives internal/fixtures 36 -> 37 (measured 43) in",
+    "both suites and internal/integration 144 -> 145 (measured 171); applied. The same run's generator",
+    "output also proposes scripts 161 -> 419 and min_tests 1070 -> 1331 / 1214 -> 1476, from tests other",
+    "slices added; those are left to the floor owner (core #14 is changing this file too). Nothing was lowered."
   ],
   "suites": {
     "unit": {
@@ -102,7 +107,7 @@
         "github.com/yegamble/vizra-core/internal/config": 86,
         "github.com/yegamble/vizra-core/internal/credential": 4,
         "github.com/yegamble/vizra-core/internal/doctor": 33,
-        "github.com/yegamble/vizra-core/internal/fixtures": 36,
+        "github.com/yegamble/vizra-core/internal/fixtures": 37,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
         "github.com/yegamble/vizra-core/internal/httpapi": 85,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
@@ -126,10 +131,10 @@
         "github.com/yegamble/vizra-core/internal/config": 86,
         "github.com/yegamble/vizra-core/internal/credential": 4,
         "github.com/yegamble/vizra-core/internal/doctor": 33,
-        "github.com/yegamble/vizra-core/internal/fixtures": 36,
+        "github.com/yegamble/vizra-core/internal/fixtures": 37,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
         "github.com/yegamble/vizra-core/internal/httpapi": 85,
-        "github.com/yegamble/vizra-core/internal/integration": 144,
+        "github.com/yegamble/vizra-core/internal/integration": 145,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 36,
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,

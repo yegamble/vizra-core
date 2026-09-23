@@ -24,7 +24,9 @@ gotest() { # tags run pkg
   log="$(mktemp)"
   go test -count=1 ${1:+-tags=$1} -v -run "$2" "$3" > "$log" 2>&1
   rc=$?
-  grep -E '^(--- FAIL|--- PASS|    --- FAIL|ok|FAIL|panic)|tmpleak_test.go|testtmp_test.go' "$log" | cut -c1-220 | head -30
+  # Absolute temporary paths are replaced by $TMPDIR: this repository is public.
+  grep -E '^(--- FAIL|--- PASS|    --- FAIL|ok|FAIL|panic)|tmpleak_test.go|testtmp_test.go|build failed' "$log" \
+    | sed -E 's#(/private)?/var/folders/[^ ]*/T/#$TMPDIR/#g; s#(/private)?/tmp/[^ ]*/#$TMPDIR/#g' | cut -c1-220 | head -30
   rm -f "$log"
   echo "go test exit=$rc"
   return "$rc"

@@ -376,13 +376,14 @@ cover them.
 ### Test stability (sentinel S-0016 / S-0001), measured on tree `d817f33`
 
 Every `go test` lane — the Makefile's `test`, `test-race`, `test-integration`,
-`test-integration-shuffle` and the three pinned direct steps — passes
-`-timeout 8m`. The value comes from measurement (`docs/evidence/test-stability/timings.txt`),
-not from a guess:
+`test-integration-shuffle`, the three pinned direct steps and the `fixtures`
+workflow's `internal/fixtures` step — passes `-timeout 8m`. The value comes from
+measurement (`docs/evidence/test-stability/timings.txt`), not from a guess:
 
 | Measurement | Slowest package | 8m is |
 |---|---|---|
-| CI, last 4 green build-test runs before the change | `internal/fixtures` 139.5s | 3.4x |
+| CI, 4 green build-test runs before the change (35914283132, 35914133999, 35910352499, 35899392555) | `internal/fixtures` 143.5s | 3.3x |
+| CI, 12 green build-test runs before the change | `internal/fixtures` 146.1s | 3.3x |
 | this host, two suites at once, after the change | `internal/integration` 186.4s | 2.6x |
 | this host, one lane, after the change | `internal/integration` 142.1s | 3.4x |
 | this host, one lane, merged head `888a003` at load ~44 | `internal/integration` 201.2s | 2.4x |
@@ -394,6 +395,26 @@ about 3.7 minutes into a 15-minute one, so 8m still prints go's goroutine dump f
 a hang before the job is killed. A host whose load average is several times its
 core count can still exceed it; that is contention, not a property of the
 suite, and `go test -timeout` can be given directly there.
+
+Limits, at the strength that holds:
+
+- The flag is enforced by byte-equality only in the three pinned direct steps
+  (`.github/pinned-steps.yml`, check 9). On the Makefile recipes and on the
+  `fixtures` workflow's step it is kept by review alone: no guard checks it, and
+  a re-pinned Makefile without it passes every anchor.
+- A test binary killed by go's `-timeout` leaves the processes it started
+  running (the integration tests' `go build`). Such an orphan can still be
+  writing into its root when the next run sweeps it, and can re-create part of
+  it. The leak test avoids this by killing the whole process group; a real
+  timeout does not.
+- The sweep decides "dead" by asking the local kernel about the PID in the
+  root's name. Runs in different PID namespaces that share one TMPDIR (a
+  container with the host's /tmp mounted) cannot see each other's processes, so
+  one can remove the other's LIVE root. That set-up is not supported.
+- `TestAliveTellsALiveProcessFromADeadOne` checks the "another user's live
+  process" branch through PID 1, which answers EPERM only to a non-root caller.
+  Run as root it passes without exercising that branch, and mutation T4 would
+  survive.
 
 What was cut: `TestManifestDetectsEveryClassOfDrift` generated the corpus 6 times
 (three of them only to put files on disk for a mutation) and ran its cases one
@@ -408,8 +429,10 @@ package generates the corpus 6 times instead of 9 (each 13-35s under `-race`).
 | direct integration step, Valkey 9.1.2 | 156s, leaves 74 MB | 150s, leaves nothing |
 | direct integration step, Redis 7.2 | 168s, leaves 75 MB | 144s, leaves nothing |
 | unit + integration(Valkey) at the same time | 238s / 236s | 145s / 198s |
-| CI `internal/fixtures` per package | 84.8–139.5s | 56.5–98.2s |
-| CI build-test job | 8.3–10.9 min | 7.4 min |
+| CI `internal/fixtures` per package (the 4 runs above) | 77.4–143.5s | 56.5–98.2s |
+| CI `internal/integration` per package (the 4 runs above) | 54.9–99.5s | 71.2–112.5s |
+| CI build-test job (the 4 runs above) | 7.8–10.8 min | 7.4 min |
+| CI cache-matrix-leg jobs (the 4 runs above) | 4.5–5.8 min | 4.2–4.5 min |
 
 Temporary files: every package with a TestMain here runs inside ONE root from
 `internal/testtmp` (`vizra-test-<pkg>-<pid>-*`, TMPDIR pointed at it), removed at

@@ -66,6 +66,10 @@ func TestAliveTellsALiveProcessFromADeadOne(t *testing.T) {
 	if alive(deadPID(t)) {
 		t.Fatal("a reaped process is reported alive")
 	}
+	// PID 1 answers EPERM only to a NON-root caller. Run as root, kill(1, 0)
+	// succeeds, so this assertion still passes but no longer exercises the
+	// EPERM branch (mutation T4 would then survive). CI and the builders run
+	// unprivileged.
 	if !alive(1) {
 		t.Fatal("pid 1 (owned by root: EPERM, not ESRCH) is reported dead; a foreign live process's root would be swept")
 	}

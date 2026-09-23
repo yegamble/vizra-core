@@ -15,8 +15,9 @@ MUTATIONS = {
     "T3": [("internal/testtmp/testtmp.go", "\t\tif err != nil || pid <= 0 || alive(pid) {\n",
             "\t\tif err != nil || pid <= 0 || alive(pid) || true {\n")],
     # alive() treats EPERM as dead: another user's live process's root would be swept.
+    # (`_ = errors.Is` keeps the file compiling: its red is a TEST failure, not a build failure.)
     "T4": [("internal/testtmp/testtmp.go", "\treturn err == nil || !errors.Is(err, syscall.ESRCH)\n",
-            "\treturn err == nil\n")],
+            "\t_ = errors.Is\n\treturn err == nil\n")],
 }
 
 for path, old, new in MUTATIONS[sys.argv[1]]:

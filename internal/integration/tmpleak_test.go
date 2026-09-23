@@ -1,31 +1,13 @@
-//go:build integration
+//go:build integration && unix
 
 package integration
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/yegamble/vizra-core/internal/testtmp"
 )
-
-// TestTheEntryPointsBuild builds the three shipped entry points the way every
-// process-level test here does (binaries), and checks each is an executable
-// file. It needs no database, so the leak test below can run it as a child.
-func TestTheEntryPointsBuild(t *testing.T) {
-	dir := binaries(t)
-	for _, name := range []string{"vizra", "vizra-api", "vizra-worker"} {
-		st, err := os.Stat(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatalf("%s was not built: %v", name, err)
-		}
-		if !st.Mode().IsRegular() || st.Mode().Perm()&0o111 == 0 {
-			t.Fatalf("%s is not an executable file (mode %v)", name, st.Mode())
-		}
-	}
-}
 
 // TestTheIntegrationTestsLeaveNoTemporaryEntry is sentinel S-0001. It runs
 // THIS package's test binary as a child with a TMPDIR only this test owns, so

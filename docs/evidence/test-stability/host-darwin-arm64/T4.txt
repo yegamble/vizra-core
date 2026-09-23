@@ -1,6 +1,6 @@
 # T4 alive() treats a foreign live process as dead
-# host: Darwin arm64  go: go1.27.1  load: 24.21 30.40 34.71
-# tree: d817f339b402c90648f3a678a88547ad6c7b6451  (0 uncommitted path(s) before the run)
+# host: Darwin arm64  go: go1.27.1  load: 25.25 28.13 36.37
+# tree: 8f96cd6ca968b2718c46f7ffb89c7f2d728284b3  (0 uncommitted path(s) before the run)
 
 ==============================================================
 MUTATION: T4 alive() treats a foreign live process as dead
@@ -8,19 +8,22 @@ MUTATION: T4 alive() treats a foreign live process as dead
   mutate: python3 docs/evidence/test-stability/mutations.py T4
   check:  gotest '' '^TestAliveTellsALiveProcessFromADeadOne$' './internal/testtmp/'
 --------------------------------------------------------------
-  sha256 BEFORE: dff0c3eec24f577b09eb8d8844ad93e6ccb6793e8767e741e4ee31e5919c3a62
-  sha256 AFTER:  5d0b802cde085fa29e385dcbc0115a5fd141cf5ad4f453150a1f2fdfb5d08c07
+  sha256 BEFORE: e899c169c7db2c9a4897f0eb630b0a868365b6804606086b49009367ed5c5084
+  sha256 AFTER:  49e4aa24f84648ea7075033e6f06957e22b67ace056966ffbdc32b29d1c6df17
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
-FAIL	github.com/yegamble/vizra-core/internal/testtmp [build failed]
+    testtmp_test.go:74: pid 1 (owned by root: EPERM, not ESRCH) is reported dead; a foreign live process's root would be swept
+--- FAIL: TestAliveTellsALiveProcessFromADeadOne (0.01s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/testtmp	0.306s
 FAIL
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: dff0c3eec24f577b09eb8d8844ad93e6ccb6793e8767e741e4ee31e5919c3a62
+  sha256 RESTORED: e899c169c7db2c9a4897f0eb630b0a868365b6804606086b49009367ed5c5084
   restore byte-identical: yes
   RESULT: T4 alive() treats a foreign live process as dead -> exit 1
 
 == after restore ==
 --- PASS: TestAliveTellsALiveProcessFromADeadOne (0.00s)
-ok  	github.com/yegamble/vizra-core/internal/testtmp	0.259s
+ok  	github.com/yegamble/vizra-core/internal/testtmp	0.284s
 go test exit=0

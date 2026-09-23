@@ -151,12 +151,12 @@ load-corpus: ## Generate the DECLARED load corpus (VZ-OPS-007). Not committed, n
 
 # -timeout 8m on every go test here and in the pinned direct steps (sentinel
 # S-0016). Sized from measurement, not raised to hide a hang: the slowest
-# package took at most 140s in CI (4 runs, before this change) and 186s on a
-# shared 8-core host running two suites at once (after it), so 8m is 3.4x and
-# 2.6x those. It is BELOW go's 10m default so that a hang in the LAST test step
-# of build-test (20m job) or cache-matrix-leg (15m job) still prints go's
-# goroutine dump before the job is killed. docs/quality/COMMANDS.md has the
-# table.
+# package took at most 146s in CI (12 runs before this change) and 201s on a
+# shared 8-core host (after it), so 8m is 3.3x and 2.4x those. It is BELOW go's
+# 10m default so that a hang in the LAST test step of build-test (20m job) or
+# cache-matrix-leg (15m job) still prints go's goroutine dump before the job is
+# killed. Only review keeps it on these recipes: no guard checks the flag here.
+# docs/quality/COMMANDS.md has the table.
 .PHONY: test
 test: ## Unit tests
 	@$(GO) test -count=1 -timeout 8m $(PKGS)

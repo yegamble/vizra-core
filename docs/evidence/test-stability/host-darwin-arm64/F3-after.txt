@@ -1,0 +1,5 @@
+# F-3 after the fix (working tree of the fix commit): go1.27.1
+$ GOOS=windows go vet ./internal/fixtures/
+exit=0
+$ GOOS=windows go vet -tags=integration ./internal/integration/
+exit=0

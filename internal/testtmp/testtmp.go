@@ -15,15 +15,28 @@
 // Run, called from a package's TestMain:
 //
 //  1. removes the roots of earlier runs of the same package whose process is
-//     no longer alive (the name carries the PID; a live process's root is never
-//     touched, so concurrent runs are safe);
+//     no longer alive (the name carries the PID; a root whose PID is alive in
+//     THIS PID namespace is never touched, so concurrent runs on one host are
+//     safe);
 //  2. creates `vizra-test-<name>-<pid>-*` under the temporary directory and
 //     points TMPDIR at it, so os.TempDir(), os.MkdirTemp("", …) and t.TempDir()
 //     in that binary — and the processes it starts — all land inside it;
 //  3. runs the tests, then removes the root.
 //
-// What it cannot do: remove a root while its own process is being killed. That
-// root is removed by the NEXT run of the same package (step 1).
+// What it cannot do:
+//
+//   - remove a root while its own process is being killed. That root is
+//     removed by the NEXT run of the same package (step 1).
+//   - stop a process the killed binary started. go test's -timeout exits the
+//     test binary and leaves its children running (the integration tests'
+//     `go build`); such an orphan can still be writing into the root when the
+//     next run sweeps it, and can re-create part of it afterwards.
+//   - see across PID namespaces. The liveness check asks the local kernel about
+//     a PID, so two runs in different PID namespaces that share one temporary
+//     directory (a container with the host's /tmp mounted) cannot see each
+//     other: one can sweep the other's LIVE root, and a PID reused locally can
+//     keep a dead root. Sharing a TMPDIR across PID namespaces is not
+//     supported. A reused PID only ever keeps a root; it never removes one.
 package testtmp
 
 import (
