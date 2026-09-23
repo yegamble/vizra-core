@@ -62,6 +62,22 @@ Checks, all of which must pass:
                   runs scripts/provenance.sh, unconditionally. A lane that
                   prints a SHA without saying which tree it stood in is the
                   shape of meta-PR3 FINDING 5.
+  11. MAKEFILE    .github/pinned-makefiles.yml exists, has its one accepted
+      PIN         shape, is non-empty, pins `Makefile`, and every digest in it
+                  matches the file's bytes. A Makefile edit without the paired
+                  pin update fails here BY NAME, as well as in every anchor.
+                  It calls the anchor's OWN scripts/makefile_pin.verify_pin,
+                  so it also refuses whatever the anchor refuses before make:
+                  a GNUmakefile/makefile beside the Makefile, a symlinked
+                  makefile, a stale entry, an unpinned or computed include,
+                  $(eval)/$(guile) (fix round 1, PR#10 VERIFY FINDING 3).
+                  The anchor is what enforces the pin at runtime — it refuses to
+                  invoke make on unpinned bytes, because make EVALUATES a
+                  makefile while reading it (chair ruling, tick 132, on
+                  docs/evidence/warroom/2026-09-23-anchor-preflight-DESK-REVIEW-security.md
+                  FINDING 4). This check is the static half: the pin is
+                  present, well-formed and current in the tree under test.
+                  Skipped under --skip-makefile, which fixture runs use.
 
 Checks 8, 8b and 9 exist because every required lane here runs through `make`,
 and a verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true`
@@ -152,12 +168,17 @@ from it.
     .github/pinned-steps.yml is a visible, reviewed diff in a file whose only
     purpose is to be a gate — the same posture as FLOOR_LANES. It is not
     prevented; it is made visible.
+  * .github/pinned-makefiles.yml (check 11) is the same kind of file. It makes
+    make run only on Makefile bytes that were reviewed together with it; a
+    reviewer who approves a malicious Makefile AND its pin update defeats it.
+    Review is the control for what the Makefile says, and CODEOWNERS is
+    advisory.
   * A `run:` this guard cannot tokenise is a FAILURE, not a skip.
   * This file, the workflows, go-test-report.py and test-floors.json are all
     checked out from the pull request under test and can be edited in it.
 
 Usage:
-    ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE]
+    ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE] [--makefile-pins FILE]
 
 scripts/scripts_test.go drives it against scripts/testdata/guard/, which holds
 one crafted workflow per evasion, so the guard has negative cases of its own.
@@ -170,6 +191,12 @@ import re
 import shlex
 import sys
 from pathlib import Path
+
+# The Makefile pin reader shared with the anchor (check 11). No bytecode is
+# written next to it: a __pycache__ in scripts/ would dirty the tree under test.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import makefile_pin as mp  # noqa: E402
 
 try:
     import yaml
@@ -369,7 +396,8 @@ DANGEROUS_SHORT = {
     "i": "-i/--ignore-errors: every recipe's failure is ignored and make exits 0",
     "k": "-k/--keep-going: make carries on past a failed target instead of stopping at it",
     "t": "-t/--touch: targets are TOUCHED, the recipes never run",
-    "q": "-q/--question: no recipe runs at all; make only reports whether a target is up to date",
+    "q": "-q/--question: no ordinary recipe runs (a `+` or `$(MAKE)` line still does); make only reports "
+         "whether a target is up to date",
     "n": "-n/--dry-run: recipes are printed, not executed",
     "e": "-e/--environment-overrides: the environment beats the makefile's own assignments",
     "f": "-f/--file: make reads a DIFFERENT makefile from the one make-integrity-guard read",
@@ -1046,6 +1074,54 @@ def check_makefile_selection(g: Guard, makefile: Path) -> None:
         g.ok(f"all {len(runs)} -run selections are non-empty")
 
 
+# Check 11 calls scripts/makefile_pin.py verify_pin() — the SAME function the
+# anchor enforces at runtime — so this static check refuses exactly what every
+# anchor refuses. Fix round 1 (PR#10 VERIFY FINDING 3): it used to carry its own
+# copy, which accepted a GNUmakefile beside the Makefile, a symlinked Makefile,
+# and stale or missing pin entries that every anchor refused.
+def check_makefile_pin(g: Guard, pin_path: Path) -> None:
+    """Check 11: the Makefile digest pin exists, is well-formed, covers the Makefile and matches."""
+    root = pin_path.parent.parent
+    r = mp.verify_pin(root, pin_path)
+    if r.ok:
+        g.ok(f"{pin_path.name} pins {len(r.pins)} makefile(s) ({', '.join(sorted(r.pins))}), "
+             f"covers the Makefile, and every digest matches the tree; make will read exactly "
+             f"{', '.join(r.order)} (the anchor's own verify_pin)")
+        return
+    changed = [p for p in r.problems if p.kind in ("mismatch", "absent")]
+    for p in r.problems:
+        if p.kind == "pin" and p.pin_kind == "missing":
+            g.fail(
+                f"{pin_path} is missing.",
+                "It pins the sha256 of every file make reads. Without it the workflow anchor refuses to run",
+                "make at all — and nothing records which Makefile bytes were reviewed.",
+            )
+        elif p.kind == "pin" and p.pin_kind in ("not-a-file", "unreadable", "encoding"):
+            g.fail(f"{pin_path}: {p.message}")
+        elif p.kind == "pin" and p.pin_kind == "empty":
+            g.fail(f"{pin_path} pins no file. An empty pin would let make read anything, so the anchor refuses it.")
+        elif p.kind == "pin":
+            g.fail(
+                f"{pin_path} is not in its one accepted shape (`makefiles:` then `  <path>: <64 hex>` lines):",
+                p.message,
+            )
+        elif p.kind == "no-makefile":
+            g.fail(f"{pin_path} does not pin `Makefile`, the file make reads first.")
+        elif p.kind in ("mismatch", "absent"):
+            continue  # reported together below
+        else:
+            g.fail(f"{pin_path.name}: {p.message}", "The workflow anchor refuses this tree before invoking make.")
+    if changed:
+        g.fail(
+            f"{', '.join(p.file for p in changed)} changed without the paired update to {pin_path.name}:",
+            *[f"{p.file}: sha256 {p.got}, pinned {p.want}" if p.kind == "mismatch"
+              else f"{p.file}: pinned, but not a file in {root}" for p in changed],
+            "A Makefile edit must land together with its pin update, in the same reviewed diff:",
+            "  shasum -a 256 Makefile   (and every other pinned file)",
+            "The workflow anchor refuses to invoke make on these bytes, so every make lane is red too.",
+        )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     root = Path(__file__).resolve().parent.parent
@@ -1053,7 +1129,9 @@ def main() -> int:
     ap.add_argument("--manifest", type=Path, default=root / ".github" / "required-checks.txt")
     ap.add_argument("--makefile", type=Path, default=root / "Makefile")
     ap.add_argument("--pins", type=Path, default=root / ".github" / "pinned-steps.yml")
-    ap.add_argument("--skip-makefile", action="store_true", help="for fixture runs that ship no Makefile")
+    ap.add_argument("--makefile-pins", type=Path, default=root / ".github" / "pinned-makefiles.yml")
+    ap.add_argument("--skip-makefile", action="store_true",
+                    help="for fixture runs that ship no Makefile: skips checks 5 and 11")
     args = ap.parse_args()
 
     g = Guard()
@@ -1184,6 +1262,10 @@ def main() -> int:
     # --- 5. the test selection the lanes actually run -----------------------
     if not args.skip_makefile:
         check_makefile_selection(g, args.makefile)
+
+    # --- 11. the Makefile bytes are the pinned, reviewed bytes ---------------
+    if not args.skip_makefile:
+        check_makefile_pin(g, args.makefile_pins)
 
     # --- 6 and 7. runner and action pinning ---------------------------------
     bad_runners: list[str] = []

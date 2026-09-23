@@ -1,0 +1,11 @@
+# D0 control: the clean tree, both modes, and check 11
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097  (identical in any commit with the same scripts/ bytes)
+
+anchor [--workflow] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)
+anchor [lenient] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)
+ci-required-guard exit=0
+  ok    pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree; make will read exactly Makefile (the anchor's own verify_pin)

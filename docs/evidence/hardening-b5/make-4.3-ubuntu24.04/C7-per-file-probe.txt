@@ -1,0 +1,45 @@
+# C7 the remake probe reverted to one make -q PER FILE (the 62d16aa shape)
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097  (identical in any commit with the same scripts/ bytes)
+
+==============================================================
+MUTATION: C7 per-file probe
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 -c "p='scripts/make-integrity-guard.py';s=open(p).read();n='    probes = [files]  #';assert s.count(n)==1;open(p,'w').write(s.replace(n,'    probes = [[f] for f in files]  #'))"
+  check:  include_sibling
+--------------------------------------------------------------
+  sha256 BEFORE: 5fdce1a07a89fb8d7852faca9b9ed8c10b56e1bc77fcd97967aea8dcf8448b30
+  sha256 AFTER:  84edba37a309c307fe9f64bd0222ba76d583b1b52dd6f2294c7ce35eb4ff63ed
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+== control: the include tree, pinned, no sibling ==
+anchor [--root /tmp/tmp.L441hPpgKU --targets ci --workflow] exit=0 processes-started=7 make-processes=6 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (1 gate target(s); make ran 6 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
+== newer a.mk.sh beside the pinned include a.mk (a.mk sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7) ==
+anchor [--workflow] exit=1 make-processes=[make -q Makefile;make -q a.mk;make -q b.mk;make -pn Makefile a.mk b.mk ci;make -pn Makefile a.mk b.mk ci;make --dry-run --no-print-directory Makefile a.mk b.mk ci] a.mk-after=6caca559f3f92fc613011225d04045c51520638e2148471ebf836f67aa93bfb1
+  FAIL  a.mk CHANGED while this guard ran make (sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7 -> 6caca559f3f92fc613011225d04045c51520638e2148471ebf836f67aa93bfb1).
+make-integrity-guard: FAILED
+  ok    `make -q Makefile a.mk b.mk` (every pinned makefile a goal, so -q applies to each) reports none would be remade; every later make command names them as goals so -n applies to them. -q runs no 
+anchor [lenient] exit=1 make-processes=[make -q Makefile;make -q a.mk;make -q b.mk;make -pn Makefile a.mk b.mk ci;make -pn Makefile a.mk b.mk ci;make --dry-run --no-print-directory Makefile a.mk b.mk ci] a.mk-after=6caca559f3f92fc613011225d04045c51520638e2148471ebf836f67aa93bfb1
+  FAIL  a.mk CHANGED while this guard ran make (sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7 -> 6caca559f3f92fc613011225d04045c51520638e2148471ebf836f67aa93bfb1).
+make-integrity-guard: FAILED
+  ok    `make -q Makefile a.mk b.mk` (every pinned makefile a goal, so -q applies to each) reports none would be remade; every later make command names them as goals so -n applies to them. -q runs no 
+include_sibling: control BROKEN (exit 1)
+------------------------------------
+  sha256 RESTORED: 5fdce1a07a89fb8d7852faca9b9ed8c10b56e1bc77fcd97967aea8dcf8448b30
+  restore byte-identical: yes
+  RESULT: C7 per-file probe -> exit 1
+
+== after restore ==
+== control: the include tree, pinned, no sibling ==
+anchor [--root /tmp/tmp.KRYTzqm3NG --targets ci --workflow] exit=0 processes-started=5 make-processes=4 first-make-argv=['make', '-q', 'Makefile', 'a.mk', 'b.mk']
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
+== newer a.mk.sh beside the pinned include a.mk (a.mk sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7) ==
+anchor [--workflow] exit=1 make-processes=[make -q Makefile a.mk b.mk] a.mk-after=d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7
+  FAIL  make would REMAKE one of Makefile, a.mk, b.mk before reading it (`make -q Makefile a.mk b.mk` exit 1).
+make-integrity-guard: FAILED — make was invoked only as `make -q` (1 process(es)), which runs no ordinary recipe.
+anchor [lenient] exit=1 make-processes=[make -q Makefile a.mk b.mk] a.mk-after=d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7
+  FAIL  make would REMAKE one of Makefile, a.mk, b.mk before reading it (`make -q Makefile a.mk b.mk` exit 1).
+make-integrity-guard: FAILED — make was invoked only as `make -q` (1 process(es)), which runs no ordinary recipe.
+include_sibling: control HELD (exit 0)

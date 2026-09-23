@@ -268,6 +268,8 @@ func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
 		"are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor",
 		"runs all 3 required invocation(s) for 'build-test'",
 		"runs scripts/provenance.sh after checking out",
+		// Check 11 (sweep B5), against the REAL pin and the real Makefile.
+		"pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report %q against the real workflows:\n%s", want, out)
@@ -286,44 +288,108 @@ func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
 // Makefile per way of doing that.
 func TestMakeIntegrityGuardFixtures(t *testing.T) {
 	cases := []struct {
-		dir      string
-		wantFail bool
-		wantText string
+		dir        string
+		wantFail   bool
+		notInvoked bool
+		wantText   string
 	}{
 		{dir: "good", wantFail: false},
 
 		// The two the verifier actually measured.
-		{dir: "shell-override", wantFail: true, wantText: "shell"},
-		{dir: "makeflags-ignore", wantFail: true, wantText: "makeflags"},
+		{dir: "shell-override", wantFail: true, notInvoked: true, wantText: "shell"},
+		{dir: "makeflags-ignore", wantFail: true, notInvoked: true, wantText: "makeflags"},
 
 		// The same two reached through an `include`, which a scan of the root
 		// Makefile alone would not see. MAKEFILE_LIST comes from make itself.
-		{dir: "included-makeflags", wantFail: true, wantText: "inc.mk"},
-		{dir: "included-shell", wantFail: true, wantText: "inc.mk"},
+		{dir: "included-makeflags", wantFail: true, notInvoked: true, wantText: "inc.mk"},
+		{dir: "included-shell", wantFail: true, notInvoked: true, wantText: "inc.mk"},
 
 		// Neighbours of the same class.
-		{dir: "shell-colon", wantFail: true, wantText: "shell"},
-		{dir: "shellflags-neutered", wantFail: true, wantText: "shellflags"},
-		{dir: "gnumakeflags", wantFail: true, wantText: "gnumakeflags"},
-		{dir: "no-shell-pin", wantFail: true, wantText: "approved assignments"},
-		{dir: "oneshell", wantFail: true, wantText: "oneshell"},
+		{dir: "shell-colon", wantFail: true, notInvoked: true, wantText: "shell"},
+		{dir: "shellflags-neutered", wantFail: true, notInvoked: true, wantText: "shellflags"},
+		{dir: "gnumakeflags", wantFail: true, notInvoked: true, wantText: "gnumakeflags"},
+		{dir: "no-shell-pin", wantFail: true, notInvoked: true, wantText: "approved assignments"},
+		{dir: "oneshell", wantFail: true, notInvoked: true, wantText: "oneshell"},
 
 		// A `-` prefix is INVISIBLE to `make --dry-run`, which prints the
 		// command without it. Only the text reading can see this one, which is
 		// why there is a text reading at all.
-		{dir: "dash-prefix", wantFail: true, wantText: "prefixed `-`"},
-		{dir: "at-dash-prefix", wantFail: true, wantText: "prefixed `-`"},
-		{dir: "plus-prefix", wantFail: true, wantText: "prefixed `+`"},
+		{dir: "dash-prefix", wantFail: true, notInvoked: true, wantText: "prefixed `-`"},
+		{dir: "at-dash-prefix", wantFail: true, notInvoked: true, wantText: "prefixed `-`"},
+		{dir: "plus-prefix", wantFail: true, notInvoked: true, wantText: "prefixed `+`"},
 
-		{dir: "or-true", wantFail: true, wantText: "|| true"},
-		{dir: "semicolon-true", wantFail: true, wantText: "; true"},
+		{dir: "or-true", wantFail: true, notInvoked: true, wantText: "|| true"},
+		{dir: "semicolon-true", wantFail: true, notInvoked: true, wantText: "; true"},
 
 		// make runs the LAST definition while a reader — and any text-based
 		// check — sees the first.
-		{dir: "duplicate-target", wantFail: true, wantText: "defined 2 times"},
-		{dir: "conditional-target", wantFail: true, wantText: "conditional"},
+		{dir: "duplicate-target", wantFail: true, notInvoked: true, wantText: "defined 2 times"},
+		{dir: "conditional-target", wantFail: true, notInvoked: true, wantText: "conditional"},
 
-		{dir: "missing-target", wantFail: true, wantText: "could not be established"},
+		// Fix round 1 (PR#10 VERIFY FINDING 4): every TEXT check above now runs on
+		// the pinned read set BEFORE make, so each is refused with make not
+		// started. A missing gate target is one of them; a lane whose shape make
+		// itself cannot resolve (a prerequisite with no rule) still reaches make
+		// and is refused by the resolver, which is what `missing-prerequisite`
+		// keeps covered.
+		{dir: "missing-target", wantFail: true, notInvoked: true, wantText: "is not defined in any makefile make will read"},
+		{dir: "missing-prerequisite", wantFail: true, wantText: "could not be established"},
+
+		// Sweep B5 — THE DIGEST PIN (chair ruling, tick 132, on the 2026-09-23 desk
+		// review, FINDING 4). make EVALUATES a makefile while reading it, so every
+		// fixture above carries its own .github/pinned-makefiles.yml: the checks
+		// above run only on pinned bytes. Each case below is refused BEFORE make is
+		// started, and says so; makefiledigest_test.go proves that line honest with
+		// a process recorder.
+		{dir: "pin-missing", wantFail: true, notInvoked: true, wantText: "pinned-makefiles.yml does not exist"},
+		{dir: "pin-empty", wantFail: true, notInvoked: true, wantText: "pins no file"},
+		{dir: "pin-malformed", wantFail: true, notInvoked: true, wantText: "not a `  <path>: <64 lowercase hex sha256>` entry"},
+		{dir: "pin-without-makefile", wantFail: true, notInvoked: true, wantText: "does not pin `Makefile`"},
+		{dir: "digest-mismatch", wantFail: true, notInvoked: true, wantText: "Makefile: sha256"},
+		{dir: "include-unpinned", wantFail: true, notInvoked: true, wantText: "make would read inc.mk, which has no entry"},
+		{dir: "include-computed", wantFail: true, notInvoked: true, wantText: "names a file make COMPUTES"},
+		{dir: "include-outside", wantFail: true, notInvoked: true, wantText: "reads a file outside the repository"},
+		{dir: "eval-in-pinned-bytes", wantFail: true, notInvoked: true, wantText: "can manufacture an include"},
+		{dir: "stale-pin-entry", wantFail: true, notInvoked: true, wantText: "pins old.mk, which make would NOT read"},
+		{dir: "gnumakefile-present", wantFail: true, notInvoked: true, wantText: "reads GNUmakefile INSTEAD of Makefile"},
+		{dir: "makefile-symlink", wantFail: true, notInvoked: true, wantText: "is not a regular file"},
+		// The positive control for includes: pinned includes are read, and make's
+		// own MAKEFILE_LIST is corroborated against the static reading.
+		{dir: "include-pinned-good", wantFail: false, wantText: "MAKEFILE_LIST ['Makefile', 'a.mk', 'b.mk'] is exactly the pinned set"},
+
+		// Fix round 2 (PR#10 re-verification, R1-F1): `.RECIPEPREFIX` moved every
+		// recipe off the TAB the recipe checks key on, and on GNU Make 4.3 the
+		// anchor passed while `make ci` ran a failing `-` prefixed gate as exit 0.
+		// Refused wherever it is named, before make — every spelling is in
+		// makefiledigest_test.go's TestEveryRefusedSpellingIsRefusedBeforeMake.
+		{dir: "recipeprefix", wantFail: true, notInvoked: true, wantText: "names `.RECIPEPREFIX`"},
+		{dir: "secondexpansion", wantFail: true, notInvoked: true, wantText: "names `.SECONDEXPANSION`"},
+		// Found in fix round 2: a PATTERN-specific SHELL applies to every target
+		// and is invisible to the resolver's global database — measured on 3.81,
+		// anchor exit 0 and `make ci` exit 0 over a failing gate script.
+		{dir: "pattern-specific-shell", wantFail: true, notInvoked: true, wantText: "pattern-specific assignment of SHELL"},
+		{dir: "define-shell", wantFail: true, notInvoked: true, wantText: "assigns SHELL with `define`"},
+		// R1-F2: a name only make resolves reaches the RESOLVER, which refuses it
+		// by name after make has run on the pinned bytes. These are the only
+		// fixtures whose refusal comes from check_resolved, so each post-make
+		// branch has a red case of its own.
+		{dir: "resolver-computed-shell", wantFail: true, wantText: "make resolves SHELL to '/usr/bin/true'"},
+		{dir: "resolver-computed-makeflags", wantFail: true, wantText: "make resolves MAKEFLAGS to"},
+		{dir: "resolver-computed-recipeprefix", wantFail: true, wantText: "make resolves .RECIPEPREFIX to '>'"},
+		{dir: "resolver-computed-secondexpansion", wantFail: true, wantText: "`.SECONDEXPANSION:` is in effect"},
+		// Found while fixing R1-F1: make applies `-`/`+` AFTER expansion, so a
+		// prefix a VARIABLE produces ignored a failing gate with the anchor green
+		// (measured on 3.81). The leading references are now resolved from make's
+		// own database; one whose value cannot be determined that way is refused.
+		{dir: "prefix-from-variable", wantFail: true, wantText: "expands to a recipe line prefixed `-`"},
+		{dir: "prefix-from-chained-variable", wantFail: true, wantText: "expands to a recipe line prefixed `@-`"},
+		{dir: "prefix-from-function", wantFail: true, wantText: "starts with a make function"},
+		{dir: "prefix-from-pattern-specific", wantFail: true, wantText: "which a target- or pattern-specific assignment sets"},
+		// ... and a swallowing SUFFIX a variable produces is read from make's own
+		// dry run, which prints the expanded command.
+		{dir: "suffix-from-variable", wantFail: true, wantText: "make's own dry run prints command(s) whose exit status is discarded"},
+		// NIT: `make -q` exit 2 is make failing, not "would remake".
+		{dir: "make-q-parse-error", wantFail: true, wantText: "failed (exit 2): make reported an ERROR"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {
@@ -339,6 +405,9 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 			}
 			if tc.wantText != "" && !strings.Contains(strings.ToLower(out), strings.ToLower(tc.wantText)) {
 				t.Fatalf("the failure does not mention %q, so an author would not know what to fix:\n%s", tc.wantText, out)
+			}
+			if tc.notInvoked && !strings.Contains(out, "make was NOT invoked (0 make process(es) started)") {
+				t.Fatalf("the refusal must come BEFORE make is started, and say so:\n%s", out)
 			}
 		})
 	}
@@ -453,6 +522,16 @@ func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
 		"MAKEFLAGS carries nothing beyond",
 		"no duplicate-definition override",
 		"defined exactly once",
+		// Sweep B5: the digest pin was checked before make ran, and make's own
+		// MAKEFILE_LIST agreed with the static reading of the pinned bytes.
+		"make runs only on REVIEWED bytes",
+		"MAKEFILE_LIST ['Makefile'] is exactly the pinned set",
+		"only on the pinned bytes of Makefile",
+		// Fix round 2: the post-make backstops reported on, not merely not-failed.
+		".RECIPEPREFIX is not set",
+		"`.SECONDEXPANSION:` is not in effect",
+		"no gate recipe line expands to a `-` or `+` prefix",
+		"no expanded gate command ends in a `|| true`-family suffix",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)

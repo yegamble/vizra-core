@@ -1,0 +1,32 @@
+# D3 an INCLUDED file's bytes changed (fixture include-pinned-good: Makefile includes a.mk and b.mk, all pinned)
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097  (identical in any commit with the same scripts/ bytes)
+
+== control ==
+anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=0 processes-started=5 make-processes=4 first-make-argv=['make', '-q', 'Makefile', 'a.mk', 'b.mk']
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
+==============================================================
+MUTATION: D3 one byte of included a.mk
+  file:   scripts/testdata/makeguard/include-pinned-good/a.mk
+  mutate: python3 -c "p='scripts/testdata/makeguard/include-pinned-good/a.mk';b=open(p,'rb').read();assert b.count(b'A_VALUE := a')==1;open(p,'wb').write(b.replace(b'A_VALUE := a',b'A_VALUE := A'))"
+  check:  anchor --root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow; anchor --root scripts/testdata/makeguard/include-pinned-good --targets ci
+--------------------------------------------------------------
+  sha256 BEFORE: 8f77c0a5bd93fdf25e8c42b4c632c7f7f9a41618a14607cbe1a046ccf098a557
+  sha256 AFTER:  11b8846553001454a03af4b3fb9613382c3347253f90e42e0a090f5ccde38c90
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=1 processes-started=1 make-processes=0
+  FAIL  a.mk: sha256 11b8846553001454a03af4b3fb9613382c3347253f90e42e0a090f5ccde38c90 does not match .github/pinned-makefiles.yml (8f77c0a5bd93fdf25e8c42b4c632c7f7f9a41618a14607cbe1a046ccf098a557).
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci] exit=1 processes-started=1 make-processes=0
+  FAIL  a.mk: sha256 11b8846553001454a03af4b3fb9613382c3347253f90e42e0a090f5ccde38c90 does not match .github/pinned-makefiles.yml (8f77c0a5bd93fdf25e8c42b4c632c7f7f9a41618a14607cbe1a046ccf098a557).
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+------------------------------------
+  sha256 RESTORED: 8f77c0a5bd93fdf25e8c42b4c632c7f7f9a41618a14607cbe1a046ccf098a557
+  restore byte-identical: yes
+  RESULT: D3 one byte of included a.mk -> exit 0
+
+== after restore ==
+anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=0 processes-started=5 make-processes=4 first-make-argv=['make', '-q', 'Makefile', 'a.mk', 'b.mk']
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
