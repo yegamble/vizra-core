@@ -98,7 +98,9 @@ kinds of step that carry the gate, and it does not read their shell at all:
    writer sits between the anchor and make, or IS the anchor step. When the
    writer is an EARLIER step they are refused at RUNTIME, by the anchor —
    provided the write is to a variable the anchor checks (the list above), or
-   puts a directory other than a system one first on PATH.
+   makes `make` resolve outside the approved system directories. The anchor
+   checks where `make` RESOLVES, not the order of PATH: prepending a directory
+   that holds no `make` is not refused, and has no effect on which `make` runs.
    `docs/evidence/hardening-b1/R1-evasion-table.txt` and
    `R2-anchor-environment.txt` carry one row for each.
 3. **Check 8c asserts the lane actually RUNS its gate invocations.** Pinning a

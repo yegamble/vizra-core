@@ -102,7 +102,9 @@ ways to name a command — so the control was inverted:
       that test statically. The other two are $GITHUB_ENV / $GITHUB_PATH writes: refused
       statically when the writer sits between the anchor and make or IS the anchor step
       (the anchor below is pinned too), and at RUNTIME by the anchor when the writer is an
-      earlier step and the write touches a variable the anchor checks.
+      earlier step and the write sets a variable the anchor checks, or makes `make`
+      resolve outside the approved system directories. The anchor checks where `make`
+      RESOLVES, not the order of PATH.
 
   8c  The lane must actually RUN the invocations pinned-steps.yml records for
       it, byte-equal. Pinning a shape does not stop a step being DELETED or
