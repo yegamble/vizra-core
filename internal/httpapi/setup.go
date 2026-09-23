@@ -18,6 +18,7 @@ import (
 	"github.com/yegamble/vizra-core/internal/audit"
 	"github.com/yegamble/vizra-core/internal/config"
 	"github.com/yegamble/vizra-core/internal/credential"
+	"github.com/yegamble/vizra-core/internal/obs"
 	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/site"
 	"github.com/yegamble/vizra-core/internal/store/sqlcgen"
@@ -33,12 +34,27 @@ const (
 	claimRateWindow        = 15 * time.Minute
 	claimFailuresPerOrigin = 10
 	claimFailuresGlobal    = 60
-	// claimHardCeiling bounds TOTAL requests to the setup routes, not just
-	// failures, so a flood of one-row SELECTs cannot exhaust the pool. It is set
-	// far above any operator-plausible use. A flood past this point is a
-	// network-level denial of service and is not something an application
-	// limiter can answer; saying so is more honest than implying otherwise.
-	claimHardCeiling = 600
+	// The two setup routes carry SEPARATE hard ceilings, and that separation is
+	// the point: sharing one counter meant 600 body-less anonymous GETs — no
+	// token, no body, no content type, no origin header — exhausted the window
+	// and the operator's POST carrying the CORRECT token was answered 429 for the
+	// next fifteen minutes, repeatable indefinitely at ~40 requests a minute, on
+	// the very endpoint that advertises `claimed:false` to a scanner. That is
+	// denial of claim by a stranger: the exact failure the failure-keyed limiter
+	// was adopted to remove, reached more cheaply, and only during the unclaimed
+	// window, which is the one window where it matters.
+	//
+	// The ruling said the ceiling may refuse a valid token. It never said the
+	// read surface should compete for the write surface's budget.
+	//
+	// claimOwnerCeiling bounds POSTs. Each one costs a body read, a strict
+	// decode, and — only past the token compare — an argon2id derivation.
+	claimOwnerCeiling = 600
+	// claimStatusCeiling bounds the read. It is higher because the work is
+	// smaller: once an instance is claimed the answer comes from the monotonic
+	// in-process cache and touches no database at all, and while it is unclaimed
+	// it is one trivial indexed EXISTS.
+	claimStatusCeiling = 3000
 )
 
 // codedError carries an application error code distinct from the one the status
@@ -194,7 +210,7 @@ func (s *Server) handleClaimStatus(c *echo.Context) error {
 	// Under the hard ceiling like the POST: this is the only unauthenticated read
 	// surface the product has, it carries Cache-Control: no-store so nothing
 	// upstream absorbs a flood, and post-claim the answer is a constant.
-	if !s.allowClaimRequest(c) {
+	if !s.allowSetupRequest(c, "ceiling.status", claimStatusCeiling) {
 		return newCodedError(http.StatusTooManyRequests, "rate_limited",
 			"too many requests to the setup endpoint; try again shortly")
 	}
@@ -232,27 +248,38 @@ func (s *Server) handleClaimOwner(c *echo.Context) error {
 	req := c.Request()
 	ctx := req.Context()
 
-	// The hard ceiling covers every request, valid or not, and protects the pool.
-	if !s.allowClaimRequest(c) {
+	// This route's OWN hard ceiling. A claim-status flood cannot spend it.
+	if !s.allowSetupRequest(c, "ceiling.claim", claimOwnerCeiling) {
 		return newCodedError(http.StatusTooManyRequests, "rate_limited",
 			"too many requests to the setup endpoint; try again shortly")
 	}
 
-	// Refuse a CLAIMED instance from the monotonic cache, before touching the
-	// pool or parsing anything.
+	// Refuse a CLAIMED instance before parsing anything.
 	//
 	// After day one every instance is claimed, so this is the path every
-	// anonymous POST takes for the rest of the product's life. Without this it
-	// cost two transactions per request AND — worse — wrote one permanent row
-	// into a table migration 0005 makes undeletable: no DELETE, no TRUNCATE, no
-	// retention path yet. The hard ceiling bounds requests per window, but a
-	// per-window bound integrates to unbounded over the life of an instance.
+	// anonymous POST takes for the rest of the product's life. Without it each
+	// request cost database work AND could write a permanent row into a table
+	// migration 0005 makes undeletable: no DELETE, no TRUNCATE, no retention path
+	// yet. The hard ceiling bounds requests per window, but a per-window bound
+	// integrates to unbounded over the life of an instance.
 	//
-	// The bit can only ever go false->true (the gate is EXISTS(users) and no path
-	// deletes the last user), so a cached true is never wrong. The authoritative
-	// in-transaction AnyUserExists inside Claim stays exactly where it is: this
-	// is a short-circuit, not the gate.
-	if claimed, fresh := s.claimed.get(s.deps.Now()); fresh && claimed {
+	// instanceClaimed, not a peek at the cache: on a COLD cache — a freshly
+	// restarted process over an instance claimed long ago — a peek found nothing,
+	// so the request went on to parse the body and examine the token, and a
+	// malformed one wrote a permanent `refused` row per request. This reads the
+	// claimed state (from the cache, or once from the database, WARMING the cache
+	// for every later request) before the body is even read, so a claimed
+	// instance answers 409 and writes nothing whatever the request carries.
+	//
+	// The bit only ever goes false->true (the gate is EXISTS(users) and no path
+	// deletes the last user), so a cached true is never wrong. The in-transaction
+	// AnyUserExists inside Claim, and the redeem statement's own users guard,
+	// stay exactly where they are: this is a short-circuit, not the gate.
+	claimed, err := s.instanceClaimed(c)
+	if err != nil {
+		return s.unavailable(c, "checking claimed state", err)
+	}
+	if claimed {
 		return newCodedError(http.StatusConflict, "conflict", claimedMessage)
 	}
 
@@ -348,13 +375,22 @@ func (s *Server) checkOrigin(req *http.Request) error {
 	// trailing dot on either side cannot turn a same-origin browser claim into a
 	// 403 that only curl escapes.
 	want := s.deps.Config.PublicOrigin
-	if origin := req.Header.Get("Origin"); origin != "" &&
-		config.NormalizeOrigin(origin) != config.NormalizeOrigin(want) {
-		// A DISTINCT code, because a wrong VIZRA_PUBLIC_ORIGIN breaks the browser
-		// claim page while curl still works, and an operator has to be able to
-		// tell that apart from a rejected token.
-		return newCodedError(http.StatusForbidden, "origin_mismatch",
-			"the request Origin does not match this instance's configured public origin")
+	if origin := req.Header.Get("Origin"); origin != "" {
+		gotN, wantN := config.NormalizeOrigin(origin), config.NormalizeOrigin(want)
+		// DENY when either side is unnormalisable. NormalizeOrigin returns "" for
+		// anything it cannot render as a browser origin — `Origin: null` from a
+		// sandboxed iframe or a data: document, and a configured value that is
+		// not an origin at all. Comparing them for equality would make two
+		// failures agree: "" == "" would ALLOW. Boot refuses such a configuration
+		// today, so this is unreachable — but a comparison that fails open is not
+		// something to leave standing on the strength of a guard elsewhere.
+		if gotN == "" || wantN == "" || gotN != wantN {
+			// A DISTINCT code, because a wrong VIZRA_PUBLIC_ORIGIN breaks the browser
+			// claim page while curl still works, and an operator has to be able to
+			// tell that apart from a rejected token.
+			return newCodedError(http.StatusForbidden, "origin_mismatch",
+				"the request Origin does not match this instance's configured public origin")
+		}
 	}
 	switch sfs := req.Header.Get("Sec-Fetch-Site"); sfs {
 	case "", "same-origin", "none":
@@ -392,17 +428,34 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 		// states the rule. Without this branch a connection error — which is not
 		// a *pgconn.PgError — falls through every mapping below to a 500 that
 		// tells the operator nothing on the one endpoint they cannot skip.
-		return newCodedError(http.StatusServiceUnavailable, "unavailable",
-			"the instance state could not be read")
+		return s.unavailable(c, "claim", err)
 
 	case errors.Is(err, pgx.ErrNoRows):
 		// The redeem matched nothing: a concurrent claimer won, or the token was
 		// already terminal. Re-read the claimed state to answer the right one.
-		if pool, perr := s.poolFor(c); perr == nil {
-			if owner, oerr := ownerclaim.LiveOwnerExists(c.Request().Context(), sqlcgen.New(pool)); oerr == nil && owner {
-				s.claimed.set(true, s.deps.Now())
-				return newCodedError(http.StatusConflict, "conflict", claimedMessage)
-			}
+		//
+		// The two failure modes of that re-read are NOT the same as "the token
+		// was wrong", and must not be laundered into it. ErrUnavailable's own doc
+		// says so three files away; letting a dead pool fall through to 403 would
+		// contradict it AND charge the caller's failure budget for a failure that
+		// was the server's.
+		pool, perr := s.poolFor(c)
+		if perr != nil {
+			return s.unavailable(c, "re-reading the claimed state", perr)
+		}
+		// The CLAIMED state (any user), not "a live owner exists". The redeem's
+		// own WHERE NOT EXISTS (SELECT 1 FROM users) makes it return no row
+		// whenever ANY user exists, and "claimed" is defined as exactly that, so
+		// OQ-4's answer is 409. Keying on a live OWNER answered a member-only or
+		// tombstoned-owner instance with 403 — charging the failure budget and
+		// writing a `refused` audit row on an instance that is claimed.
+		claimed, cerr := ownerclaim.Claimed(c.Request().Context(), sqlcgen.New(pool))
+		if cerr != nil {
+			return s.unavailable(c, "re-reading the claimed state", cerr)
+		}
+		if claimed {
+			s.claimed.set(true, s.deps.Now())
+			return newCodedError(http.StatusConflict, "conflict", claimedMessage)
 		}
 		return s.refuseToken(c)
 	}
@@ -415,6 +468,9 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch {
+		case ownerclaim.IsServerUnavailable(pgErr.Code):
+			// The server answered, but to say it cannot serve: an outage.
+			return s.unavailable(c, "claim", err)
 		case pgErr.Code == "23505" && pgErr.ConstraintName == "users_one_owner":
 			// The index fired: an owner was created out of band between the
 			// claimed check and the insert. One owner still exists, the token is
@@ -446,6 +502,24 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 			"the request could not be completed in time")
 	}
 	return err // 500 via the shared handler, with the cause logged there
+}
+
+// unavailable answers 503 and logs the CAUSE exactly once, redacted.
+//
+// The canned client message is deliberate — it tells an attacker nothing — but
+// the first version of this branch dropped the wrapped pgconn error entirely, so
+// a database outage on the one endpoint an operator cannot skip produced a 503
+// whose only trace was "the instance state could not be read". That is not
+// diagnosable. The cause goes to the log with the request id, through
+// obs.Redact, so a DSN or password embedded in a driver error cannot reach a log
+// line (AGENTS.md) while the operator still gets something to act on.
+func (s *Server) unavailable(c *echo.Context, where string, cause error) error {
+	s.deps.Logger.Error("http: the claim endpoint could not reach the database",
+		"where", where,
+		"error", obs.Redact(cause.Error()),
+		"request_id", requestIDOf(c))
+	return newCodedError(http.StatusServiceUnavailable, "unavailable",
+		"the instance state could not be read")
 }
 
 const claimedMessage = "this instance already has an owner"

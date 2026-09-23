@@ -1,27 +1,38 @@
+# VZ-INSTALL-003 M1-A — shuffled integration lane
+date:  2026-09-23T03:13:56Z
+host:  Darwin/arm64
+go:    go version go1.27.1 darwin/arm64
+src:   95afb6223b4ce6ca06ce3d13986a48ce35ea9458 (tree 8f591d8beeda905b8a261f6e947304435babf085)
+base:  5eb2829eb4f830206029f8e2a836f93a44a93a02 (origin/main)
+pg:    PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+cache: valkey_version:9.1.2
+cmd:   make test-integration-shuffle
+
 ==> test-integration-shuffle
-ok  	github.com/yegamble/vizra-core/cmd/api	2.208s
+ok  	github.com/yegamble/vizra-core/cmd/api	1.895s
 ?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
 ?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
-ok  	github.com/yegamble/vizra-core/cmd/vizra	1.576s
+ok  	github.com/yegamble/vizra-core/cmd/vizra	3.191s
 ?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/audit	1.803s
-ok  	github.com/yegamble/vizra-core/internal/authz	2.490s
+ok  	github.com/yegamble/vizra-core/internal/audit	2.391s
+ok  	github.com/yegamble/vizra-core/internal/authz	3.626s
 ?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/cache	2.799s
-ok  	github.com/yegamble/vizra-core/internal/config	3.018s
-ok  	github.com/yegamble/vizra-core/internal/credential	6.163s
+ok  	github.com/yegamble/vizra-core/internal/cache	4.175s
+ok  	github.com/yegamble/vizra-core/internal/config	4.115s
+ok  	github.com/yegamble/vizra-core/internal/credential	13.408s
 ?   	github.com/yegamble/vizra-core/internal/db	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/doctor	2.955s
-ok  	github.com/yegamble/vizra-core/internal/fixtures	136.652s
-ok  	github.com/yegamble/vizra-core/internal/healthcheck	3.100s
-ok  	github.com/yegamble/vizra-core/internal/httpapi	3.262s
-ok  	github.com/yegamble/vizra-core/internal/integration	78.573s
-ok  	github.com/yegamble/vizra-core/internal/jobs	8.173s
+ok  	github.com/yegamble/vizra-core/internal/doctor	3.491s
+ok  	github.com/yegamble/vizra-core/internal/fixtures	375.129s
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.294s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	5.291s
+ok  	github.com/yegamble/vizra-core/internal/integration	247.182s
+ok  	github.com/yegamble/vizra-core/internal/jobs	16.558s
 ?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/obs	3.288s
-ok  	github.com/yegamble/vizra-core/internal/ownerclaim	2.760s
-ok  	github.com/yegamble/vizra-core/internal/search	2.064s
-ok  	github.com/yegamble/vizra-core/internal/site	1.707s
+ok  	github.com/yegamble/vizra-core/internal/obs	4.724s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	4.210s
+ok  	github.com/yegamble/vizra-core/internal/search	3.452s
+ok  	github.com/yegamble/vizra-core/internal/site	2.250s
 ?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
 ?   	github.com/yegamble/vizra-core/migrations	[no test files]
-ok  	github.com/yegamble/vizra-core/scripts	10.491s
+ok  	github.com/yegamble/vizra-core/scripts	42.007s
+SHUFFLE_EXIT=0

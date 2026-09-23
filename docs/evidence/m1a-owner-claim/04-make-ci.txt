@@ -1,0 +1,165 @@
+# VZ-INSTALL-003 M1-A — make ci
+date:  2026-09-23T03:08:34Z
+host:  Darwin/arm64
+go:    go version go1.27.1 darwin/arm64
+src:   95afb6223b4ce6ca06ce3d13986a48ce35ea9458 (tree 8f591d8beeda905b8a261f6e947304435babf085)
+base:  5eb2829eb4f830206029f8e2a836f93a44a93a02 (origin/main)
+pg:    PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+cache: valkey_version:9.1.2
+cmd:   make ci
+
+==> fmt-check
+  ok    all Go files are gofmt-clean
+==> vet
+  ok    go vet is clean
+==> lint-imports
+lint-imports:
+  ok    Echo is imported only by internal/httpapi
+  ok    no package-global database, cache, storage or search handle
+  ok    no hardcoded storage root
+  ok    the image decoder is not linked into the api
+lint-imports: passed
+==> migrate-lint
+migrate-lint: migrations
+  ok    5 migrations form a gapless 1..5 sequence
+  ok    0005_users_credentials_owner_claim.up.sql:210 destructive statement with a stated reason
+  ok    append-only manifest matches (10 migrations)
+migrate-lint: passed
+==> config-template-check
+ok  	github.com/yegamble/vizra-core/internal/config	0.499s
+==> openapi-verify
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.735s
+==> sqlc-verify
+  ok    internal/store/sqlcgen matches store/queries + migrations
+==> ci-guard
+ci-required-guard:
+  ok    all 6 floor lane(s) are present and non-optional
+  ok    required check 'append-only' resolves to a job
+  ok    required check 'build-test' resolves to a job
+  ok    required check 'cache-matrix' resolves to a job
+  ok    required check 'fixtures' resolves to a job
+  ok    required check 'govulncheck' resolves to a job
+  ok    required check 'docker-build' resolves to a job
+  ok    floor lane 'append-only' runs on pull_request
+  ok    floor lane 'append-only' invokes no `make`, so it needs no make-integrity anchor
+  ok    floor lane 'append-only' carries no continue-on-error
+  ok    floor lane 'build-test' runs on pull_request
+  ok    floor lane 'build-test' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
+  ok    floor lane 'build-test' carries no continue-on-error
+  ok    floor lane 'cache-matrix' runs on pull_request
+  ok    floor lane 'cache-matrix' invokes no `make`, so it needs no make-integrity anchor
+  ok    floor lane 'cache-matrix -> needs:cache-matrix-leg' runs the make-integrity-guard anchor (step 4) before `make` (step 5), unconditionally and without continue-on-error
+  ok    floor lane 'cache-matrix' carries no continue-on-error
+  ok    floor lane 'fixtures' runs on pull_request
+  ok    floor lane 'fixtures' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
+  ok    floor lane 'fixtures' carries no continue-on-error
+  ok    floor lane 'govulncheck' runs on pull_request
+  ok    floor lane 'govulncheck' runs the make-integrity-guard anchor (step 3) before `make` (step 4), unconditionally and without continue-on-error
+  ok    floor lane 'govulncheck' carries no continue-on-error
+  ok    floor lane 'docker-build' runs on pull_request
+  ok    floor lane 'docker-build' invokes no `make`, so it needs no make-integrity anchor
+  ok    floor lane 'docker-build' carries no continue-on-error
+  ok    required lane 'build-test' runs the suite directly, without make: 'go test -race -count=1 ./...'
+  ok    the test-race lane selects the whole module (PKGS = ./...)
+  ok    the test-race target uses $(PKGS)
+  ok    all 2 -run selections are non-empty
+  ok    every job runs on GitHub-hosted ubuntu-24.04
+  ok    every third-party action is pinned to a commit SHA
+ci-required-guard: passed (6 required check(s))
+make-integrity-guard: /Users/yosefgamble/github/vizra/.claude/worktrees/core-m1-owner-claim
+  gate targets: ci, tidy-check, build, test-integration, test-integration-shuffle, fixtures, fixtures-verify, govulncheck
+  ok    the environment carries no MAKEFLAGS/GNUMAKEFLAGS that would disarm a recipe
+  closure: 17 target(s); 9 reached through prerequisites (fmt-check, vet, lint-imports, migrate-lint, config-template-check, openapi-verify, sqlc-verify, ci-guard, test-race)
+  ok    make read 1 makefile(s): Makefile
+  ok    the root Makefile pins SHELL and .SHELLFLAGS to the approved values, and nothing else assigns them
+  ok    gate target `ci` is defined exactly once (Makefile:38)
+  ok    gate target `tidy-check` is defined exactly once (Makefile:194)
+  ok    gate target `build` is defined exactly once (Makefile:203)
+  ok    gate target `test-integration` is defined exactly once (Makefile:162)
+  ok    gate target `test-integration-shuffle` is defined exactly once (Makefile:170)
+  ok    gate target `fixtures` is defined exactly once (Makefile:126)
+  ok    gate target `fixtures-verify` is defined exactly once (Makefile:131)
+  ok    gate target `govulncheck` is defined exactly once (Makefile:185)
+  ok    gate target `fmt-check` is defined exactly once (Makefile:43)
+  ok    gate target `vet` is defined exactly once (Makefile:59)
+  ok    gate target `lint-imports` is defined exactly once (Makefile:65)
+  ok    gate target `migrate-lint` is defined exactly once (Makefile:70)
+  ok    gate target `config-template-check` is defined exactly once (Makefile:79)
+  ok    gate target `openapi-verify` is defined exactly once (Makefile:84)
+  ok    gate target `sqlc-verify` is defined exactly once (Makefile:89)
+  ok    gate target `ci-guard` is defined exactly once (Makefile:103)
+  ok    gate target `test-race` is defined exactly once (Makefile:157)
+  ok    `ci`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `ci`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `ci`: `.ONESHELL:` is not in effect
+  ok    `ci`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `ci`: make reports no duplicate-definition override
+  ok    `tidy-check`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `tidy-check`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `tidy-check`: `.ONESHELL:` is not in effect
+  ok    `tidy-check`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `tidy-check`: make reports no duplicate-definition override
+  ok    `build`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `build`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `build`: `.ONESHELL:` is not in effect
+  ok    `build`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `build`: make reports no duplicate-definition override
+  ok    `test-integration`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `test-integration`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `test-integration`: `.ONESHELL:` is not in effect
+  ok    `test-integration`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `test-integration`: make reports no duplicate-definition override
+  ok    `test-integration-shuffle`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `test-integration-shuffle`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `test-integration-shuffle`: `.ONESHELL:` is not in effect
+  ok    `test-integration-shuffle`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `test-integration-shuffle`: make reports no duplicate-definition override
+  ok    `fixtures`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `fixtures`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `fixtures`: `.ONESHELL:` is not in effect
+  ok    `fixtures`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `fixtures`: make reports no duplicate-definition override
+  ok    `fixtures-verify`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `fixtures-verify`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `fixtures-verify`: `.ONESHELL:` is not in effect
+  ok    `fixtures-verify`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `fixtures-verify`: make reports no duplicate-definition override
+  ok    `govulncheck`: make resolves SHELL to the approved /usr/bin/env bash
+  ok    `govulncheck`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
+  ok    `govulncheck`: `.ONESHELL:` is not in effect
+  ok    `govulncheck`: MAKEFLAGS carries nothing beyond this guard's own -pn ('pn')
+  ok    `govulncheck`: make reports no duplicate-definition override
+make-integrity-guard: passed (8 gate target(s))
+==> fixtures-verify
+fixtures-verify: ok — 12 fixtures, 1791508 bytes, generator 1 (4ff582ba6959), toolchain go1.27.1
+  every fixture regenerated byte-identically, the generator source digest matches,
+  the committed codec inputs match, and the toolchain is the pinned one.
+==> test-race
+ok  	github.com/yegamble/vizra-core/cmd/api	1.766s
+?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
+?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
+ok  	github.com/yegamble/vizra-core/cmd/vizra	4.483s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/audit	3.817s
+ok  	github.com/yegamble/vizra-core/internal/authz	2.574s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/cache	2.225s
+ok  	github.com/yegamble/vizra-core/internal/config	3.420s
+ok  	github.com/yegamble/vizra-core/internal/credential	14.924s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/doctor	3.137s
+ok  	github.com/yegamble/vizra-core/internal/fixtures	287.102s
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.016s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	5.631s
+ok  	github.com/yegamble/vizra-core/internal/jobs	19.384s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/obs	4.179s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.929s
+ok  	github.com/yegamble/vizra-core/internal/search	4.098s
+ok  	github.com/yegamble/vizra-core/internal/site	3.494s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+ok  	github.com/yegamble/vizra-core/scripts	32.373s
+
+make ci: all lanes passed
+CI_EXIT=0

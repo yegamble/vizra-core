@@ -86,6 +86,14 @@ func Boot(ctx context.Context, pool *pgxpool.Pool, mode string, ttl time.Duratio
 	}
 
 	raw, generation, err := Mint(ctx, pool, ttl, false, true)
+	if errors.Is(err, ErrHasUsers) {
+		// A user appeared between the AnyUserExists above and the mint statement,
+		// whose own WHERE NOT EXISTS then refused. That is a benign race with the
+		// correct outcome "claimed" — reporting it as degraded readiness plus an
+		// error log would tell an operator their new instance is broken at the
+		// exact moment it was successfully claimed.
+		return BootOutcome{Claimed: true}, nil
+	}
 	if errors.Is(err, ErrLiveTokenExists) {
 		// Another replica won the lock, or a token from an earlier boot is still
 		// live. Announce the command and the live generation; never a credential,

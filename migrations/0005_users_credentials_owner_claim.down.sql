@@ -17,7 +17,7 @@
 --
 -- So: THIS FILE EXISTS FOR A DEVELOPMENT DATABASE THAT WAS NEVER CLAIMED. On a
 -- claimed instance the supported rollback is a restore from backup, not this
--- file (ADR-002 § Rollback floor routes that case through restore).
+-- file.
 --
 -- The up file deliberately does NOT use ADD CONSTRAINT ... NOT VALID: that would
 -- weaken the constraint's guarantee on every fresh database in order to buy a

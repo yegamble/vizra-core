@@ -5,10 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/yegamble/vizra-core/internal/config"
@@ -163,6 +166,19 @@ func TestClaimErrorMapping(t *testing.T) {
 		{"a bare network error wrapped as unavailable", fmt.Errorf("%w: dial: %v",
 			ownerclaim.ErrUnavailable, errors.New("connection refused")),
 			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
+		// backend NEW-2: the 409-vs-403 re-read runs on a server with no pools, so
+		// poolFor fails. That is the server's failure, not a wrong token, and must
+		// not be laundered into "that claim token was not accepted".
+		// A server-SIGNALLED outage arrives as a *pgconn.PgError, and used to match
+		// no branch and fall through to a 500.
+		{"admin shutdown (57P01)", &pgconn.PgError{Code: "57P01"},
+			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
+		{"connection failure (08006)", &pgconn.PgError{Code: "08006"},
+			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
+		{"too many connections (53300)", &pgconn.PgError{Code: "53300"},
+			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
+		{"the claimed re-read cannot reach the database", pgx.ErrNoRows,
+			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -204,44 +220,72 @@ func TestNoClaimErrorMapsToAnUnhandledFiveHundred(t *testing.T) {
 	}
 }
 
-// TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs (F1).
+// TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs (F1, backend NEW-1).
 //
 // openapi-verify checks route<->operation and never status codes, so nothing
-// else stops the handler and the published contract drifting apart — which is
-// exactly how "database unreachable" came to answer 500 while the spec promised
-// 503, frozen for vizra-user's generated client.
+// else stops the handler and the published contract drifting apart. That is how
+// "database unreachable" came to answer 500 while the spec promised 503, and how
+// claim-status came to answer 429 that the spec did not declare at all.
+//
+// It is a TABLE over EVERY setup operation, not just the POST: the next route
+// added to this group is then covered by construction, because an operation with
+// no entry here fails the test rather than being silently unchecked.
 func TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs(t *testing.T) {
-	spec := loadSpec(t, specPath)
-	op := spec.Paths.Find("/api/v1/setup/claim-owner").Post
-	if op == nil {
-		t.Fatal("claimOwner is not in the contract")
-	}
-	declared := map[string]bool{}
-	for code := range op.Responses.Map() {
-		declared[code] = true
+	// Every status each handler can return, and where. A new branch returning a
+	// status absent from this map fails; so does a status the spec declares that
+	// nothing produces.
+	produced := map[string]map[string]string{
+		pathSetupClaimOwner: {
+			"201": "handleClaimOwner success",
+			"400": "validation / decode / empty body",
+			"403": "token refused, origin_mismatch",
+			"409": "already claimed, duplicate identifier, users_one_owner",
+			"413": "MaxBytesReader",
+			"415": "requireJSONContentType",
+			"429": "claimOwnerCeiling, failure budget",
+			"503": "ErrUnavailable, ErrBusy, claimed re-read failure",
+		},
+		pathSetupClaimStatus: {
+			"200": "handleClaimStatus",
+			"429": "claimStatusCeiling",
+			"503": "the claimed lookup failed",
+		},
 	}
 
-	// Every status the handler can return, with where it is produced. A new
-	// branch that returns a status absent from this list fails the test, and so
-	// does a status declared in the spec that nothing produces.
-	produced := map[string]string{
-		"201": "handleClaimOwner success",
-		"400": "validation / decode",
-		"403": "token refused, origin_mismatch",
-		"409": "already claimed, duplicate identifier",
-		"413": "MaxBytesReader",
-		"415": "requireJSONContentType",
-		"429": "hard ceiling, failure budget",
-		"503": "ErrUnavailable, ErrBusy",
-	}
-	for code := range declared {
-		if _, ok := produced[code]; !ok {
-			t.Errorf("the contract declares %s for claimOwner but no handler path produces it", code)
+	spec := loadSpec(t, specPath)
+	seen := map[string]bool{}
+	for path, item := range spec.Paths.Map() {
+		for method, op := range item.Operations() {
+			if !strings.HasPrefix(path, "/api/v1/setup/") {
+				continue
+			}
+			seen[path] = true
+			want, ok := produced[path]
+			if !ok {
+				t.Errorf("%s %s is a setup operation with no entry in this test; every status "+
+					"it can return must be enumerated here", method, path)
+				continue
+			}
+			declared := map[string]bool{}
+			for code := range op.Responses.Map() {
+				declared[code] = true
+			}
+			for code := range declared {
+				if _, produces := want[code]; !produces {
+					t.Errorf("%s declares %s but no handler path produces it", path, code)
+				}
+			}
+			for code, where := range want {
+				if !declared[code] {
+					t.Errorf("%s can return %s (%s) but the contract does not declare it",
+						path, code, where)
+				}
+			}
 		}
 	}
-	for code, where := range produced {
-		if !declared[code] {
-			t.Errorf("the handler can return %s (%s) but the contract does not declare it", code, where)
+	for path := range produced {
+		if !seen[path] {
+			t.Errorf("%s is enumerated here but is not in the contract at all", path)
 		}
 	}
 }
@@ -266,6 +310,84 @@ func TestTheAnnounceDefaultIsOff(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("VIZRA_OWNER_CLAIM_ANNOUNCE is not in the config registry")
+	}
+}
+
+// TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket (security NEW-1).
+//
+// Sharing one counter meant 600 body-less anonymous GETs — no token, no body, no
+// content type, no origin header — spent the budget the operator's POST needs,
+// holding an unclaimed instance shut for fifteen minutes at a time on the very
+// endpoint that advertises `claimed:false`.
+func TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket(t *testing.T) {
+	if claimStatusCeiling == claimOwnerCeiling {
+		t.Logf("the two ceilings are numerically equal (%d); that is allowed, "+
+			"but they must still be SEPARATE counters", claimOwnerCeiling)
+	}
+	var keys []string
+	s := newProbeServer(t, func(d *Deps) {
+		d.InstanceClaimed = func(context.Context) (bool, error) { return false, nil }
+		d.Limiter = recordingLimiter{seen: &keys}
+	})
+	// One request to each route.
+	get(t, s, pathSetupClaimStatus)
+	req := httptest.NewRequest(http.MethodPost, pathSetupClaimOwner, strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	s.Handler().ServeHTTP(httptest.NewRecorder(), req)
+
+	var status, claim string
+	for _, k := range keys {
+		switch {
+		case strings.Contains(k, "ceiling.status"):
+			status = k
+		case strings.Contains(k, "ceiling.claim"):
+			claim = k
+		}
+	}
+	if status == "" || claim == "" {
+		t.Fatalf("expected one ceiling key per route; saw %v", keys)
+	}
+	if status == claim {
+		t.Fatalf("both setup routes spend the SAME ceiling key %q; a status flood can then "+
+			"deny the operator's claim", status)
+	}
+}
+
+// recordingLimiter captures the keys the handler spends, so bucket separation is
+// asserted on the key itself rather than inferred from behaviour.
+type recordingLimiter struct{ seen *[]string }
+
+func (r recordingLimiter) Allow(_ context.Context, key string, _ int, _ time.Duration) (bool, int) {
+	*r.seen = append(*r.seen, key)
+	return true, 1
+}
+func (r recordingLimiter) Degraded() bool { return false }
+
+// TestAnUnnormalisableOriginNeverMatches (security NEW-4).
+//
+// checkOrigin compares NORMALISED origins, and NormalizeOrigin returns "" for
+// anything it cannot render. Comparing for equality alone would make two
+// failures agree: `Origin: null` against an unnormalisable configured value is
+// "" == "" and would ALLOW. Boot refuses such a configuration, so this is
+// unreachable through LoadFrom — which is why the test builds the Config
+// directly: the comparison itself must not fail open on the strength of a guard
+// somewhere else.
+func TestAnUnnormalisableOriginNeverMatches(t *testing.T) {
+	for _, configured := range []string{"not-an-origin", "", "https://фотки.example"} {
+		for _, sent := range []string{"null", "not-an-origin", "https://фотки.example"} {
+			s := newProbeServer(t, func(d *Deps) {
+				d.InstanceClaimed = func(context.Context) (bool, error) { return false, nil }
+			})
+			s.deps.Config.PublicOrigin = configured
+			req := httptest.NewRequest(http.MethodPost, pathSetupClaimOwner, nil)
+			req.Header.Set("Origin", sent)
+			err := s.checkOrigin(req)
+			var ce *codedError
+			if !errors.As(err, &ce) || ce.status != http.StatusForbidden || ce.code != "origin_mismatch" {
+				t.Errorf("configured %q, Origin %q: got %v, want 403 origin_mismatch — two "+
+					"unnormalisable values must never compare equal", configured, sent, err)
+			}
+		}
 	}
 }
 

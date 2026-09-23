@@ -200,6 +200,39 @@ func fakeVerifier() string {
 		bytes.Repeat([]byte{0x02}, int(credential.ADR003.KeyLen)))
 }
 
+// waitForLockWaiters blocks until at least n OTHER sessions on this database are
+// waiting on a heavyweight lock, and FAILS the test if that does not happen.
+//
+// It replaces time.Sleep barriers. A sleep can never make these tests go falsely
+// red — but on a loaded runner it can silently stop them exercising the race
+// they exist for: the goroutines simply have not reached the lock yet when it is
+// released, run one after another, and the test passes having proved nothing.
+// Measured, not hypothetical: this suite ran on a machine at load average 197 on
+// 8 CPUs while this was written. Waiting on pg_stat_activity makes the barrier a
+// fact the database reports rather than a guess about scheduling.
+func waitForLockWaiters(t *testing.T, pool *pgxpool.Pool, n int) {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		var waiting int
+		if err := pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity
+			  WHERE datname = current_database()
+			    AND pid <> pg_backend_pid()
+			    AND wait_event_type = 'Lock'`).Scan(&waiting); err != nil {
+			t.Fatalf("reading pg_stat_activity: %v", err)
+		}
+		if waiting >= n {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("only %d session(s) reached the lock within 60s, want %d; the race this "+
+				"test exists for was never set up, so it must not pass", waiting, n)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 func bodyCode(body map[string]any) string {
 	e, ok := body["error"].(map[string]any)
 	if !ok {
@@ -346,7 +379,11 @@ func TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation(t *
 				switch {
 				case c == http.StatusCreated:
 					created++
-				case c == http.StatusConflict || c == http.StatusForbidden:
+				// 409 exactly, never 403: by the time a loser is answered the winner
+				// has committed, the instance is claimed, and OQ-4 says a claimed
+				// instance answers 409. A 403 here would also charge the loser's
+				// failure budget and write a `refused` row for the server's race.
+				case c == http.StatusConflict:
 					declined++
 				case c >= 500:
 					serverErrors++
@@ -1013,6 +1050,13 @@ func TestOriginsAreComparedNormalisedNotAsStrings(t *testing.T) {
 			return strings.Replace(c, "://localhost", "://localhost.", 1)
 		}, http.StatusCreated},
 		{"a genuinely different host", func(string) string { return "https://evil.example" }, http.StatusForbidden},
+		// security NEW-4: `Origin: null` — a sandboxed iframe, a data: document,
+		// some cross-origin redirects — normalises to "". Comparing normalised
+		// values for equality would make two failures agree, so an unnormalisable
+		// origin must DENY rather than match.
+		{"Origin: null", func(string) string { return "null" }, http.StatusForbidden},
+		{"an origin that is not an origin", func(string) string { return "not-an-origin" }, http.StatusForbidden},
+		{"an origin carrying a path", func(c string) string { return c + "/setup/claim" }, http.StatusForbidden},
 		{"a different scheme", func(c string) string {
 			return strings.Replace(c, "http://", "https://", 1)
 		}, http.StatusForbidden},
@@ -1698,8 +1742,8 @@ func TestConcurrentBootsMintExactlyOneToken(t *testing.T) {
 				ownerclaim.AnnounceStderr, e.cfg.OwnerClaimTTL, &sinks[i])
 		}(i)
 	}
-	// Both boots are now either blocked on the lock or about to be.
-	time.Sleep(750 * time.Millisecond)
+	// Release only once BOTH boots are observably queued on the advisory lock.
+	waitForLockWaiters(t, e.pool, boots)
 	if err := blocker.Commit(t.Context()); err != nil {
 		t.Fatalf("releasing the mint lock: %v", err)
 	}
@@ -1794,7 +1838,11 @@ func TestOwnerClaimAnswers503WhenTheDatabaseIsDown(t *testing.T) {
 	deadResolver := site.NewResolver(&dead)
 	pools, err := db.Open(t.Context(), deadResolver)
 	if err != nil {
-		t.Skipf("the pool refused to open against a closed port, so the 503 path cannot be driven here: %v", err)
+		// FATAL, never SKIP. A lane that did not run is not a pass (AGENTS.md),
+		// and core PR #9 lands executed-test floors with an EMPTY skip allowlist,
+		// so a skip here would go red by name rather than quietly not proving the
+		// 503 contract.
+		t.Fatalf("this lane is BLOCKED, not skipped: the pool would not open against a closed port: %v", err)
 	}
 	t.Cleanup(pools.Close)
 
@@ -1871,8 +1919,11 @@ func TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed(t *testing.T) {
 // TestClaimStatusIsBoundedByTheHardCeiling (N-2 / R-A).
 func TestClaimStatusIsBoundedByTheHardCeiling(t *testing.T) {
 	e := newClaimEnv(t)
+	// Drive past the STATUS route's own ceiling (3000), not the claim route's
+	// (600). This test sent 700 when the two shared a bucket; after they were
+	// split it no longer reached the ceiling at all and failed on correct code.
 	limited := false
-	for i := 0; i < 700; i++ {
+	for i := 0; i < 3100; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/setup/claim-status", nil)
 		req.RemoteAddr = "203.0.113.42:51000"
 		rec := httptest.NewRecorder()
@@ -1883,7 +1934,7 @@ func TestClaimStatusIsBoundedByTheHardCeiling(t *testing.T) {
 		}
 	}
 	if !limited {
-		t.Fatal("700 unauthenticated GETs were never rate limited; the status route must sit " +
+		t.Fatal("3100 unauthenticated GETs were never rate limited; the status route must sit " +
 			"under the same hard ceiling as the POST")
 	}
 }
@@ -1927,8 +1978,8 @@ func TestUsersOneOwnerFiresThroughTheHandler(t *testing.T) {
 		done <- result{code, body}
 	}()
 
-	// Give the claim time to reach the index and block on it, then release it.
-	time.Sleep(750 * time.Millisecond)
+	// Release only once the claim is observably blocked on the unique index.
+	waitForLockWaiters(t, e.pool, 1)
 	if err := blocker.Commit(t.Context()); err != nil {
 		t.Fatalf("committing the blocker: %v", err)
 	}
@@ -2006,5 +2057,615 @@ func TestTheCredentialsCheckRefusesEveryNonArgon2idSecret(t *testing.T) {
 		`INSERT INTO credentials (id,user_id,kind,secret) VALUES ($1,$2,'password',$3)`,
 		id, userID, fakeVerifier()); err != nil {
 		t.Fatalf("a real argon2id verifier must be accepted: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fix round 2 — the regression round 1 introduced, and its neighbours
+// ---------------------------------------------------------------------------
+
+// TestAStatusFloodDoesNotStarveTheClaim (security NEW-1).
+//
+// Round 1 put claim-status under the hard ceiling, which was right, but through
+// the SAME counter as the POST. A body-less GET needs no token, no body, no
+// content type and no origin header, so 600 of them in a few seconds exhausted
+// the window and the operator's POST carrying the CORRECT token was answered 429
+// for the next fifteen minutes — repeatable indefinitely, on the very endpoint
+// that advertises `claimed:false` to a scanner.
+func TestAStatusFloodDoesNotStarveTheClaim(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+
+	limited := false
+	for i := 0; i < 4000 && !limited; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/setup/claim-status", nil)
+		req.RemoteAddr = "203.0.113.42:51000"
+		rec := httptest.NewRecorder()
+		e.srv.Handler().ServeHTTP(rec, req)
+		if rec.Code == http.StatusTooManyRequests {
+			limited = true
+		}
+	}
+	if !limited {
+		t.Fatal("the status route was never rate limited, so this test proves nothing")
+	}
+
+	// The operator's claim must still go through.
+	code, body := e.post(t, validBody(token), nil)
+	if code != http.StatusCreated {
+		t.Fatalf("after a status flood exhausted its ceiling, the operator's VALID token was "+
+			"answered %d — a stranger can deny the claim. body=%v", code, body)
+	}
+}
+
+// TestAClaimFloodDoesNotSilenceTheStatusEndpoint — the reverse direction.
+func TestAClaimFloodDoesNotSilenceTheStatusEndpoint(t *testing.T) {
+	e := newClaimEnv(t)
+	e.mint(t)
+
+	limited := false
+	for i := 0; i < 900 && !limited; i++ {
+		if code, _ := e.post(t, validBody(strings.Repeat("a", 64)), nil); code == http.StatusTooManyRequests {
+			limited = true
+		}
+	}
+	if !limited {
+		t.Fatal("the claim route was never rate limited, so this test proves nothing")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/setup/claim-status", nil)
+	req.RemoteAddr = "203.0.113.42:51000"
+	rec := httptest.NewRecorder()
+	e.srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("after a claim flood, claim-status answered %d; the two routes must not share "+
+			"a ceiling in either direction", rec.Code)
+	}
+}
+
+// TestTheRedeemStatementRefusesADeadToken (FU-3, scoring MUT-6 and MUT-1b).
+//
+// Round 1 declared the CTE's expiry and consumption guards review-only, because
+// the Go liveness pre-check refuses first and nothing reddened. Calling the
+// generated query DIRECTLY bypasses every Go-side check, so the guards that are
+// the enforcement of record become observable — two honest "MEASURED: nothing
+// reddens" notes turn into two scored cases.
+func TestTheRedeemStatementRefusesADeadToken(t *testing.T) {
+	newIDs := func(t *testing.T) (uuid.UUID, uuid.UUID) {
+		t.Helper()
+		u, err := uuid.NewV7()
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := uuid.NewV7()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u, c
+	}
+
+	for _, tc := range []struct {
+		name string
+		kill string
+	}{
+		{"expired", `UPDATE owner_claim_tokens SET minted_at = now() - interval '4h', expires_at = now() - interval '3h'`},
+		{"already consumed", `UPDATE owner_claim_tokens SET consumed_at = now()`},
+		{"superseded", `UPDATE owner_claim_tokens SET superseded_at = now()`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newClaimEnv(t)
+			token, _ := e.mint(t)
+			if _, err := e.pool.Exec(t.Context(), tc.kill); err != nil {
+				t.Fatal(err)
+			}
+			userID, credID := newIDs(t)
+			_, err := sqlcgen.New(e.pool).ClaimOwner(t.Context(), sqlcgen.ClaimOwnerParams{
+				TokenSha256:  ownerclaim.Digest(token),
+				UserID:       userID,
+				Username:     "owner",
+				Email:        "owner@example.org",
+				CredentialID: credID,
+				PasswordHash: fakeVerifier(),
+			})
+			if !errors.Is(err, pgx.ErrNoRows) {
+				t.Fatalf("the redeem statement accepted a %s token (err=%v); the CTE's guard is "+
+					"the enforcement of record and must refuse it whatever Go did first", tc.name, err)
+			}
+			if got := e.count(t, `SELECT count(*) FROM users`); got != 0 {
+				t.Fatalf("a refused redeem created %d users", got)
+			}
+		})
+	}
+}
+
+// TestTheRedeemStatementRefusesAClaimedInstance (FU-2).
+//
+// "An instance that already has users is implicitly claimed" was the one claim
+// invariant enforced only in Go. The Go gate still decides the ANSWER (409 vs
+// 403); this is the guarantee, and M1-B's registration route is the first thing
+// that could race it.
+func TestTheRedeemStatementRefusesAClaimedInstance(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+	insertOwner(t, e.pool, "outofband", "oob@example.org")
+
+	userID, _ := uuid.NewV7()
+	credID, _ := uuid.NewV7()
+	_, err := sqlcgen.New(e.pool).ClaimOwner(t.Context(), sqlcgen.ClaimOwnerParams{
+		TokenSha256:  ownerclaim.Digest(token),
+		UserID:       userID,
+		Username:     "second",
+		Email:        "second@example.org",
+		CredentialID: credID,
+		PasswordHash: fakeVerifier(),
+	})
+	if !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("the redeem statement ran on an instance that already has users (err=%v)", err)
+	}
+	if got := e.count(t, `SELECT count(*) FROM users`); got != 1 {
+		t.Fatalf("users = %d, want 1", got)
+	}
+	if got := e.count(t, `SELECT count(*) FROM owner_claim_tokens WHERE consumed_at IS NOT NULL`); got != 0 {
+		t.Fatal("a refused redeem consumed the token")
+	}
+}
+
+// TestADatabaseOutageIsDiagnosableFromTheLog (security NEW-2, first half).
+//
+// The canned 503 body tells an attacker nothing, which is right — but round 1
+// dropped the wrapped cause entirely, so a database outage on the one endpoint
+// an operator cannot skip left no trace beyond "the instance state could not be
+// read". The cause is now logged once, redacted, with the request id.
+func TestADatabaseOutageIsDiagnosableFromTheLog(t *testing.T) {
+	cfg, _, _ := freshDatabase(t)
+
+	dead := *cfg
+	const password = "s3kr1t-not-a-real-password"
+	dead.DatabaseURL = "postgres://vizra:" + password + "@127.0.0.1:1/vizra_test?sslmode=disable&connect_timeout=1"
+	deadResolver := site.NewResolver(&dead)
+	pools, err := db.Open(t.Context(), deadResolver)
+	if err != nil {
+		t.Fatalf("this lane is BLOCKED, not skipped: the pool would not open: %v", err)
+	}
+	t.Cleanup(pools.Close)
+
+	logs := &safeBuffer{}
+	srv := httpapi.New(httpapi.Deps{
+		Config:                &dead,
+		Resolver:              deadResolver,
+		Pools:                 pools,
+		EmbeddedSchemaVersion: mustEmbedded(t),
+		InstanceClaimed:       func(context.Context) (bool, error) { return false, nil },
+		// A PLAIN handler: the redacting handler would hide a leak rather than
+		// prove there is none.
+		Logger: obs.NewLogger(logs, false),
+		Now:    time.Now,
+	})
+
+	body, _ := json.Marshal(validBody(strings.Repeat("a", 64)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/setup/claim-owner", strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("claim against a dead database = %d, want 503. body=%s", rec.Code, rec.Body.String())
+	}
+	out := logs.String()
+	if !strings.Contains(out, "could not reach the database") {
+		t.Fatalf("the 503 left nothing diagnosable in the log: %s", firstRunes(out, 400))
+	}
+	// ONCE. The shared error handler also writes a generic line for every 5xx,
+	// but that line carries only the canned client message; the CAUSE must be
+	// written exactly once, at the point the 503 is decided.
+	if n := strings.Count(out, "could not reach the database"); n != 1 {
+		t.Errorf("the cause was logged %d times, want exactly once: %s", n, firstRunes(out, 600))
+	}
+	if !strings.Contains(out, "request_id") {
+		t.Error("the log line carries no request id, so it cannot be correlated with the caller's 503")
+	}
+	// And the cause must not drag the DSN or its password in with it.
+	if strings.Contains(out, password) {
+		t.Errorf("the database password reached a log line: %s", firstRunes(out, 400))
+	}
+	if strings.Contains(out, dead.DatabaseURL) {
+		t.Errorf("the DSN reached a log line: %s", firstRunes(out, 400))
+	}
+}
+
+// TestTheClaimTransactionPinsReadCommitted.
+//
+// The claim transaction pins READ COMMITTED explicitly rather than inheriting
+// `default_transaction_isolation`, which an operator, a managed provider or a
+// pooler can set. Under REPEATABLE READ a claimant that has already passed the
+// in-transaction gate and then blocks on the redeem's row lock gets 40001
+// `could not serialize access`, which no branch maps — a 500 on exactly the race
+// the ledger's negative case names, and only in production.
+//
+// After the read/write split that window became narrow enough that the ordinary
+// race test no longer reaches it (most losers are refused by a gate before they
+// ever touch the lock), so this forces it deterministically: a third connection
+// holds the token row locked until BOTH claimants are past every gate and
+// queued on that exact row.
+func TestTheClaimTransactionPinsReadCommitted(t *testing.T) {
+	e := newClaimEnv(t)
+
+	dbName := quoteIdent(currentDatabase(t, e.pool))
+	if _, err := e.pool.Exec(t.Context(), fmt.Sprintf(
+		"ALTER DATABASE %s SET default_transaction_isolation = %q", dbName, "repeatable read")); err != nil {
+		t.Fatalf("setting the server default isolation: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = e.pool.Exec(context.Background(), fmt.Sprintf(
+			"ALTER DATABASE %s RESET default_transaction_isolation", dbName))
+	})
+	e.pool.Reset()
+
+	token, _ := e.mint(t)
+
+	// Lock the token row so every claimant queues on it rather than racing.
+	blocker, err := e.pool.Begin(t.Context())
+	if err != nil {
+		t.Fatalf("opening the blocking transaction: %v", err)
+	}
+	var locked bool
+	if err := blocker.QueryRow(t.Context(),
+		`SELECT true FROM owner_claim_tokens WHERE id FOR UPDATE`).Scan(&locked); err != nil {
+		t.Fatalf("locking the token row: %v", err)
+	}
+
+	const claimants = 2
+	codes := make([]int, claimants)
+	bodies := make([]map[string]any, claimants)
+	var wg sync.WaitGroup
+	for i := 0; i < claimants; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			b := validBody(token)
+			b.Username = fmt.Sprintf("racer%d", i)
+			b.Email = fmt.Sprintf("racer%d@example.org", i)
+			codes[i], bodies[i] = e.post(t, b, nil)
+		}(i)
+	}
+	// Release only once BOTH claimants are observably queued on the locked row —
+	// that is, past the read phase and past the in-transaction gate.
+	waitForLockWaiters(t, e.pool, claimants)
+	if err := blocker.Commit(t.Context()); err != nil {
+		t.Fatalf("releasing the token row: %v", err)
+	}
+	wg.Wait()
+
+	created, declined := 0, 0
+	for i, c := range codes {
+		switch {
+		case c == http.StatusCreated:
+			created++
+		// 409 exactly. The loser here passed every gate, blocked on the token row,
+		// and got no row from the redeem once the winner consumed it — so its
+		// answer is decided by the 409-vs-403 RE-READ, and the instance is claimed.
+		case c == http.StatusConflict:
+			declined++
+		default:
+			t.Errorf("claimant %d got %d (%v) — want 201 or 409. Under a REPEATABLE READ server default a "+
+				"claimant blocked on the redeem raises 40001, which no branch maps; the claim "+
+				"transaction must pin READ COMMITTED itself", i, c, bodies[i])
+		}
+	}
+	if created != 1 {
+		t.Fatalf("%d claimants created the owner, want exactly 1", created)
+	}
+	if declined != claimants-1 {
+		t.Fatalf("%d claimants were cleanly declined, want %d", declined, claimants-1)
+	}
+	if got := e.count(t, `SELECT count(*) FROM users WHERE role='owner' AND tombstoned_at IS NULL`); got != 1 {
+		t.Fatalf("live owners = %d, want 1", got)
+	}
+}
+
+// TestABootRaceWithTheFirstAccountReportsClaimedNotDegraded (FU-1).
+//
+// If an account appears between Boot's AnyUserExists and the mint statement,
+// the statement's own WHERE NOT EXISTS (SELECT 1 FROM users) refuses and Mint
+// returns ErrHasUsers. That is a benign race whose correct outcome is
+// "claimed". Reporting it as degraded readiness plus an error would tell the
+// operator their instance is broken at the moment it was successfully claimed.
+//
+// Forced deterministically: a third connection holds the mint advisory lock, so
+// Boot passes its own checks and queues inside Mint; the account is committed
+// while it waits; then the lock is released.
+func TestABootRaceWithTheFirstAccountReportsClaimedNotDegraded(t *testing.T) {
+	e := newClaimEnv(t)
+
+	blocker, err := e.pool.Begin(t.Context())
+	if err != nil {
+		t.Fatalf("opening the lock holder: %v", err)
+	}
+	if _, err := blocker.Exec(t.Context(), "SELECT pg_advisory_xact_lock(1)"); err != nil {
+		t.Fatalf("taking the mint lock: %v", err)
+	}
+
+	type result struct {
+		out ownerclaim.BootOutcome
+		err error
+	}
+	done := make(chan result, 1)
+	var sink strings.Builder
+	go func() {
+		out, err := ownerclaim.Boot(t.Context(), e.pool, ownerclaim.AnnounceStderr, e.cfg.OwnerClaimTTL, &sink)
+		done <- result{out, err}
+	}()
+
+	// Boot must be past AnyUserExists (no users yet) and observably queued on the
+	// advisory lock before the account appears.
+	waitForLockWaiters(t, e.pool, 1)
+	insertOwner(t, e.pool, "first", "first@example.org")
+	if err := blocker.Commit(t.Context()); err != nil {
+		t.Fatalf("releasing the mint lock: %v", err)
+	}
+
+	var got result
+	select {
+	case got = <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Boot never returned")
+	}
+	if got.err != nil {
+		t.Fatalf("a benign race with the first account returned an error: %v", got.err)
+	}
+	if got.out.Degraded {
+		t.Fatalf("a benign race with the first account reported DEGRADED readiness: %+v", got.out)
+	}
+	if !got.out.Claimed {
+		t.Fatalf("the instance has an account, so Boot must report Claimed: %+v", got.out)
+	}
+	if hex64(sink.String()) {
+		t.Fatal("Boot printed a credential for an instance that is already claimed")
+	}
+	if n := e.count(t, `SELECT count(*) FROM owner_claim_tokens`); n != 0 {
+		t.Fatalf("token rows = %d, want 0 — nothing may be minted on a claimed instance", n)
+	}
+}
+
+// TestAConnectionKilledMidClaimAnswers503NotFiveHundred.
+//
+// Round 1 added ErrUnavailable so a database outage answers 503, but it wrapped
+// only NON-PgError failures, deliberately leaving *pgconn.PgError unwrapped so
+// the mapper can key on constraint codes. A server-SIGNALLED outage also arrives
+// as a *pgconn.PgError — 57P01 admin shutdown, 57P03 cannot-connect-now, 53300
+// too-many-connections, class 08 — and matched no branch, so it fell through to
+// a 500. And the audit insert inside the claim transaction was not wrapped at all.
+//
+// Forced deterministically: a blocker holds an ACCESS EXCLUSIVE lock on
+// audit_events, so the claim runs its redeem and then queues on the audit insert
+// INSIDE its transaction; the claim's backend is then terminated, which the
+// server reports as 57P01.
+func TestAConnectionKilledMidClaimAnswers503NotFiveHundred(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+
+	blocker, err := e.pool.Begin(t.Context())
+	if err != nil {
+		t.Fatalf("opening the blocker: %v", err)
+	}
+	defer func() { _ = blocker.Rollback(context.Background()) }()
+	if _, err := blocker.Exec(t.Context(), `LOCK TABLE audit_events IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatalf("locking audit_events: %v", err)
+	}
+
+	type result struct {
+		code int
+		body map[string]any
+	}
+	done := make(chan result, 1)
+	go func() {
+		code, body := e.post(t, validBody(token), nil)
+		done <- result{code, body}
+	}()
+
+	// The claim is inside its transaction, queued on the audit insert.
+	waitForLockWaiters(t, e.pool, 1)
+	var killed bool
+	if err := e.pool.QueryRow(t.Context(), `
+		SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+		 WHERE datname = current_database() AND pid <> pg_backend_pid()
+		   AND wait_event_type = 'Lock' AND query ILIKE '%audit_events%'
+		 LIMIT 1`).Scan(&killed); err != nil || !killed {
+		t.Fatalf("could not terminate the claim's backend (killed=%v): %v", killed, err)
+	}
+	_ = blocker.Rollback(context.Background())
+
+	var got result
+	select {
+	case got = <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the claim never returned")
+	}
+	if got.code != http.StatusServiceUnavailable {
+		t.Fatalf("a connection killed mid-claim answered %d, want 503 — a server-signalled "+
+			"outage is still an outage. body=%v", got.code, got.body)
+	}
+	if bodyCode(got.body) != "unavailable" {
+		t.Errorf("code = %q, want unavailable", bodyCode(got.body))
+	}
+	// And the transaction left nothing behind.
+	if n := e.count(t, `SELECT count(*) FROM users`); n != 0 {
+		t.Fatalf("users = %d after an aborted claim, want 0", n)
+	}
+	if n := e.count(t, `SELECT count(*) FROM owner_claim_tokens WHERE consumed_at IS NOT NULL`); n != 0 {
+		t.Fatal("the token was consumed by a claim whose transaction never committed")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fix round 2 — the verifier's R2-C and R2-D
+// ---------------------------------------------------------------------------
+
+// newColdServer builds a SECOND server over the same database: a freshly started
+// process, whose claimed cache is empty whatever the database says.
+func newColdServer(t *testing.T, e *claimEnv) (*httpapi.Server, *pgxpool.Pool) {
+	t.Helper()
+	cacheClient, err := cache.Open(e.cfg.CacheURL, e.cfg.CacheNamespace)
+	if err != nil {
+		t.Fatalf("opening the cache: %v", err)
+	}
+	t.Cleanup(func() { _ = cacheClient.Close() })
+	pools := poolsOf(t, e.resolver)
+	srv := httpapi.New(httpapi.Deps{
+		Config:                e.cfg,
+		Resolver:              e.resolver,
+		Pools:                 pools,
+		Cache:                 cacheClient,
+		Limiter:               cache.NewFallbackLimiter(cacheClient),
+		EmbeddedSchemaVersion: mustEmbedded(t),
+		Hasher:                e.hasher,
+		Logger:                obs.NewLogger(e.logs, false),
+		Now:                   time.Now,
+	})
+	return srv, pools.Default()
+}
+
+// TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody (R2-C).
+//
+// The round-1 short-circuit only fired when the cached bit was ALREADY true,
+// and nothing primed it at boot. Claim then validated the token's SHAPE before
+// reading the claimed state, so on a freshly restarted process over an instance
+// claimed long ago, a malformed token was refused as a token problem: 403
+// instead of the ruled 409, a failure-budget charge, and a permanent `refused`
+// audit row per request — and the cache never warmed. The verifier measured 11
+// permanent rows from 15 POSTs. Bots do not poll the status page first.
+func TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+	if code, _ := e.post(t, validBody(token), nil); code != http.StatusCreated {
+		t.Fatal("setup claim failed")
+	}
+
+	bodies := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{"malformed token", "application/json", `{"token":"x","username":"owner","email":"owner@example.org","password":"` + testPassphrase() + `"}`},
+		{"well-formed wrong token", "application/json", `{"token":"` + strings.Repeat("b", 64) + `","username":"owner","email":"owner@example.org","password":"` + testPassphrase() + `"}`},
+		{"empty token", "application/json", `{"token":"","username":"owner","email":"owner@example.org","password":"` + testPassphrase() + `"}`},
+		{"empty body", "application/json", ``},
+		{"unknown field", "application/json", `{"token":"x","role":"owner"}`},
+		{"not JSON at all", "text/plain", `hello`},
+	}
+	send := func(srv *httpapi.Server, contentType, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/setup/claim-owner", strings.NewReader(body))
+		req.Header.Set("Content-Type", contentType)
+		req.RemoteAddr = "203.0.113.42:51000"
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	auditBefore := e.count(t, `SELECT count(*) FROM audit_events`)
+	derivationsBefore := e.hasher.Derivations()
+
+	// EACH body as the FIRST request of its own freshly started process. Sending
+	// them in sequence to one server would let whichever body happens to warm the
+	// cache mask the rest — the first version of this test did exactly that, so
+	// a regression to a warm-only check stayed green behind it.
+	for _, b := range bodies {
+		cold, _ := newColdServer(t, e)
+		if rec := send(cold, b.contentType, b.body); rec.Code != http.StatusConflict {
+			t.Errorf("[%s] as the first request after a restart, a CLAIMED instance answered %d, "+
+				"want 409 whatever the body (OQ-4: the claimed check strictly precedes any token "+
+				"examination). body=%s", b.name, rec.Code, rec.Body.String())
+		}
+	}
+
+	// And once warm, the process stops touching the database at all.
+	warm, warmPool := newColdServer(t, e)
+	send(warm, bodies[0].contentType, bodies[0].body)
+	acquiresBefore := warmPool.Stat().AcquireCount()
+	for round := 0; round < 3; round++ {
+		for _, b := range bodies {
+			if rec := send(warm, b.contentType, b.body); rec.Code != http.StatusConflict {
+				t.Fatalf("[%s, warm] a claimed instance answered %d, want 409", b.name, rec.Code)
+			}
+		}
+	}
+	if acquires := warmPool.Stat().AcquireCount() - acquiresBefore; acquires != 0 {
+		t.Fatalf("18 POSTs to a warm claimed instance acquired %d pooled connections, want 0", acquires)
+	}
+
+	if got := e.count(t, `SELECT count(*) FROM audit_events`) - auditBefore; got != 0 {
+		t.Fatalf("%d permanent audit rows were written by refused POSTs to a claimed instance; a "+
+			"permanently closed endpoint must write none", got)
+	}
+	if got := e.hasher.Derivations() - derivationsBefore; got != 0 {
+		t.Fatalf("refused POSTs to a claimed instance cost %d derivations, want 0", got)
+	}
+}
+
+// TestClaimReadsTheClaimedStateBeforeExaminingTheToken (R2-C, the library).
+//
+// The handler now answers a claimed instance before calling Claim at all, which
+// would hide the library's own ordering. Claim is also what M1-B and any future
+// caller will reuse, so its contract is tested directly: on a claimed instance
+// a MALFORMED token must come back as ErrAlreadyClaimed, not ErrTokenNotAccepted.
+func TestClaimReadsTheClaimedStateBeforeExaminingTheToken(t *testing.T) {
+	e := newClaimEnv(t)
+	insertOwner(t, e.pool, "owner", "owner@example.org")
+
+	for _, tok := range []string{"x", "", strings.Repeat("z", 64), strings.Repeat("a", 63)} {
+		_, err := ownerclaim.Claim(t.Context(), e.pool, e.hasher, ownerclaim.Input{
+			Token: tok, Username: "someone", Email: "someone@example.org", Password: testPassphrase(),
+		}, "", nil)
+		if !errors.Is(err, ownerclaim.ErrAlreadyClaimed) {
+			t.Errorf("token %q on a claimed instance: got %v, want ErrAlreadyClaimed — the claimed "+
+				"check must precede any examination of the token, including its shape", tok, err)
+		}
+	}
+	if e.hasher.Derivations() != 0 {
+		t.Errorf("%d derivations on a claimed instance, want 0", e.hasher.Derivations())
+	}
+}
+
+// TestAClaimRefusesWhenAUserAppearsDuringTheHash (R2-D).
+//
+// The read phase checks the claimed state OUTSIDE any transaction, then hashes.
+// A user committed during that hash must not end with an owner being created on
+// an instance that already had a user. The verifier's probe measured exactly
+// that — HTTP 201 and a new owner — with the in-transaction gate deleted, before
+// the redeem statement carried its own users guard.
+//
+// The user is committed from inside the hasher's `before` hook, so it lands
+// deterministically after the read phase and before the write transaction.
+func TestAClaimRefusesWhenAUserAppearsDuringTheHash(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+
+	e.hasher.before = func() {
+		// A MEMBER, not an owner: users_one_owner cannot stop this case.
+		id, _ := uuid.NewV7()
+		if _, err := e.pool.Exec(context.Background(),
+			`INSERT INTO users (id, username, email, role) VALUES ($1,'member','member@example.org','member')`,
+			id); err != nil {
+			t.Errorf("committing the member mid-hash: %v", err)
+		}
+	}
+	auditBefore := e.count(t, `SELECT count(*) FROM audit_events`)
+
+	code, body := e.post(t, validBody(token), nil)
+	if code != http.StatusConflict {
+		t.Fatalf("a user appearing during the hash yielded %d, want 409 (the instance is claimed "+
+			"the moment it has any user). body=%v", code, body)
+	}
+	if n := e.count(t, `SELECT count(*) FROM users WHERE role='owner'`); n != 0 {
+		t.Fatalf("an owner was created on an instance that already had a user (owners=%d)", n)
+	}
+	if n := e.count(t, `SELECT count(*) FROM owner_claim_tokens WHERE consumed_at IS NOT NULL`); n != 0 {
+		t.Fatal("the token was consumed by a refused claim")
+	}
+	if n := e.count(t, `SELECT count(*) FROM credentials`); n != 0 {
+		t.Fatalf("an orphan credential survived: %d", n)
+	}
+	if got := e.count(t, `SELECT count(*) FROM audit_events`) - auditBefore; got != 0 {
+		t.Fatalf("a refused claim on a now-claimed instance wrote %d audit rows, want 0", got)
 	}
 }

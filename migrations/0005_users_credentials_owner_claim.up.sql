@@ -79,9 +79,9 @@ CREATE TABLE users (
     -- widening it later needs an annotated-destructive CHECK swap. The username
     -- appears in /u/{username} and is the account's public handle, where a
     -- Unicode homograph is an impersonation primitive — two visually identical
-    -- handles owned by different people. `display_name` carries the Unicode
-    -- identity instead, which is where a global photo community needs it
-    -- (VZ-I18N-001). The trade is legibility of a URL-bearing identifier against
+    -- handles owned by different people. A future `display_name`
+    -- (VZ-ACCOUNT-001) is where the Unicode identity belongs; this migration does
+    -- not add it. The trade is legibility of a URL-bearing identifier against
     -- expressiveness of a display field, and it is taken knowingly.
     CONSTRAINT users_username_shape CHECK (username ~ '^[A-Za-z0-9][A-Za-z0-9_-]{2,29}$'),
     -- The bound is BYTES. JSON Schema maxLength counts characters, so a
@@ -113,11 +113,13 @@ CREATE UNIQUE INDEX users_email_fold_key ON users (email_fold) WHERE email_fold 
 CREATE UNIQUE INDEX users_one_owner ON users (role)
     WHERE role = 'owner' AND tombstoned_at IS NULL;
 
--- `credentials` holds at most ONE VERIFIER SECRET PER (user, kind) — 'password'
--- now, 'totp' later. It is NOT the home for api_keys (many per user, scoped,
--- revocable, with last_used), oauth_identities (unique on (provider, subject)) or
--- step-up rows: ADR-003 and ADR-007 give each of those its own table. Do not
--- widen this one into them.
+-- `credentials` holds at most ONE SECRET PER (user, kind); 'password' is the
+-- only kind today. It is NOT the home for API keys (many per user, scoped,
+-- revocable, with last_used), step-up rows (ADR-003 reserves a table for each)
+-- or OAuth identities (VZ-AUTH-006; keyed by provider and subject, which this
+-- table cannot carry). ADR-003 also reserves TOTP tables, so whether TOTP ever
+-- becomes a kind here is that slice's decision, not this migration's. Do not
+-- widen this one into the others.
 --
 -- kind is text + CHECK rather than an enum: it has no ordering semantics, and a
 -- text CHECK widens in one reversible annotated migration whereas an enum value
@@ -126,7 +128,7 @@ CREATE TABLE credentials (
     id          uuid        PRIMARY KEY,
     user_id     uuid        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     kind        text        NOT NULL,
-    secret      text        NOT NULL,   -- a verifier, never a reversible value
+    secret      text        NOT NULL,   -- for 'password', a verifier; never plaintext
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
 
@@ -138,8 +140,8 @@ CREATE TABLE credentials (
     -- make a parameter raise a schema fight.
     CONSTRAINT credentials_password_is_argon2id CHECK (
         kind <> 'password' OR secret LIKE '$argon2id$%'),
-    -- 1024 octets leaves room for an envelope-encrypted TOTP secret plus its KEK
-    -- metadata, so adding 'totp' later needs no CHECK swap.
+    -- 1024 octets is far above any argon2id PHC string; it bounds the column so
+    -- no caller can park an unbounded value here.
     CONSTRAINT credentials_secret_bounded CHECK (octet_length(secret) BETWEEN 1 AND 1024)
 );
 
@@ -175,7 +177,8 @@ CREATE TABLE owner_claim_tokens (
 );
 
 -- ---------------------------------------------------------------------------
--- The two obligations 0003_audit_events deferred to "the first M1 writer".
+-- The two obligations 0003_audit_events deferred to M1: the users FK and the
+-- immutability trigger.
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE audit_events
@@ -196,9 +199,9 @@ CREATE TRIGGER audit_events_no_update_or_delete
 
 -- A row-level trigger does not fire on TRUNCATE, which would let a single
 -- statement destroy the entire trail the other trigger exists to protect.
--- Verified before adding this: no TRUNCATE appears in any Go, SQL or shell source
--- in this repository, and the integration harness resets a test database with
--- DROP SCHEMA public CASCADE, so nothing depends on truncating this table.
+-- Checked when this was written: no production code path truncated this table,
+-- and the integration harness resets a test database with DROP SCHEMA public
+-- CASCADE, so refusing truncation breaks nothing that ships.
 --
 -- Written on one line because migrate-lint's destructive pattern is a
 -- case-insensitive keyword match and its exemption comment must sit on the line

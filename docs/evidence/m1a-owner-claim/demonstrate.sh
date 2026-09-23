@@ -145,7 +145,7 @@ run_case MUT-2b "drop the users_one_owner index entirely" \
   perl -0pi -e "s/CREATE UNIQUE INDEX users_one_owner ON users \(role\)\n    WHERE role = 'owner' AND tombstoned_at IS NULL;/-- index removed by the mutation harness/" "$MIG"
 
 run_case MUT-16 "drop the explicit ReadCommitted TxOptions from the claim" \
-  "$SVC" 'TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation' "$INT" \
+  "$SVC" 'TestTheClaimTransactionPinsReadCommitted' "$INT" \
   perl -0pi -e 's/\ttx, err := pool\.BeginTx\(ctx, pgx\.TxOptions\{IsoLevel: pgx\.ReadCommitted\}\)\n\tif err != nil \{\n\t\treturn Result\{\}, unavailable\("beginning claim", err\)/\ttx, err := pool.Begin(ctx)\n\tif err != nil {\n\t\treturn Result{}, unavailable("beginning claim", err)/' "$SVC"
 
 # --- the token ---------------------------------------------------------------
@@ -228,9 +228,16 @@ run_case MUT-17 "delete the users_one_owner case from the error mapper" \
   "$HND" 'TestClaimErrorMapping' "$UNI_API" \
   perl -0pi -e 's/case pgErr\.Code == "23505" && pgErr\.ConstraintName == "users_one_owner":/case false:/' "$HND"
 
-run_case MUT-11c "restore the per-request already_claimed audit row" \
+# The same mutation as MUT-17, scored END TO END: the unit table proves the
+# mapper; this proves a real 23505 on users_one_owner reaches the operator as
+# the owner-conflict message rather than as "that username is already taken".
+run_case MUT-17b "delete the users_one_owner case from the error mapper (through the handler)" \
+  "$HND" 'TestUsersOneOwnerFiresThroughTheHandler' "$INT" \
+  perl -0pi -e 's/case pgErr\.Code == "23505" && pgErr\.ConstraintName == "users_one_owner":/case false:/' "$HND"
+
+run_case MUT-11c "delete the handler's claimed short-circuit (every POST reaches the database again)" \
   "$HND" 'TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail' "$INT" \
-  perl -0pi -e 's/\tif claimed, fresh := s\.claimed\.get\(s\.deps\.Now\(\)\); fresh && claimed \{\n\t\treturn newCodedError\(http\.StatusConflict, "conflict", claimedMessage\)\n\t\}\n//' "$HND"
+  perl -0pi -e 's/\tclaimed, err := s\.instanceClaimed\(c\)\n\tif err != nil \{\n\t\treturn s\.unavailable\(c, "checking claimed state", err\)\n\t\}\n\tif claimed \{\n\t\treturn newCodedError\(http\.StatusConflict, "conflict", claimedMessage\)\n\t\}\n//' "$HND"
 
 run_case MUT-11d "audit every already-claimed refusal again" \
   "$HND" 'TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail' "$INT" \
@@ -268,11 +275,11 @@ run_case MUT-33 "serve claim-status from the uncached path again" \
 
 run_case MUT-34 "take the hard ceiling off the claim-status route" \
   "$HND" 'TestClaimStatusIsBoundedByTheHardCeiling' "$INT" \
-  perl -0pi -e 's/\tif !s\.allowClaimRequest\(c\) \{\n\t\treturn newCodedError\(http\.StatusTooManyRequests, "rate_limited",\n\t\t\t"too many requests to the setup endpoint; try again shortly"\)\n\t\}\n\t\/\/ instanceClaimed, not lookupClaimed/\t\/\/ instanceClaimed, not lookupClaimed/' "$HND"
+  perl -0pi -e 's/\tif !s\.allowSetupRequest\(c, "ceiling\.status", claimStatusCeiling\) \{\n\t\treturn newCodedError\(http\.StatusTooManyRequests, "rate_limited",\n\t\t\t"too many requests to the setup endpoint; try again shortly"\)\n\t\}\n//' "$HND"
 
 run_case MUT-35 "compare origins as raw strings again" \
   "$HND" 'TestOriginsAreComparedNormalisedNotAsStrings' "$INT" \
-  perl -0pi -e 's/\t\tconfig\.NormalizeOrigin\(origin\) != config\.NormalizeOrigin\(want\) \{/\t\torigin != want {/' "$HND"
+  perl -0pi -e 's/gotN, wantN := config\.NormalizeOrigin\(origin\), config\.NormalizeOrigin\(want\)/gotN, wantN := origin, want/' "$HND"
 
 # --- verifier findings V1-V10 ----------------------------------------------
 
@@ -292,6 +299,84 @@ run_case MUT-40 "normalise the configured origin but not the request's" \
   "$CFG" 'TestLoadStoresTheNormalisedPublicOrigin' "./internal/config/" \
   perl -0pi -e 's/\t\tc\.PublicOrigin = n\n/\t\t_ = n\n/' "$CFG"
 
+# --- fix round 2: the regression round 1 introduced, and its neighbours ------
+
+run_case MUT-41 "collapse the two setup ceilings back into one shared bucket" \
+  "$HND" 'TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket' "$UNI_API" \
+  bash -c "perl -0pi -e 's/s\.allowSetupRequest\(c, \"ceiling\.status\", claimStatusCeiling\)/s.allowSetupRequest(c, \"ceiling\", claimOwnerCeiling)/' $HND && perl -0pi -e 's/s\.allowSetupRequest\(c, \"ceiling\.claim\", claimOwnerCeiling\)/s.allowSetupRequest(c, \"ceiling\", claimOwnerCeiling)/' $HND"
+
+run_case MUT-42 "declare no 429 on getSetupClaimStatus" \
+  api/openapi.yaml 'TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs' "$UNI_API" \
+  perl -0pi -e 's/        "429":\n          description: \|\n            Too many requests to this route\. It carries its own hard ceiling,\n            separate from the claim endpoint.s, so a flood here can never spend\n            the budget a claim needs\.\n          content:\n            application\/json:\n              schema:\n                \$ref: "#\/components\/schemas\/Error"\n//' api/openapi.yaml
+
+run_case MUT-43 "launder a failed claimed re-read into a token refusal" \
+  "$HND" 'TestClaimErrorMapping' "$UNI_API" \
+  perl -0pi -e 's/\t\tpool, perr := s\.poolFor\(c\)\n\t\tif perr != nil \{\n\t\t\treturn s\.unavailable\(c, "re-reading the claimed state", perr\)\n\t\t\}/\t\tpool, perr := s.poolFor(c)\n\t\tif perr != nil {\n\t\t\treturn s.refuseToken(c)\n\t\t}/' "$HND"
+
+run_case MUT-44 "drop the cause from the 503 log line" \
+  "$HND" 'TestADatabaseOutageIsDiagnosableFromTheLog' "$INT" \
+  perl -0pi -e 's/\ts\.deps\.Logger\.Error\("http: the claim endpoint could not reach the database",\n\t\t"where", where,\n\t\t"error", obs\.Redact\(cause\.Error\(\)\),\n\t\t"request_id", requestIDOf\(c\)\)\n//' "$HND"
+
+run_case MUT-45 "allow an origin that cannot be normalised" \
+  "$HND" 'TestAnUnnormalisableOriginNeverMatches' "$UNI_API" \
+  perl -0pi -e 's/\t\tif gotN == "" \|\| wantN == "" \|\| gotN != wantN \{/\t\tif gotN != wantN {/' "$HND"
+
+EXTRA_RESTORE="internal/store/sqlcgen/"
+run_case MUT-6 "remove the expires_at predicate from the redeem" \
+  "$QRY" 'TestTheRedeemStatementRefusesADeadToken' "$INT" \
+  bash -c "perl -0pi -e 's/\n       AND expires_at    > now\(\)//' $QRY && sqlc generate"
+
+run_case MUT-1b "drop 'consumed_at IS NULL' from the redeem CTE" \
+  "$QRY" 'TestTheRedeemStatementRefusesADeadToken' "$INT" \
+  bash -c "perl -0pi -e 's/\n       AND consumed_at   IS NULL//' $QRY && sqlc generate"
+
+run_case MUT-1c "drop 'superseded_at IS NULL' from the redeem CTE" \
+  "$QRY" 'TestTheRedeemStatementRefusesADeadToken' "$INT" \
+  bash -c "perl -0pi -e 's/\n       AND superseded_at IS NULL//' $QRY && sqlc generate"
+
+run_case MUT-46 "drop the users guard from the redeem CTE" \
+  "$QRY" 'TestTheRedeemStatementRefusesAClaimedInstance' "$INT" \
+  bash -c "perl -0pi -e 's/\n       AND NOT EXISTS \(SELECT 1 FROM users\)//' $QRY && sqlc generate"
+EXTRA_RESTORE=""
+
+run_case MUT-47 "report a benign ErrHasUsers boot race as degraded" \
+  "$ANN" 'TestABootRaceWithTheFirstAccountReportsClaimedNotDegraded' "$INT" \
+  perl -0pi -e 's/\tif errors\.Is\(err, ErrHasUsers\) \{\n.*?\n\t\treturn BootOutcome\{Claimed: true\}, nil\n\t\}\n//s' "$ANN"
+
+run_case MUT-48 "stop treating a server-signalled outage as unavailable" \
+  "$SVC" 'TestAConnectionKilledMidClaimAnswers503NotFiveHundred' "$INT" \
+  perl -0pi -e 's/\tcase strings\.HasPrefix\(code, "08"\), strings\.HasPrefix\(code, "53"\):\n\t\treturn true\n\tcase code == "57P01", code == "57P02", code == "57P03":\n\t\treturn true\n//' "$SVC"
+
+# --- the verifier's R2-C and R2-D ----------------------------------------------
+
+run_case MUT-50 "answer a claimed instance only from an ALREADY-warm cache again" \
+  "$HND" 'TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody' "$INT" \
+  perl -0pi -e 's/\tclaimed, err := s\.instanceClaimed\(c\)\n\tif err != nil \{\n\t\treturn s\.unavailable\(c, "checking claimed state", err\)\n\t\}\n\tif claimed \{/\tif claimed, fresh := s.claimed.get(s.deps.Now()); fresh \&\& claimed {/' "$HND"
+
+run_case MUT-51 "examine the token before the claimed state again (library)" \
+  "$SVC" 'TestClaimReadsTheClaimedStateBeforeExaminingTheToken' "$INT" \
+  perl -0pi -e 's/(\tq := sqlcgen\.New\(pool\)\n)/$1\tif err := in.Validate(); err != nil {\n\t\treturn Result{}, err\n\t}\n/' "$SVC"
+
+run_case MUT-52 "answer the redeem's no-row case with a token refusal regardless" \
+  "$HND" 'TestTheClaimTransactionPinsReadCommitted' "$INT" \
+  perl -0pi -e 's/\t\tif claimed \{\n\t\t\ts\.claimed\.set\(true, s\.deps\.Now\(\)\)\n\t\t\treturn newCodedError\(http\.StatusConflict, "conflict", claimedMessage\)\n\t\t\}\n\t\treturn s\.refuseToken\(c\)/\t\t_ = claimed\n\t\treturn s.refuseToken(c)/' "$HND"
+
+# Both defences against "a user appears during the hash" removed at once. Neither
+# alone is observable through the handler (see MUT-53 in the review-only block),
+# so this proves the end-to-end test has teeth and that these two are the only
+# things standing between that race and an owner being created.
+EXTRA_RESTORE="internal/store/sqlcgen/ $SVC"
+run_case MUT-54 "delete BOTH the in-transaction gate and the redeem's users guard" \
+  "$QRY" 'TestAClaimRefusesWhenAUserAppearsDuringTheHash' "$INT" \
+  bash -c "perl -0pi -e 's/\n       AND NOT EXISTS \(SELECT 1 FROM users\)//' $QRY && sqlc generate && perl -0pi -e 's/\tclaimed, err = qtx\.AnyUserExists\(ctx\)\n\tif err != nil \{\n\t\treturn Result\{\}, unavailable\(\x22checking claimed state\x22, err\)\n\t\}\n\tif claimed \{\n\t\treturn Result\{\}, ErrAlreadyClaimed\n\t\}\n//' $SVC"
+EXTRA_RESTORE=""
+
+# R2-G(d): under --env F, the origin check's RAW half must come from F too.
+DOC=cmd/vizra/doctor.go
+run_case MUT-55 "read the raw public origin from the process env under --env again" \
+  "$DOC" 'TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig' ./cmd/vizra/ \
+  perl -0pi -e 's/\t\t\tl, err := source\(\)\n\t\t\tif err != nil \{\n\t\t\t\treturn "" \/\/ unreachable in practice: loadConfig already failed on it\n\t\t\t\}\n\t\t\tv, _ := l\("VIZRA_PUBLIC_ORIGIN"\)/\t\t\tv, _ := os.LookupEnv("VIZRA_PUBLIC_ORIGIN")/' "$DOC"
+
 rule "REVIEW-ONLY PROPERTIES (no mutation here turns a test red)"
 cat <<'NOTE'
 Stated rather than implied, because a mutation matrix that quietly omits these
@@ -303,6 +388,21 @@ would overclaim:
   MUT-4b passing the PRESENTED digest rather than the row's own digest to the
          redeem statement. Identical results today; the property is defence
          against a future index-probing change. Code review owns it.
+
+  MUT-53 deleting ONLY the in-transaction AnyUserExists gate in Claim — the one
+         the code calls THE authoritative gate. MEASURED: nothing reddens, and
+         the reason is structural. Since the redeem statement gained
+         `AND NOT EXISTS (SELECT 1 FROM users)` (FU-2), a user present when the
+         redeem runs makes it return no row, and the 409-vs-403 re-read — which
+         keys on the CLAIMED state, as OQ-4 defines it — answers 409 exactly as
+         the gate would, with no audit row and no budget charged. The two paths
+         are indistinguishable from outside. Before FU-2 they were not: the
+         verifier measured HTTP 201 and an owner created with this gate deleted.
+         The statement guard is scored on its own by MUT-46 (a direct-query test
+         that bypasses every Go check), and MUT-54 deletes both layers together
+         to prove the end-to-end test catches the race they jointly prevent.
+         Making this single deletion observable would require the re-read to
+         answer 403 on a claimed instance, which is the wrong answer.
 
   MUT-36 flipping `refuseIfUsersExist` to false in `vizra claim-token` — the S-12
          escalation path the verifier found unobserved. MEASURED: it no longer
@@ -316,42 +416,11 @@ would overclaim:
          redundancy in front of a database guarantee — which is the right way
          round, and better than the first round where neither existed.
 
-  MUT-6  dropping `expires_at > now()` from the redeem CTE. MEASURED: since the
-         liveness pre-check landed (MUT-31), a correct-but-EXPIRED token is
-         refused in Go before the CTE is reached, so removing the CTE predicate
-         no longer reddens anything. The CTE guard remains the enforcement of
-         record — the pre-check is an optimisation in front of it, and a race
-         that expires a token between the two is still caught by the CTE. Both
-         are kept; only one is observable, and this says which.
-
   MUT-14 re-minting unconditionally at boot. The decision it targeted MOVED into
          Mint, under the advisory lock, which is the whole point of the fix —
          MUT-14b mutates it in its new home and reddens
          TestConcurrentBootsMintExactlyOneToken.
 
-  MUT-1c dropping `superseded_at IS NULL` from the redeem CTE. MEASURED: no
-         test goes red, and the reason is structural rather than a gap. A
-         re-mint UPSERTS a new digest over the old row, so a token that was
-         superseded-and-replaced no longer matches on its digest and never
-         reaches this predicate. The only path that supersedes WITHOUT
-         re-minting is boot on an instance that already has accounts — where
-         the claimed check answers 409 before any token is examined. The
-         predicate is a correct guard for a path that does not exist yet.
-
-  MUT-1b dropping ONLY `consumed_at IS NULL` from the redeem CTE. MEASURED, not
-         assumed: the race test stays GREEN. This is defence in depth working
-         rather than a gap — with the row guard gone, every losing claimant
-         raises 23505 on users_one_owner instead of matching no row, and the
-         error mapper turns that into the same 409 the guard would have
-         produced. Exactly one owner still exists and no 5xx is returned, so
-         there is nothing for a test to observe. The index is proven by MUT-2b,
-         by TestUsersOneOwnerFiresThroughTheHandler (which forces 23505 through
-         the real handler with an uncommitted concurrent insert), and the mapper
-         by MUT-17 — which only reddens because TestClaimErrorMapping pins the
-         MESSAGE: both 23505 branches answer 409/conflict, so a status-and-code
-         assertion alone left that mutation green. The row guard's own
-         contribution is redundancy, and saying so is worth more than a test
-         that pretends.
 NOTE
 
 rule "SUMMARY"

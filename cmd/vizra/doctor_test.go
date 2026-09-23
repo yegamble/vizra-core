@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -272,5 +273,30 @@ func TestRealProbesWiresEveryCheck(t *testing.T) {
 	}
 	if p.loadConfig == nil || p.openPools == nil || p.schema == nil || p.openCache == nil || p.searchReachable == nil {
 		t.Error("realProbes left a probe unwired")
+	}
+}
+
+// R2-G(d): `vizra doctor --env F` validated F's configuration but compared the
+// PROCESS environment's VIZRA_PUBLIC_ORIGIN against it, so the origin check
+// judged a value the operator never wrote into F — or reported an empty one.
+// Both halves of that check must come from the same source.
+func TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig(t *testing.T) {
+	t.Setenv("VIZRA_PUBLIC_ORIGIN", "https://process.invalid")
+
+	file := t.TempDir() + "/vizra.env"
+	if err := os.WriteFile(file, []byte("VIZRA_PUBLIC_ORIGIN=https://Photos.Example.org/\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	p := realProbes(file)
+	if p.rawPublicOrigin == nil {
+		t.Fatal("realProbes does not wire rawPublicOrigin")
+	}
+	if got, want := p.rawPublicOrigin(), "https://Photos.Example.org/"; got != want {
+		t.Errorf("--env: raw public origin = %q, want the env file's %q", got, want)
+	}
+
+	if got, want := realProbes("").rawPublicOrigin(), "https://process.invalid"; got != want {
+		t.Errorf("no --env: raw public origin = %q, want the process environment's %q", got, want)
 	}
 }

@@ -168,6 +168,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SetupClaimStatus"
+        "429":
+          description: |
+            Too many requests to this route. It carries its own hard ceiling,
+            separate from the claim endpoint's, so a flood here can never spend
+            the budget a claim needs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "503":
           description: The instance state could not be read.
           content:

@@ -109,14 +109,39 @@ var (
 )
 
 // unavailable wraps an infrastructure error in ErrUnavailable, preserving the
-// cause for the log. A *pgconn.PgError is NOT wrapped: the server answered, and
-// the mapper keys on its code and constraint name.
+// cause for the log.
+//
+// A *pgconn.PgError is normally NOT wrapped, because the server answered and the
+// mapper keys on its code and constraint name (23505, 23514 ...). The exception
+// is a server that answered in order to say it is UNAVAILABLE — see
+// IsServerUnavailable. The first version of this function exempted every
+// PgError, so a claim whose connection was terminated mid-transaction (57P01)
+// answered a 500 while the contract promises 503.
 func unavailable(op string, err error) error {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if errors.As(err, &pgErr) && !IsServerUnavailable(pgErr.Code) {
 		return fmt.Errorf("ownerclaim: %s: %w", op, err)
 	}
 	return fmt.Errorf("%w: %s: %v", ErrUnavailable, op, err)
+}
+
+// IsServerUnavailable reports whether a SQLSTATE means "the database cannot
+// serve this request right now" rather than "this request violated something".
+//
+//	08xxx  connection exception (the connection failed or was lost)
+//	53xxx  insufficient resources (too many connections, out of memory, disk full)
+//	57P01  admin shutdown   57P02 crash shutdown   57P03 cannot connect now
+//
+// These are outages, and an outage is 503 (ADR-003: "a database outage returns
+// 503, never 401"), never a 500 and never a claim-specific refusal.
+func IsServerUnavailable(code string) bool {
+	switch {
+	case strings.HasPrefix(code, "08"), strings.HasPrefix(code, "53"):
+		return true
+	case code == "57P01", code == "57P02", code == "57P03":
+		return true
+	}
+	return false
 }
 
 // ValidationError names the first offending field in prose. The per-field error
@@ -360,6 +385,22 @@ func State(ctx context.Context, q *sqlcgen.Queries) (TokenState, error) {
 // names, and only in production. There is no retry: under READ COMMITTED the
 // loser's answer is deterministic, so there is nothing to retry.
 func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in Input, correlationID string, ipPrefix *string) (Result, error) {
+	q := sqlcgen.New(pool)
+
+	// The claimed check strictly precedes ANY token examination (OQ-4) — and that
+	// includes the token SHAPE check inside Validate. The previous order validated
+	// first, so on a claimed instance a malformed token was refused as a TOKEN
+	// problem: a 403 instead of the ruled 409, a failure-budget charge, and a
+	// permanent `refused` audit row, per request, for as long as a scanner kept
+	// sending malformed bodies.
+	claimed, err := q.AnyUserExists(ctx)
+	if err != nil {
+		return Result{}, unavailable("checking claimed state", err)
+	}
+	if claimed {
+		return Result{}, ErrAlreadyClaimed
+	}
+
 	if err := in.Validate(); err != nil {
 		return Result{}, err
 	}
@@ -382,18 +423,6 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 	//
 	// M1-B's sign-in is the real multi-caller of this hasher and is instructed to
 	// import it; this is the call shape it should copy.
-	q := sqlcgen.New(pool)
-
-	// The claimed check strictly precedes any token examination, so a claimed
-	// instance never reveals anything about a token.
-	claimed, err := q.AnyUserExists(ctx)
-	if err != nil {
-		return Result{}, unavailable("checking claimed state", err)
-	}
-	if claimed {
-		return Result{}, ErrAlreadyClaimed
-	}
-
 	row, err := q.GetOwnerClaimToken(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No token was ever minted. That is the fifth indistinguishable cause.
@@ -468,10 +497,9 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Result{}, err // the caller re-reads the claimed state to pick 409 or 403
 		}
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			return Result{}, err // a constraint spoke; the mapper keys on it
-		}
+		// unavailable() passes a CONSTRAINT PgError through untouched for the
+		// mapper to key on, and wraps connection failures and server-signalled
+		// outages alike.
 		return Result{}, unavailable("redeeming the token", err)
 	}
 
@@ -486,7 +514,9 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		CorrelationID: nonEmpty(correlationID),
 		IPPrefix:      ipPrefix,
 	}); err != nil {
-		return Result{}, err
+		// Inside the claim transaction: a lost connection here is an outage, and
+		// must answer 503 like every other one rather than fall through to a 500.
+		return Result{}, unavailable("recording the claim", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -498,11 +528,6 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		Role:            string(created.Role),
 		TokenGeneration: created.TokenGeneration,
 	}, nil
-}
-
-// LiveOwnerExists distinguishes 409 from 403 when ClaimOwner returns no row.
-func LiveOwnerExists(ctx context.Context, q *sqlcgen.Queries) (bool, error) {
-	return q.LiveOwnerExists(ctx)
 }
 
 func nonEmpty(s string) *string {

@@ -11,12 +11,6 @@
 -- and tombstoning the owner does not reopen the claim endpoint.
 SELECT EXISTS (SELECT 1 FROM users) AS any_user;
 
--- name: LiveOwnerExists :one
--- Used only to choose between 409 and 403 when ClaimOwner returns no row.
-SELECT EXISTS (
-    SELECT 1 FROM users WHERE role = 'owner' AND tombstoned_at IS NULL
-) AS live_owner;
-
 -- name: GetOwnerClaimToken :one
 -- The single token row, if any. A plain fetch, never a lookup keyed by the
 -- presented value. `live` is computed with the DATABASE clock (ADR-004), so
@@ -92,6 +86,15 @@ WITH consumed AS (
        -- minting on an unclaimed instance.
        AND superseded_at IS NULL
        AND expires_at    > now()
+       -- "an instance that already has users is implicitly claimed" is the one
+       -- claim invariant that was enforced only in Go. This makes it a property
+       -- of the STATEMENT as well. The Go gate stays, because it decides the
+       -- ANSWER (409 vs 403); this decides the GUARANTEE.
+       --
+       -- The sibling CTE's INSERT is not visible here: every CTE sees the same
+       -- pre-statement snapshot, so this cannot refuse the owner the same
+       -- statement is creating.
+       AND NOT EXISTS (SELECT 1 FROM users)
     RETURNING generation
 ),
 owner AS (

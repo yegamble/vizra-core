@@ -1,0 +1,36 @@
+# VZ-INSTALL-003 M1-A — unit suite without make
+date:  2026-09-23T03:20:21Z
+host:  Darwin/arm64
+go:    go version go1.27.1 darwin/arm64
+src:   95afb6223b4ce6ca06ce3d13986a48ce35ea9458 (tree 8f591d8beeda905b8a261f6e947304435babf085)
+base:  5eb2829eb4f830206029f8e2a836f93a44a93a02 (origin/main)
+pg:    PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+cache: valkey_version:9.1.2
+cmd:   go test -race -count=1 ./...
+
+ok  	github.com/yegamble/vizra-core/cmd/api	1.871s
+?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
+?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
+ok  	github.com/yegamble/vizra-core/cmd/vizra	3.014s
+?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/audit	3.459s
+ok  	github.com/yegamble/vizra-core/internal/authz	2.383s
+?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/cache	4.013s
+ok  	github.com/yegamble/vizra-core/internal/config	4.946s
+ok  	github.com/yegamble/vizra-core/internal/credential	21.646s
+?   	github.com/yegamble/vizra-core/internal/db	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/doctor	3.616s
+ok  	github.com/yegamble/vizra-core/internal/fixtures	373.742s
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.030s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	5.781s
+ok  	github.com/yegamble/vizra-core/internal/jobs	23.542s
+?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
+ok  	github.com/yegamble/vizra-core/internal/obs	4.451s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.986s
+ok  	github.com/yegamble/vizra-core/internal/search	4.100s
+ok  	github.com/yegamble/vizra-core/internal/site	7.918s
+?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
+?   	github.com/yegamble/vizra-core/migrations	[no test files]
+ok  	github.com/yegamble/vizra-core/scripts	45.262s
+UNIT_EXIT=0

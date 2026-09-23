@@ -4,7 +4,15 @@
 |---|---|
 | `01-integration-pg18.txt` | the integration suite, `-race`, verbose, on real PostgreSQL 18.6 and Valkey 9.1.2 |
 | `02-mutations.txt` | every mutation demonstration: RED under one controlled mutation, GREEN when reverted |
+| `03-shuffle.txt` | the integration slice again under `-shuffle=on`, so no test depends on another's leftovers |
+| `04-make-ci.txt` | `make ci` (every `ci-required` floor lane that runs without Docker) |
+| `05-mut53-measurement.txt` | the measurement behind MUT-53's review-only status: the gate deleted, the whole unit and integration suites run, both exit 0. This is attempt 2 and says so: attempt 1's unit run panicked on the 10-minute default timeout in `internal/fixtures` (which does not import `internal/ownerclaim`) under host load, with integration exit 0 |
+| `06-unit.txt` | `go test -race -count=1 ./...` without make — what `build-test` runs directly |
 | `demonstrate.sh` | the harness that produced `02-mutations.txt`, re-runnable by a verifier |
+
+Every transcript was produced on the tested tree recorded in its own `src:` header line. The pushed
+commit is that tree plus these transcript files and nothing else (`git diff <src> <pushed> --stat`
+lists only `docs/evidence/m1a-owner-claim/`).
 
 ## How to reproduce
 
@@ -45,11 +53,88 @@ added, including the **MUT-17 this transcript previously cited without running**
 Every `MUT-` id referenced anywhere in the repository is now either declared in
 `demonstrate.sh` or listed as review-only with its reason — audited, not assumed.
 
-**Three properties have no mutation that turns a test red, and are listed as
-review-only in `02-mutations.txt` rather than implied to be covered:** the
-constant-time token comparison, passing the row's own digest rather than the
-presented one to the redeem statement, and the `consumed_at`/`superseded_at`
-predicates in the redeem CTE — both of which are measured to leave the suite
-green because `users_one_owner` plus the error mapper produce the same answer.
-That is defence in depth working, not a gap, and the transcript says which is
-which.
+### Fix round 2
+
+Round 1's own fix for claim-status created two blockers, both closed here: the
+status GET shared ONE hard-ceiling counter with the claim POST (so a body-less
+GET flood answered the operator's valid token 429), and the route could return a
+429 the contract did not declare. The routes now have separate ceilings (claim
+600, status 3000 per 15-minute window) and the status-coverage test is a table
+over every setup operation. Also: a failed claimed-state re-read answers 503
+instead of being laundered into "token not accepted"; a 503's cause is logged
+once, redacted; `checkOrigin` denies when either side cannot be normalised; the
+redeem CTE refuses on an instance that already has users; and a benign boot race
+reports "claimed" rather than "degraded".
+
+**A gap in round 1's own fix, found by re-reading AGENTS.md against the code.**
+The row said a database outage answers 503, "never 500". It was not true: round
+1's `ErrUnavailable` wrapped only non-`PgError` failures, deliberately leaving
+`*pgconn.PgError` untouched so the mapper can key on constraint codes — but a
+server that answers in order to say it cannot serve (57P01 admin shutdown,
+57P03, 53300, class 08) also arrives as a `PgError`, matched no branch, and fell
+through to a 500. The audit insert inside the claim transaction was not wrapped
+at all. `TestAConnectionKilledMidClaimAnswers503NotFiveHundred` was written
+first and went red with a real 500 (it terminates the claim's backend
+mid-transaction), then green with `IsServerUnavailable`; MUT-48 scores it.
+
+Four race tests used `time.Sleep` as a barrier. Under load that can never make
+them go falsely red, but it can silently stop them exercising the race they exist
+for. They now wait until `pg_stat_activity` reports the expected sessions blocked
+on a lock, and FAIL if that does not happen within 60 s. This was prompted by a
+measurement, not a hunch: this round's suite ran on a machine at load average 197
+on 8 CPUs.
+
+Three review-only properties became SCORED this round by calling the generated
+`ClaimOwner` query directly, bypassing every Go-side check: MUT-6 (expiry),
+MUT-1b (consumption) and MUT-1c (supersession). MUT-16 is scored again through
+`TestTheClaimTransactionPinsReadCommitted`, which forces the REPEATABLE READ
+40001 window deterministically — after the read/write split the ordinary race
+test no longer reached it.
+
+**The harness found two defects in itself this round, too.** A rename left two
+mutators matching nothing (reported `HARNESS-FAIL`, never scored). And an edit
+had indented the `NOTE` heredoc terminator, which would have swallowed the
+SUMMARY and the final exit-status line so the harness exited 0 whatever happened;
+that was caught by reading the file before the full run, and a single-case run
+then confirmed the summary prints real values and the exit status is real. Nothing
+in the harness enforces that check; it was done, not guaranteed.
+
+**Final round (round 2, second half).** The verifier's re-verification at
+`59a19c5` found two further REQUIRED defects, both real, and both are fixed here:
+
+- **R2-C — a cold cache was an audit writer.** On a restarted server over a
+  claimed instance, `Claim` validated the token's shape before asking whether
+  the instance was claimed, so malformed POSTs wrote permanent `refused` rows,
+  answered 403 instead of OQ-4's 409, and never warmed the cache. The handler now
+  asks `instanceClaimed` first (right after the hard ceiling, before content
+  type, body, origin or token), and `Claim` reads the claimed state before it
+  validates anything. `TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody`
+  gives EACH body its own cold server — an earlier draft sent them in sequence
+  to one server, where the first 409 warmed the cache and masked the rest (MUT-50
+  stayed green until that was fixed). MUT-50 and MUT-51 score the two orderings.
+- **R2-D — the "authoritative" in-transaction gate was unobserved.** The redeem
+  statement already refused on any user (FU-2), but the no-row re-read keyed on
+  a live OWNER, so a member-only or tombstoned-owner instance answered 403 and
+  charged the budget. The re-read now keys on the claimed state (`ownerclaim.Claimed`,
+  i.e. EXISTS(users)). `TestAClaimRefusesWhenAUserAppearsDuringTheHash` commits a
+  member mid-hash and requires 409 with no owner. With both layers in place,
+  deleting only the Go gate is indistinguishable from outside — declared
+  review-only as MUT-53, with the full-suite measurement in
+  `05-mut53-measurement.txt`; MUT-54 deletes both layers and goes red.
+- **`vizra doctor --env F`** compared the process environment's
+  `VIZRA_PUBLIC_ORIGIN` with F's normalised value. Both halves now come from one
+  source; `TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig` went red
+  first, and MUT-55 scores it.
+- Comment-only corrections to migration 0005 (a wrong ADR-002 attribution, a
+  misattributed ledger ID, a TRUNCATE sentence the new test falsified, a
+  misquote of 0003, and TOTP speculation that contradicted ADR-003's
+  reservation). The SQL is identical once comments are stripped.
+
+**The review-only block in `02-mutations.txt` lists exactly five ids, and says
+which kind each is.** Two are properties no Go test can observe: MUT-4 (the
+constant-time comparison) and MUT-4b (passing the row's own digest to the
+redeem). Two are Go-side redundancy in front of a scored database guard: MUT-36
+(the CLI flag, behind MUT-32) and MUT-53 (the in-transaction gate, behind MUT-46,
+with MUT-54 scoring the pair). One moved: MUT-14's decision now lives in `Mint`
+and is scored as MUT-14b. The `consumed_at`/`superseded_at`/expiry predicates are
+no longer review-only — MUT-1b, MUT-1c and MUT-6 score them by direct query.

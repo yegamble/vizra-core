@@ -105,8 +105,6 @@ type Querier interface {
 	InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) (InsertAuditEventRow, error)
 	JobDepthByKindState(ctx context.Context) ([]JobDepthByKindStateRow, error)
 	ListStorageLocations(ctx context.Context) ([]StorageLocation, error)
-	// Used only to choose between 409 and 403 when ClaimOwner returns no row.
-	LiveOwnerExists(ctx context.Context) (bool, error)
 	// Mint or re-mint the single token row. Re-minting bumps the generation and
 	// overwrites the digest IN PLACE, so invalidation of the previous token is
 	// atomic and total: the old digest ceases to exist at commit, and no second copy

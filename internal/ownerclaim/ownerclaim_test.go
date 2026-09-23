@@ -206,3 +206,19 @@ func TestGenerateTokenProducesTheDeclaredShape(t *testing.T) {
 		seen[raw] = true
 	}
 }
+
+// TestIsServerUnavailableSeparatesOutagesFromViolations: an outage is 503, a
+// constraint violation is a client answer, and the two must never be confused
+// — in either direction.
+func TestIsServerUnavailableSeparatesOutagesFromViolations(t *testing.T) {
+	for _, code := range []string{"08000", "08003", "08006", "53000", "53100", "53200", "53300", "57P01", "57P02", "57P03"} {
+		if !IsServerUnavailable(code) {
+			t.Errorf("%s is an outage and must be classified as one", code)
+		}
+	}
+	for _, code := range []string{"23505", "23514", "23503", "40001", "42501", "57014", "22001", ""} {
+		if IsServerUnavailable(code) {
+			t.Errorf("%s is not an outage; classifying it as one would turn a real answer into a 503", code)
+		}
+	}
+}

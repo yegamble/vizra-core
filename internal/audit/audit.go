@@ -1,7 +1,7 @@
 // Package audit is the one way Vizra writes audit_events.
 //
-// It exists because migration 0003 froze a CHECK on ip_prefix and deferred its
-// writer to "the first M1 writer" — this slice. Two rules follow from the
+// It exists because migration 0003 froze a CHECK on ip_prefix and said its
+// writer "ships with the first writer in M1" — this slice. Two rules follow from the
 // schema and bind every later emitter:
 //
 //  1. The ip_prefix writer is TOTAL. Every audit insert shares the transaction
@@ -55,9 +55,13 @@ const (
 // Refusal reasons recorded on ActionOwnerClaimRefused. Deliberately coarse: the
 // endpoint answers one message for every token failure, and an audit trail that
 // distinguished them would reconstruct the oracle the response refuses to be.
+//
+// There is deliberately no "already_claimed" reason. A refusal on a permanently
+// closed endpoint is not a security event, and recording one per request would
+// make every claimed instance an unauthenticated writer into a table nothing
+// can delete. Do not add it back.
 const (
 	ReasonTokenNotAccepted = "token_not_accepted"
-	ReasonAlreadyClaimed   = "already_claimed"
 )
 
 // These are the ip_prefix grammar from migrations/0003_audit_events.up.sql,

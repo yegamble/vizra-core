@@ -56,24 +56,29 @@ func (s *Server) claimLimiterKeys(c *echo.Context) (perOrigin string, global str
 	return "", global
 }
 
-// allowClaimRequest applies the hard ceiling. BOTH setup routes call it — the
-// POST and the claim-status GET — which is what the name claims and what the
-// first round did not do: the comment here asserted coverage the code lacked,
-// and a comment that promises a control the code does not have is worse than no
-// comment (0003's own header says so).
+// allowSetupRequest applies a hard ceiling to one setup route.
 //
-// It is deliberately far above operator-plausible use: its job is to keep a
-// flood of one-row SELECTs from exhausting the connection pool, not to police
+// Each route gets its OWN counter, keyed by `bucket`. They must never be merged:
+// a shared counter let a body-less GET flood spend the budget the operator's
+// POST needs, so a stranger could hold an unclaimed instance shut for fifteen
+// minutes at a time (see the constants' comment).
+//
+// Its job is to keep a flood from exhausting the connection pool, not to police
 // credentials. Unlike the failure budget, this one CAN refuse a request carrying
-// a valid token — stated rather than hidden. A flood past it is a network-level
-// denial of service, which an application limiter cannot answer.
-func (s *Server) allowClaimRequest(c *echo.Context) bool {
+// a valid token — stated rather than hidden, and bounded to that route.
+//
+// ACCEPTED RESIDUAL, recorded rather than implied: this is a FIXED-WINDOW count,
+// so N requests inside one window answer even a valid token 429 until the window
+// rolls. The guard the pool actually wants is a CONCURRENCY bound, which is
+// M1-B's; until then the number and this consequence are written down here and
+// in AGENTS.md.
+func (s *Server) allowSetupRequest(c *echo.Context, bucket string, limit int) bool {
 	if s.deps.Limiter == nil {
 		return true
 	}
 	st, _ := site.FromContext(c.Request().Context())
 	ok, _ := s.deps.Limiter.Allow(c.Request().Context(),
-		st.CacheKey("rl", "setup.claim", "ceiling"), claimHardCeiling, claimRateWindow)
+		st.CacheKey("rl", "setup.claim", bucket), limit, claimRateWindow)
 	return ok
 }
 
