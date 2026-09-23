@@ -99,6 +99,7 @@ make-integrity-guard: /src
   ok    `govulncheck`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
   ok    `govulncheck`: no expanded gate command ends in a `|| true`-family suffix
   ok    `govulncheck`: make reports no duplicate-definition override
-  ok    no gate recipe line expands to a `-` or `+` prefix (62 line(s), leading variable references resolved from make's database)
+  ok    make's own database: the 62 recipe line(s) of the 17 gate closure target(s) carry no `-`/`+` prefix, sub-make or swallowing suffix
+  ok    no gate recipe line expands to a `-` or `+` prefix (62 distinct line(s) from the text and make's database, leading variable references resolved from the database)
   ok    make's own .PHONY list covers all 17 gate closure target(s)
 make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)

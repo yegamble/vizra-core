@@ -1,7 +1,7 @@
 # C15 (ignore-per-target) the pre-make .IGNORE refusal removed (the resolver backstops remain)
 # host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
-# tree: 83fef729833370c1530f467cfe3636e6830472d7  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 6e3ed51e4e9b0669c8f4433f7b02b6504670b5a8
+# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
 
 ==============================================================
 MUTATION: C15 .IGNORE refusal removed
@@ -9,8 +9,8 @@ MUTATION: C15 .IGNORE refusal removed
   mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C15
   check:  fixture_scenario ignore-per-target 'names `.IGNORE`'
 --------------------------------------------------------------
-  sha256 BEFORE: 090455c70cd01be7d44c90a7e70cffde4ca07b6afd968ec7e7b7389f7376a52b
-  sha256 AFTER:  e4a84304b1691b0904035fe7ad1cdd7fd6b8a02719092d2680f6bd202c4c0299
+  sha256 BEFORE: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  sha256 AFTER:  b23a16edcd5f7377ea4881e9d19c030cef2a0f4eb0a1967e5e19e12334c8e149
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
 fixture ignore-per-target: raw `make ci` on these bytes (no anchor): exit 0
@@ -22,7 +22,7 @@ anchor [lenient] exit=1 make-processes=4
 make-integrity-guard: FAILED
 fixture_scenario ignore-per-target: control BROKEN (exit 1)
 ------------------------------------
-  sha256 RESTORED: 090455c70cd01be7d44c90a7e70cffde4ca07b6afd968ec7e7b7389f7376a52b
+  sha256 RESTORED: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
   restore byte-identical: yes
   RESULT: C15 .IGNORE refusal removed -> exit 1
 

@@ -1,0 +1,37 @@
+# C23 the multi-target refusal removed
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
+
+==============================================================
+MUTATION: C23 the multi-target refusal removed
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C23
+  check:  fixture_scenario multi-target-rule 'is a MULTI-TARGET rule'
+--------------------------------------------------------------
+  sha256 BEFORE: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  sha256 AFTER:  a5d84354f4e56465730b797d3750da958a2fde1c3776a57c8c2dc52cc959a5d9
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+fixture multi-target-rule: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  gate target `ci` is not defined in any makefile make will read.
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  gate target `ci` is not defined in any makefile make will read.
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario multi-target-rule: control BROKEN (exit 1)
+------------------------------------
+  sha256 RESTORED: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  restore byte-identical: yes
+  RESULT: C23 the multi-target refusal removed -> exit 1
+
+== after restore ==
+fixture multi-target-rule: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:5 is a MULTI-TARGET rule (ci, other): `ci other:`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:5 is a MULTI-TARGET rule (ci, other): `ci other:`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario multi-target-rule: control HELD (exit 0)

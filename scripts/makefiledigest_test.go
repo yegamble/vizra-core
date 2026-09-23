@@ -840,57 +840,76 @@ func TestEveryRefusedSpellingIsRefusedBeforeMake(t *testing.T) {
 	)
 	cases := []struct {
 		name, extra, wantText string
+		// mustNot: text the refusal must NOT contain — a refusal for the wrong
+		// reason names the wrong construct (#11 cross-check X-1).
+		mustNot []string
 	}{
-		{"recipeprefix :=", ".RECIPEPREFIX := >\n", rp},
-		{"recipeprefix = no spaces", ".RECIPEPREFIX=>\n", rp},
-		{"recipeprefix +=", ".RECIPEPREFIX   +=   >\n", rp},
-		{"recipeprefix ?=", ".RECIPEPREFIX ?= >\n", rp},
-		{"recipeprefix ::=", ".RECIPEPREFIX ::= >\n", rp},
-		{"recipeprefix !=", ".RECIPEPREFIX != printf '>'\n", rp},
-		{"recipeprefix override", "override .RECIPEPREFIX = >\n", rp},
-		{"recipeprefix export", "export .RECIPEPREFIX := >\n", rp},
-		{"recipeprefix override export", "override export .RECIPEPREFIX := >\n", rp},
-		{"recipeprefix private", "private .RECIPEPREFIX := >\n", rp},
-		{"recipeprefix leading spaces", "   .RECIPEPREFIX := >\n", rp},
-		{"recipeprefix trailing comment", ".RECIPEPREFIX := > # a comment\n", rp},
-		{"recipeprefix define", "define .RECIPEPREFIX\n>\nendef\n", rp},
-		{"recipeprefix target-specific", "ci: .RECIPEPREFIX := >\n", rp},
-		{"recipeprefix line continuation", ".RECIPEPREFIX := \\\n>\n", rp},
-		{"secondexpansion", ".SECONDEXPANSION:\n", se},
-		{"secondexpansion spaced", ".SECONDEXPANSION :\n", se},
-		{"secondexpansion double colon", ".SECONDEXPANSION::\n", se},
-		{"secondexpansion among targets", ".PHONY .SECONDEXPANSION:\n", se},
-		{"pattern-specific SHELL", "%: SHELL := /usr/bin/true\n", tsa + " SHELL"},
-		{"target-specific SHELL", "ci: SHELL := /usr/bin/true\n", tsa + " SHELL"},
-		{"pattern-specific MAKEFLAGS", "%: MAKEFLAGS += -i\n", tsa + " MAKEFLAGS"},
-		{"pattern-specific override SHELL", "%: override SHELL = /usr/bin/true\n", tsa + " SHELL"},
-		{"pattern-specific private .SHELLFLAGS", "%: private .SHELLFLAGS := -c\n", tsa + " .SHELLFLAGS"},
-		{"prefix-pattern export GNUMAKEFLAGS", "test-%: export GNUMAKEFLAGS := -k\n", tsa + " GNUMAKEFLAGS"},
-		{"pattern-specific computed name", "NAME := SHELL\n%: $(NAME) := /usr/bin/true\n", tsa + " a variable whose NAME make computes"},
-		{"define SHELL", "define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def},
-		{"override define SHELL", "override define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def},
-		{"define MAKEFLAGS", "define MAKEFLAGS\n-i\nendef\n", "assigns MAKEFLAGS " + def},
-		{"private SHELL", "private SHELL := /usr/bin/true\n", "sets SHELL to something other than the approved value"},
+		{"recipeprefix :=", ".RECIPEPREFIX := >\n", rp, nil},
+		{"recipeprefix = no spaces", ".RECIPEPREFIX=>\n", rp, nil},
+		{"recipeprefix +=", ".RECIPEPREFIX   +=   >\n", rp, nil},
+		{"recipeprefix ?=", ".RECIPEPREFIX ?= >\n", rp, nil},
+		{"recipeprefix ::=", ".RECIPEPREFIX ::= >\n", rp, nil},
+		{"recipeprefix !=", ".RECIPEPREFIX != printf '>'\n", rp, nil},
+		{"recipeprefix override", "override .RECIPEPREFIX = >\n", rp, nil},
+		{"recipeprefix export", "export .RECIPEPREFIX := >\n", rp, nil},
+		{"recipeprefix override export", "override export .RECIPEPREFIX := >\n", rp, nil},
+		{"recipeprefix private", "private .RECIPEPREFIX := >\n", rp, nil},
+		{"recipeprefix leading spaces", "   .RECIPEPREFIX := >\n", rp, nil},
+		{"recipeprefix trailing comment", ".RECIPEPREFIX := > # a comment\n", rp, nil},
+		{"recipeprefix define", "define .RECIPEPREFIX\n>\nendef\n", rp, nil},
+		{"recipeprefix target-specific", "ci: .RECIPEPREFIX := >\n", rp, nil},
+		{"recipeprefix line continuation", ".RECIPEPREFIX := \\\n>\n", rp, nil},
+		{"secondexpansion", ".SECONDEXPANSION:\n", se, nil},
+		{"secondexpansion spaced", ".SECONDEXPANSION :\n", se, nil},
+		{"secondexpansion double colon", ".SECONDEXPANSION::\n", se, nil},
+		{"secondexpansion among targets", ".PHONY .SECONDEXPANSION:\n", se, nil},
+		{"pattern-specific SHELL", "%: SHELL := /usr/bin/true\n", tsa + " SHELL", nil},
+		{"target-specific SHELL", "ci: SHELL := /usr/bin/true\n", tsa + " SHELL", nil},
+		{"pattern-specific MAKEFLAGS", "%: MAKEFLAGS += -i\n", tsa + " MAKEFLAGS", nil},
+		{"pattern-specific override SHELL", "%: override SHELL = /usr/bin/true\n", tsa + " SHELL", nil},
+		{"pattern-specific private .SHELLFLAGS", "%: private .SHELLFLAGS := -c\n", tsa + " .SHELLFLAGS", nil},
+		{"prefix-pattern export GNUMAKEFLAGS", "test-%: export GNUMAKEFLAGS := -k\n", tsa + " GNUMAKEFLAGS", nil},
+		{"pattern-specific computed name", "NAME := SHELL\n%: $(NAME) := /usr/bin/true\n", tsa + " a variable whose NAME make computes", nil},
+		{"define SHELL", "define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def, nil},
+		{"override define SHELL", "override define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def, nil},
+		{"define MAKEFLAGS", "define MAKEFLAGS\n-i\nendef\n", "assigns MAKEFLAGS " + def, nil},
+		{"private SHELL", "private SHELL := /usr/bin/true\n", "sets SHELL to something other than the approved value", nil},
 		// Slice B5b (R2-F1): .IGNORE / .DEFAULT / .EXTRA_PREREQS in every form.
-		{"ignore bare", ".IGNORE:\n", "names `.IGNORE`"},
-		{"ignore per-target", ".IGNORE: ci\n", "names `.IGNORE`"},
-		{"ignore double colon", ".IGNORE::\n", "names `.IGNORE`"},
-		{"ignore among targets", ".PHONY .IGNORE: ci\n", "names `.IGNORE`"},
-		{"default rule", ".DEFAULT:\n\t@true\n", "names `.DEFAULT`"},
-		{"default one-line recipe", ".DEFAULT: ; @true\n", "names `.DEFAULT`"},
-		{"extra-prereqs :=", ".EXTRA_PREREQS := Makefile\n", "names `.EXTRA_PREREQS`"},
-		{"extra-prereqs target-specific", "ci: .EXTRA_PREREQS := Makefile\n", "names `.EXTRA_PREREQS`"},
-		{"extra-prereqs override", "override .EXTRA_PREREQS += Makefile\n", "names `.EXTRA_PREREQS`"},
+		{"ignore bare", ".IGNORE:\n", "names `.IGNORE`", nil},
+		{"ignore per-target", ".IGNORE: ci\n", "names `.IGNORE`", nil},
+		{"ignore double colon", ".IGNORE::\n", "names `.IGNORE`", nil},
+		{"ignore among targets", ".PHONY .IGNORE: ci\n", "names `.IGNORE`", nil},
+		{"default rule", ".DEFAULT:\n\t@true\n", "names `.DEFAULT`", nil},
+		{"default one-line recipe", ".DEFAULT: ; @true\n", "names `.DEFAULT`", nil},
+		{"extra-prereqs :=", ".EXTRA_PREREQS := Makefile\n", "names `.EXTRA_PREREQS`", nil},
+		{"extra-prereqs target-specific", "ci: .EXTRA_PREREQS := Makefile\n", "names `.EXTRA_PREREQS`", nil},
+		{"extra-prereqs override", "override .EXTRA_PREREQS += Makefile\n", "names `.EXTRA_PREREQS`", nil},
 		// Slice B5b (R2-F2).
-		{"pattern rule", "%.done:\n\t@echo pattern\n", "is a PATTERN rule"},
-		{"pattern rule double colon", "%.done::\n\t@echo pattern\n", "is a PATTERN rule"},
-		{"sub-make ${MAKE}", "ci-sub:\n\t${MAKE} other\n.PHONY: ci-sub\nci: ci-sub\n", "starts a sub-make"},
+		{"pattern rule", "%.done:\n\t@echo pattern\n", "is a PATTERN rule", nil},
+		{"pattern rule double colon", "%.done::\n\t@echo pattern\n", "is a PATTERN rule", nil},
+		{"sub-make ${MAKE}", "ci-sub:\n\t${MAKE} other\n.PHONY: ci-sub\nci: ci-sub\n", "starts a sub-make", nil},
 		// Controls: a pattern-specific assignment of an ordinary variable, a
 		// `.DEFAULT_GOAL` (which `.DEFAULT` is a prefix of), and a comment-free
 		// tree, are NOT refused.
-		{"control: .DEFAULT_GOAL", ".DEFAULT_GOAL := ci\n", ""},
-		{"control: pattern-specific ordinary variable", "%: FOO := bar\n", ""},
-		{"control: nothing added", "", ""},
+		// #11 fix round 1 (cross-check X-1): the recipe forms the TAB-keyed,
+		// one-target-per-line reading did not scan, each refused by name for
+		// what it is — not incidentally, through junk "prerequisites".
+		{"inline recipe on the gate target", "ci: ; -true\n", "is a rule with an INLINE `;` recipe", []string{"has no explicit rule"}},
+		{"inline recipe, no space", "ci:;-true\n", "is a rule with an INLINE `;` recipe", []string{"has no explicit rule"}},
+		{"inline recipe glued to a computed token", "EMPTY :=\nci: $(EMPTY); -./run-the-real-tests.sh\n", "is a rule with an INLINE `;` recipe", []string{"has no explicit rule"}},
+		{"inline recipe on a closure prerequisite", "ci: lane\n.PHONY: lane\nlane: ; -./run-the-real-tests.sh\n", "is a rule with an INLINE `;` recipe", []string{"has no explicit rule"}},
+		{"multi-target rule naming a closure target", "other ci:\n\t-./run-the-real-tests.sh\n", "is a MULTI-TARGET rule (other, ci)", []string{"is not defined in any makefile"}},
+		{"multi-target rule, gate target first", "ci other:\n\t-./run-the-real-tests.sh\n", "is a MULTI-TARGET rule (ci, other)", []string{"is not defined in any makefile"}},
+		{"multi-target recipe beside a recipe-less rule", "ci: lane\n.PHONY: lane\nlane:\nother lane:\n\t-./run-the-real-tests.sh\n", "is a MULTI-TARGET rule (other, lane)", []string{"has no explicit rule"}},
+		{"grouped targets", "a b &:\n\t@true\n", "is a MULTI-TARGET rule", nil},
+		{"static pattern, two targets", "a b: %.x: %.y\n", "is a MULTI-TARGET rule", nil},
+		// B5c (search desk review M-1, M-5).
+		{"computed prerequisite", "LANE := lane\nci: $(LANE)\n", "has a prerequisite make COMPUTES: $(LANE)", nil},
+		{"computed order-only prerequisite", "LANE := lane\nci: | $(LANE)\n", "has a prerequisite make COMPUTES: $(LANE)", nil},
+		{"posix", ".POSIX:\n", "names `.POSIX`", nil},
+		{"control: .DEFAULT_GOAL", ".DEFAULT_GOAL := ci\n", "", nil},
+		{"control: pattern-specific ordinary variable", "%: FOO := bar\n", "", nil},
+		{"control: nothing added", "", "", nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -911,6 +930,11 @@ func TestEveryRefusedSpellingIsRefusedBeforeMake(t *testing.T) {
 				return
 			}
 			assertRefusedBeforeMake(t, tc.name, out, rec, tc.wantText)
+			for _, bad := range tc.mustNot {
+				if strings.Contains(out, bad) {
+					t.Fatalf("%s: refused for the WRONG reason — the output says %q:\n%s", tc.name, bad, out)
+				}
+			}
 		})
 	}
 }

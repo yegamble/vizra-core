@@ -410,6 +410,16 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "pattern-rule", wantFail: true, notInvoked: true, wantText: "is a PATTERN rule"},
 		{dir: "closure-not-phony", wantFail: true, notInvoked: true, wantText: "not declared `.PHONY` in the pinned bytes: ci"},
 		{dir: "submake", wantFail: true, notInvoked: true, wantText: "starts a sub-make"},
+		// #11 fix round 1 (cross-check X-1): a recipe the TAB-keyed,
+		// one-target-per-line reading would not attribute.
+		{dir: "inline-recipe", wantFail: true, notInvoked: true, wantText: "is a rule with an INLINE `;` recipe"},
+		{dir: "multi-target-rule", wantFail: true, notInvoked: true, wantText: "is a MULTI-TARGET rule (ci, other)"},
+		// ... and a recipe only make can attribute (a rule whose target NAME make
+		// computes, beside a recipe-less `ci:`): refused from make's database.
+		{dir: "computed-target-recipe", wantFail: true, wantText: "make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`"},
+		// B5c (search desk review M-1, M-5).
+		{dir: "computed-prerequisite", wantFail: true, notInvoked: true, wantText: "has a prerequisite make COMPUTES: $(LANE)"},
+		{dir: "posix", wantFail: true, notInvoked: true, wantText: "names `.POSIX`"},
 		// NIT: `make -q` exit 2 is make failing, not "would remake".
 		{dir: "make-q-parse-error", wantFail: true, wantText: "failed (exit 2): make reported an ERROR"},
 	}
@@ -558,6 +568,8 @@ func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
 		"has one explicit rule and is declared .PHONY",
 		"no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`",
 		"make's own .PHONY list covers all 17 gate closure target(s)",
+		// #11 fix round 1: every closure recipe as make holds it.
+		"make's own database: the 62 recipe line(s) of the 17 gate closure target(s) carry no",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)

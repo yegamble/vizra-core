@@ -1,0 +1,37 @@
+# C26 the database recipe scan removed
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
+
+==============================================================
+MUTATION: C26 the database recipe scan removed
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C26
+  check:  fixture_scenario_post computed-target-recipe 'own database gives gate closure target'
+--------------------------------------------------------------
+  sha256 BEFORE: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  sha256 AFTER:  d94029aa388caf39f4a83fc6f6c65a93c04263f74c6baf05a76098e08b7c484c
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+fixture computed-target-recipe: raw `make ci` on these bytes (no anchor): exit 0
+anchor [--workflow] exit=0
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+anchor [lenient] exit=0
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+fixture_scenario_post computed-target-recipe: control BROKEN (exit 1)
+------------------------------------
+  sha256 RESTORED: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  restore byte-identical: yes
+  RESULT: C26 the database recipe scan removed -> exit 1
+
+== after restore ==
+fixture computed-target-recipe: raw `make ci` on these bytes (no anchor): exit 0
+anchor [--workflow] exit=1
+  FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a `-` prefix.
+  FAIL  make's database:0 — gate target `ci`: `-./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own database.
+make-integrity-guard: FAILED
+anchor [lenient] exit=1
+  FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a `-` prefix.
+  FAIL  make's database:0 — gate target `ci`: `-./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own database.
+make-integrity-guard: FAILED
+fixture_scenario_post computed-target-recipe: control HELD (exit 0)

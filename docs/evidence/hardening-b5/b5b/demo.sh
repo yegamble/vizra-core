@@ -96,6 +96,54 @@ for f in ignore-per-target ignore-bare; do
 } > "$out/C15b-$f-refusal-and-backstop-removed.txt" 2>&1
 done
 
+# #11 fix round 1 (cross-check X-1) and B5c. Go-free, so they run on 4.3 too.
+# fixture_scenario_post: the refusal comes AFTER make (from make's database) —
+# HELD means exit 1 in both modes with the refusal naming $2.
+fixture_scenario_post() {
+  local fixture="$1" name="$2" t rc=0
+  t="$(mktemp -d)"
+  cp -R "scripts/testdata/makeguard/$fixture/." "$t/"
+  printf '#!/bin/sh\necho "the gate FAILED"\nexit 1\n' > "$t/run-the-real-tests.sh"
+  chmod +x "$t/run-the-real-tests.sh"
+  echo "fixture $fixture: raw \`make ci\` on these bytes (no anchor): exit $(cd "$t" && make ci >/dev/null 2>&1; echo $?)"
+  for mode in --workflow ""; do
+    python3 scripts/testdata/spawn-recorder.py "$REC" --root "$t" --targets ci $mode > "$REC.out" 2>&1
+    local arc=$?
+    echo "anchor [${mode:-lenient}] exit=$arc"
+    grep -E '^ +FAIL|make-integrity-guard: (passed|FAILED)' "$REC.out" | cut -c1-200
+    [ "$arc" = 1 ] || rc=1
+    grep -q "$name" "$REC.out" || rc=1
+    rm -f "$REC.out"
+  done
+  rm -rf "$t"
+  echo "fixture_scenario_post $fixture: control $([ $rc = 0 ] && echo HELD || echo BROKEN) (exit $rc)"
+  return $rc
+}
+export -f fixture_scenario_post
+
+for pair in "inline-recipe:is a rule with an INLINE" "multi-target-rule:is a MULTI-TARGET rule" \
+            "computed-prerequisite:has a prerequisite make COMPUTES" "posix:names \`.POSIX\`"; do
+  f="${pair%%:*}"; n="${pair#*:}"
+  { header "D-$f: the committed fixture, gate stub failing"; fixture_scenario "$f" "$n"; echo "fixture_scenario exit=$?"; } \
+    > "$out/D-$f.txt" 2>&1
+done
+{ header "D-computed-target-recipe: refused AFTER make, from make's own database"
+  fixture_scenario_post computed-target-recipe "own database gives gate closure target"
+  echo "fixture_scenario_post exit=$?"; } > "$out/D-computed-target-recipe.txt" 2>&1
+
+xrow() { # id title fixture name [post]
+  local fn=fixture_scenario; [ "${5:-}" = post ] && fn=fixture_scenario_post
+  { header "$1 $2"
+    bash "$M" "$1 $2" scripts/make-integrity-guard.py "python3 $MUT $1" "$fn $3 '$4'"
+    echo "== after restore =="; $fn "$3" "$4"
+  } > "$out/$1.txt" 2>&1
+}
+xrow C22 "the inline-recipe refusal removed" inline-recipe "is a rule with an INLINE"
+xrow C23 "the multi-target refusal removed" multi-target-rule "is a MULTI-TARGET rule"
+xrow C24 "the computed-prerequisite refusal removed" computed-prerequisite "has a prerequisite make COMPUTES"
+xrow C25 "the .POSIX refusal removed" posix 'names `.POSIX`'
+xrow C26 "the database recipe scan removed" computed-target-recipe "own database gives gate closure target" post
+
 if [ "${DEMO_ONLY:-}" = "D" ]; then
   echo "DEMO_ONLY=D: the Go-test C rows skipped (they need go)."
   echo "tree after: $(git status --porcelain | wc -l | tr -d ' ') uncommitted path(s)"

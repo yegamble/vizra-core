@@ -69,13 +69,20 @@ Before make, on the pinned text, it refuses: a `SHELL` / `.SHELLFLAGS` /
 `MAKEFLAGS` / `GNUMAKEFLAGS` / `MFLAGS` assignment in any form (global with any
 modifier, `define`, target- or pattern-specific) other than the two approved
 global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`,
-`.IGNORE`, `.DEFAULT` (whole word) or `.EXTRA_PREREQS`; a pattern rule; a
-LITERAL `-`/`@-`/`+` prefix, `|| true`-family suffix or `$(MAKE)` on a gate
-recipe line; a duplicate or conditional gate target; and a gate closure target
-with no explicit rule or not declared `.PHONY`. The recipe scan covers the
-EXPLICIT rules of the prerequisite closure — and because every closure target
-must have one and be phony, make reaches no implicit, pattern or `.DEFAULT`
-recipe through it (GNU make skips implicit-rule search for phony targets).
+`.IGNORE`, `.DEFAULT` (whole word), `.EXTRA_PREREQS` or `.POSIX`; a pattern
+rule; a rule with an INLINE `;` recipe; a MULTI-TARGET rule line; a `$`-named
+prerequisite on a gate closure rule; a LITERAL `-`/`@-`/`+` prefix,
+`|| true`-family suffix or `$(MAKE)` on a gate recipe line; a duplicate or
+conditional gate target; and a gate closure target with no explicit rule or
+not declared `.PHONY`. **No gate lane may depend on a real file target**:
+every target the gate closure reaches must be an explicit, phony rule. So
+every recipe the closure reaches is scanned — GNU make skips implicit-rule
+search for phony targets (measured on 3.81 and 4.3), so the recipe is on an
+explicit rule, and with inline and multi-target forms refused it is on the
+TAB lines under that target's own rule line, which the text reading scans
+before make. After make, every closure target's recipe as make's `-pn`
+database holds it is held to the same literal checks, which catches a recipe
+make attaches some other way (a rule whose target name make computes).
 After make has run on the pinned bytes, the resolver refuses what only make can
 see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` /
 `.EXTRA_PREREQS` or declares `.SECONDEXPANSION` / `.IGNORE` / a `.DEFAULT`
@@ -254,3 +261,15 @@ Same host (GNU Make 3.81, go1.27.1). Not pushed at the time of measurement (the 
 | `./scripts/ci-required-guard.sh` | 0 | |
 | `docs/evidence/hardening-b5/b5b/demo.sh` + `measure.sh` on 3.81 | 0 | D rows HELD; C15–C21 red, green after restore |
 | GNU Make 4.3 (`ubuntu:24.04` container): D rows, C15/C15b, `measure.sh`, both anchors, ci-required-guard, all 57 makeguard fixtures | as expected | `docs/evidence/hardening-b5/b5b/make-4.3-ubuntu24.04/`; 55 red, 2 green |
+
+### #11 fix round 1 (cross-check X-1, B5c), measured on scripts/ tree `173c57f1…`
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| direct unit step + `go-test-report.py` | 0 | **1247 executed, 0 failed, 0 skipped**, floor 943; `scripts` 327 |
+| `go test -race -count=1 ./scripts/` | 0 | 327 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD; C15–C26 red, green after restore |
+| GNU Make 4.3 container: D rows, C15/C15b, C22–C26, `measure.sh`, both anchors, the guard, all 62 makeguard fixtures | as expected | 60 red, 2 green |

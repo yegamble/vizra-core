@@ -1,6 +1,8 @@
 GNU Make 4.3
 at-dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `@-./run-the-real-tests.sh`
 closure-not-phony exit=1 notinv=1   FAIL  gate closure target(s) not declared `.PHONY` in the pinned bytes: ci
+computed-prerequisite exit=1 notinv=1   FAIL  Makefile:6 — gate closure target `ci` has a prerequisite make COMPUTES: $(LANE)
+computed-target-recipe exit=1 notinv=0   FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a 
 conditional-target exit=1 notinv=1   FAIL  Makefile:6 defines the gate target `ci` inside a make conditional.
 dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `-./run-the-real-tests.sh`
 default-recipe exit=1 notinv=1   FAIL  Makefile:8 names `.DEFAULT`: `.DEFAULT:`
@@ -20,11 +22,13 @@ include-pinned-good exit=0 notinv=0
 include-unpinned exit=1 notinv=1   FAIL  make would read inc.mk, which has no entry in .github/pinned-makefiles.yml.
 included-makeflags exit=1 notinv=1   FAIL  inc.mk:1 assigns MAKEFLAGS: `MAKEFLAGS += -i`
 included-shell exit=1 notinv=1   FAIL  inc.mk:1 assigns SHELL, but only the root Makefile may: `SHELL := /usr/bin/true`
+inline-recipe exit=1 notinv=1   FAIL  Makefile:5 is a rule with an INLINE `;` recipe: `ci: ; ./run-the-real-tests.sh`
 make-q-parse-error exit=1 notinv=0   FAIL  `make -q Makefile` failed (exit 2): make reported an ERROR, not "up to date" and not "would remake".
 makefile-symlink exit=1 notinv=1   FAIL  Makefile is not a regular file (a symlink, FIFO or device is refused): make would read whatever it poi
 makeflags-ignore exit=1 notinv=1   FAIL  Makefile:1 assigns MAKEFLAGS: `MAKEFLAGS += -i`
 missing-prerequisite exit=1 notinv=1   FAIL  `no-such-file-and-no-rule`, a prerequisite in the gate closure, has no explicit rule in the pinned byt
 missing-target exit=1 notinv=1   FAIL  gate target `ci` is not defined in any makefile make will read.
+multi-target-rule exit=1 notinv=1   FAIL  Makefile:5 is a MULTI-TARGET rule (ci, other): `ci other:`
 no-shell-pin exit=1 notinv=1   FAIL  the root Makefile does not carry BOTH approved assignments.
 oneshell exit=1 notinv=1   FAIL  Makefile:3 declares `.ONESHELL`: `.ONESHELL:`
 or-true exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line ending `|| true`: `./run-the-real-tests.sh || true`
@@ -35,6 +39,7 @@ pin-malformed exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml:2: not a `  <
 pin-missing exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml does not exist. It is the list of Makefile bytes make may read; without i
 pin-without-makefile exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml does not pin `Makefile`, the file make reads first.
 plus-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `+`: `+echo "forced to run even under -n"`
+posix exit=1 notinv=1   FAIL  Makefile:8 names `.POSIX`: `.POSIX:`
 prefix-from-chained-variable exit=1 notinv=0   FAIL  Makefile:10 — gate target `ci`: `@$(EMPTY) $(IGNORE_FAILURE)./run-the-real-tests.sh` expands to a re
 prefix-from-function exit=1 notinv=0   FAIL  Makefile:7 — gate target `ci`: the recipe prefix of `$(if yes,-)./run-the-real-tests.sh` cannot be d
 prefix-from-pattern-specific exit=1 notinv=0   FAIL  Makefile:9 — gate target `ci`: the recipe prefix of `$(IGNORE_FAILURE)./run-the-real-tests.sh` canno

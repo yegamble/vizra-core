@@ -19,6 +19,12 @@ MUTATIONS = {
     "C20": [(GUARD, "                undefined.append(t)\n                g.fail(",
              "                undefined.append(t)\n                if False: g.fail(")],
     "C21": [(GUARD, "        if _SUBMAKE_RE.search(body):", "        if False:")],
+    # #11 fix round 1 (cross-check X-1) and B5c.
+    "C22": [(GUARD, '            if ";" in rest:', "            if False:")],
+    "C23": [(GUARD, "            if len(names) > 1:", "            if False:")],
+    "C24": [(GUARD, "            if computed:", "            if False:")],
+    "C25": [(GUARD, '    ".POSIX": ', '    ".POSIX-disabled-by-C25": ')],
+    "C26": [(GUARD, "    check_db_recipes(g, closure)\n", "")],
 }
 
 for path, old, new in MUTATIONS[sys.argv[1]]:

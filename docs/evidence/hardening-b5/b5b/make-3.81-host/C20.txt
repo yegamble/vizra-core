@@ -1,7 +1,7 @@
 # C20 the no-explicit-rule refusal removed (back to a 'note')
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 83fef729833370c1530f467cfe3636e6830472d7  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 6e3ed51e4e9b0669c8f4433f7b02b6504670b5a8
+# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
 
 ==============================================================
 MUTATION: C20 the no-explicit-rule refusal removed (back to a 'note')
@@ -9,22 +9,22 @@ MUTATION: C20 the no-explicit-rule refusal removed (back to a 'note')
   mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C20
   check:  gotest 'TestMakeIntegrityGuardFixtures/missing-prerequisite'
 --------------------------------------------------------------
-  sha256 BEFORE: 090455c70cd01be7d44c90a7e70cffde4ca07b6afd968ec7e7b7389f7376a52b
-  sha256 AFTER:  0a7f1e1b9e6e996166d4332ee34fd63067acf4d4625f65836fca6edc62351b3e
+  sha256 BEFORE: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  sha256 AFTER:  c823857a467466b0da7bbb32b4f2e6a280227ad820615b15176b96cd588431a4
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
 --- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
-    --- FAIL: TestMakeIntegrityGuardFixtures/missing-prerequisite (0.83s)
-        scripts_test.go:429: the failure does not mention "has no explicit rule in the pinned bytes", so an author would not know what to fix:
+    --- FAIL: TestMakeIntegrityGuardFixtures/missing-prerequisite (0.09s)
+        scripts_test.go:439: the failure does not mention "has no explicit rule in the pinned bytes", so an author would not know what to fix:
 FAIL
-FAIL	github.com/yegamble/vizra-core/scripts	1.251s
+FAIL	github.com/yegamble/vizra-core/scripts	0.283s
 FAIL
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: 090455c70cd01be7d44c90a7e70cffde4ca07b6afd968ec7e7b7389f7376a52b
+  sha256 RESTORED: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
   restore byte-identical: yes
   RESULT: C20 the no-explicit-rule refusal removed (back to a 'note') -> exit 1
 
 == after restore ==
-ok  	github.com/yegamble/vizra-core/scripts	1.077s
+ok  	github.com/yegamble/vizra-core/scripts	0.258s
 go test exit=0
