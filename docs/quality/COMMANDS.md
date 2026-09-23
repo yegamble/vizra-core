@@ -65,7 +65,48 @@ advisory. Changing the Makefile:
 shasum -a 256 Makefile      # paste into .github/pinned-makefiles.yml, same diff
 ```
 
-Before make, on the pinned text, it refuses: a `SHELL` / `.SHELLFLAGS` /
+**The allowlist grammar is the primary pre-make control** (queue 2p, core
+B5d; ported from vizra-search `scripts/makegate.py` at `4810048`). Before make,
+in both modes and in `ci-required-guard` check 11 (both call
+`scripts/makefile_pin.py` `verify_pin`), every logical line of every pinned
+makefile must be one of five shapes, or it is refused by file and line number
+with make not started:
+
+- empty, or a `#` comment in column 0 (a comment continued by a trailing
+  backslash is refused);
+- a column-0 literal assignment `NAME :=` / `?=` / `=` whose NAME is not a
+  directive keyword and whose value uses only `$$`, `$(NAME)` / `${NAME}` and a
+  `$(shell …)` (listed on the ok line as a reviewed parse-time call);
+- `.PHONY: names`;
+- a rule with ONE literal target and literal prerequisites, on one physical
+  line;
+- a TAB recipe line of such a rule, using only `$$` and `$(NAME)` / `${NAME}`.
+
+Plus byte refusals anywhere: a carriage return, NUL, any other control
+character, an invisible format (Cf) character, and non-ASCII whitespace.
+Everything else — `include` and every other directive, conditionals, `define`,
+`export`, `override`, target- and pattern-specific assignments, `+=` / `!=`,
+special targets other than `.PHONY`, functions and substitution references,
+inline `;` recipes, multi-target, double-colon and pattern rules, and every
+character above — is outside the grammar. The real Makefile fits it unchanged
+(56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe lines; the
+anchor's ok line prints the counts). Because `include` is refused, the pinned
+read set is the root `Makefile` alone; the include reading and the post-make
+checks below remain as defence in depth.
+
+Every text reading of a makefile — the grammar, the static read set, the
+parse-time sites, the anchor's closure, recipe, assignment and definition
+readings, and `ci-required-guard`'s env-name and PKGS / test-race readings —
+consumes ONE line sequence, `makefile_pin.makefile_lines`, so no two readers
+can disagree on where a line or a recipe ends.
+`scripts/testdata/one-reader-probe.py` proves it three ways (POISON: rewriting
+the text inside `makefile_lines` changes every reader's verdict; SOURCE: no
+reader splits or decodes text itself, and every such spelling in the three
+files is a named read of a non-makefile input; IDENTITY: every reader of one
+text gets the same sequence object).
+
+Then, as the SECOND diagnosis on the same text (the gate has already failed),
+it refuses by name: a `SHELL` / `.SHELLFLAGS` /
 `MAKEFLAGS` / `GNUMAKEFLAGS` / `MFLAGS` assignment in any form (global with any
 modifier, `define`, target- or pattern-specific) other than the two approved
 global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`,
@@ -97,7 +138,13 @@ recipe, a closure target missing from make's own `.PHONY` list, a `-`/`+`
 prefix a leading variable expands to (a
 leading function or target-specific variable is refused as undeterminable), a
 `|| true` suffix in the expanded dry-run command, and a `MAKEFILE_LIST` that is
-not the pinned set. The value of any OTHER variable (`GO`, `PKGS`, …) in the
+not the pinned set. Since the grammar, every committed route to these
+post-make branches is refused before make, so their refusals are exercised
+in-process by `scripts/testdata/db-scan-probe.py` (26 rows). **What the grammar
+does not see:** make's BUILT-IN implicit rules and variables — no makefile line
+names them. They are answered by the one `make -q` (a pinned makefile make
+would remake) and by the rule that every gate closure target is an explicit
+`.PHONY` rule, not by the grammar. The value of any OTHER variable (`GO`, `PKGS`, …) in the
 pinned bytes is not checked here: review is the control for that.
 
 `ci-required-guard` runs its checks over `set(FLOOR_LANES) | set(required)`.

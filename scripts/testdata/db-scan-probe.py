@@ -124,10 +124,102 @@ ROWS = [
 ]
 
 
+# ------------------------------------------------------------------------------------------------------
+# Queue 2p (core B5d): the allowlist grammar refuses BEFORE make every committed fixture that used to reach
+# these post-make branches (a computed variable name, a function in a recipe, a pattern-specific
+# assignment, an unparseable line). The branches stay as defence in depth, so each keeps a red case HERE,
+# driven in-process: the database strings through parse_database, and make itself replaced by a stub of
+# the guard's own run_make (no process is started — subprocess raises).
+
+
+class _Proc:
+    def __init__(self, returncode: int, stdout: str = "", stderr: str = ""):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+
+def _guarded(call):
+    g = mig.Guard()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+        call(g)
+    return g.failed, out.getvalue()
+
+
+def resolved(db_text: str):
+    return lambda: _guarded(lambda g: mig.check_resolved(g, "ci", mig.parse_database(db_text + END)))
+
+
+def expanded(line: str, target_specific=()):
+    def run():
+        mig.GATE_RECIPE_LINES[:] = [("Makefile", 1, "ci", line)]
+        mig.TARGET_SPECIFIC_NAMES.clear()
+        mig.TARGET_SPECIFIC_NAMES.update(target_specific)
+        variables = mig.parse_database(GOOD_DB + END)
+        return _guarded(lambda g: mig.check_expanded_prefixes(g, variables))
+    return run
+
+
+def with_make(returncode: int, call, calls=None):
+    def run():
+        real = mig.run_make
+
+        def stub(root, args):
+            if calls is not None:
+                calls.append(list(args))
+            return _Proc(returncode, "", "make: *** stub")
+        mig.run_make = stub
+        try:
+            return _guarded(call)
+        finally:
+            mig.run_make = real
+    return run
+
+
+PROBE_CALLS: list = []
+
+
+def remake_probe_is_one_invocation():
+    PROBE_CALLS.clear()
+    failed, out = with_make(0, lambda g: mig.check_no_pinned_makefile_would_be_remade(
+        g, Path("."), ["Makefile", "a.mk", "b.mk"]), PROBE_CALLS)()
+    one = PROBE_CALLS == [["-q", "Makefile", "a.mk", "b.mk"]]
+    return (failed or not one), out + f"\nmake calls: {PROBE_CALLS}"
+
+
+POST_MAKE_ROWS = [
+    # (name, fn, expect_fail, must_contain, must_not_contain)
+    ("resolver: SHELL resolved to a no-op", resolved(GOOD_DB.replace("SHELL := /usr/bin/env bash",
+                                                                     "SHELL := /usr/bin/true")), True,
+     "make resolves SHELL to '/usr/bin/true'", None),
+    ("resolver: MAKEFLAGS carries i", resolved(GOOD_DB.replace(SHELL_VARS, SHELL_VARS + "MAKEFLAGS = pni\n")), True,
+     "make resolves MAKEFLAGS to 'pni'", None),
+    ("resolver: .RECIPEPREFIX set", resolved(GOOD_DB.replace(SHELL_VARS, SHELL_VARS + ".RECIPEPREFIX := >\n")), True,
+     "make resolves .RECIPEPREFIX to '>'", None),
+    ("resolver: .EXTRA_PREREQS set", resolved(GOOD_DB.replace(SHELL_VARS, SHELL_VARS + ".EXTRA_PREREQS := Makefile\n")),
+     True, "make resolves .EXTRA_PREREQS to 'Makefile'", None),
+    ("expanded prefix: a leading make function", expanded("$(if yes,-)./run-the-real-tests.sh"), True,
+     "starts with a make function", None),
+    ("expanded prefix: a target-specific leading variable", expanded("$(IGN)./run-the-real-tests.sh", ("IGN",)), True,
+     "which a target- or pattern-specific assignment sets", None),
+    ("control: expanded prefix of a plain command", expanded("./run-the-real-tests.sh"), False,
+     "no gate recipe line expands", None),
+    ("resolver: make -pn fails", with_make(2, lambda g: mig.resolve_database(g, Path("."), "ci")), True,
+     "could not be established", None),
+    ("remake probe: make -q exit 2", with_make(2, lambda g: mig.check_no_pinned_makefile_would_be_remade(
+        g, Path("."), ["Makefile"])), True, "failed (exit 2): make reported an ERROR", "would REMAKE"),
+    ("remake probe: make -q exit 1", with_make(1, lambda g: mig.check_no_pinned_makefile_would_be_remade(
+        g, Path("."), ["Makefile"])), True, "make would REMAKE one of Makefile", None),
+    ("remake probe: ONE make -q naming every pinned makefile", remake_probe_is_one_invocation, False,
+     "make calls: [['-q', 'Makefile', 'a.mk', 'b.mk']]", None),
+]
+
+
 def main() -> int:
     bad = 0
-    for name, which, db, closure, text, expect_fail, want, not_want in ROWS:
-        failed, out = run_check(which, db, closure, text)
+    rows = [(name, (lambda w=which, d=db, c=closure, t=text: run_check(w, d, c, t)), expect_fail, want, not_want)
+            for name, which, db, closure, text, expect_fail, want, not_want in ROWS] + POST_MAKE_ROWS
+    for name, fn, expect_fail, want, not_want in rows:
+        failed, out = fn()
         ok = failed == expect_fail and want in out and (not not_want or not_want not in out)
         print(f"ROW {'ok  ' if ok else 'BAD '} {name}: refused={failed} (expected {expect_fail}); "
               f"says {want!r}: {want in out}")
@@ -136,9 +228,9 @@ def main() -> int:
             for line in out.strip().splitlines()[:6]:
                 print(f"        | {line}")
     if bad:
-        print(f"PROBE: FAILED — {bad} of {len(ROWS)} rows did not behave as expected")
+        print(f"PROBE: FAILED — {bad} of {len(rows)} rows did not behave as expected")
         return 1
-    print(f"PROBE: all {len(ROWS)} rows as expected")
+    print(f"PROBE: all {len(rows)} rows as expected")
     return 0
 
 

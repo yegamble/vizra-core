@@ -70,7 +70,12 @@ Checks, all of which must pass:
                   so it also refuses whatever the anchor refuses before make:
                   a GNUmakefile/makefile beside the Makefile, a symlinked
                   makefile, a stale entry, an unpinned or computed include,
-                  $(eval)/$(guile) (fix round 1, PR#10 VERIFY FINDING 3).
+                  $(eval)/$(guile) (fix round 1, PR#10 VERIFY FINDING 3) —
+                  and, first, every line outside the allowlist grammar
+                  (queue 2p, core B5d), by file and line number. This file's
+                  own readings of the Makefile (the `?=` names, PKGS, the
+                  test-race recipe, its -run patterns) consume the same ONE
+                  line reader, makefile_pin.makefile_lines.
                   The anchor is what enforces the pin at runtime — it refuses to
                   invoke make on unpinned bytes, because make EVALUATES a
                   makefile while reading it (chair ruling, tick 132, on
@@ -629,11 +634,20 @@ def extra_keys(step: dict) -> list[str]:
 MAKEFILE_ENV_NAMES: set[str] = {"GOFLAGS"}
 
 
+_ENV_TAKEN_ASSIGN_RE = re.compile(r"^\s*(?:export\s+|override\s+)*([A-Za-z_][A-Za-z0-9_]*)\s*\?=")
+
+
 def load_makefile_env_names(makefile: Path) -> None:
+    """The `?=` names, read through the ONE line reader (makefile_pin.makefile_lines), a line at a time."""
     if makefile.exists():
-        MAKEFILE_ENV_NAMES.update(
-            re.findall(r"^\s*(?:export\s+|override\s+)*([A-Za-z_][A-Za-z0-9_]*)\s*\?=",
-                       makefile.read_text(), re.M))
+        try:
+            lines = mp.read_makefile_lines(makefile)
+        except (OSError, UnicodeDecodeError):
+            return
+        for rec in lines:
+            m = _ENV_TAKEN_ASSIGN_RE.match(rec.raw)
+            if m:
+                MAKEFILE_ENV_NAMES.add(m.group(1))
 
 
 def env_problems(scope: str, env) -> list[str]:
@@ -1040,11 +1054,17 @@ def check_makefile_selection(g: Guard, makefile: Path) -> None:
     if not makefile.exists():
         g.fail(f"{makefile} is missing; the test selection cannot be checked")
         return
-    text = makefile.read_text()
+    try:
+        recs = mp.read_makefile_lines(makefile)
+    except (OSError, UnicodeDecodeError) as err:
+        g.fail(f"{makefile} cannot be read as a makefile: {err}")
+        return
 
     # test-race must cover the whole module. PKGS is the indirection that makes
-    # narrowing it a one-word edit.
-    pkgs = re.search(r"^PKGS\s*:?=\s*(.+)$", text, re.M)
+    # narrowing it a one-word edit. Read through the ONE line reader, like
+    # every other reading of the Makefile here (queue 2p).
+    pkgs = next((m for m in (re.match(r"^PKGS\s*:?=\s*(.+)$", rec.code) for rec in recs if not rec.tab) if m),
+                None)
     if not pkgs:
         g.fail("the Makefile defines no PKGS; the test-race lane's selection is unknown")
     elif pkgs.group(1).strip() != "./...":
@@ -1055,15 +1075,17 @@ def check_makefile_selection(g: Guard, makefile: Path) -> None:
     else:
         g.ok("the test-race lane selects the whole module (PKGS = ./...)")
 
-    race = re.search(r"^test-race:.*?\n((?:\t.*\n|\s*\n)+)", text, re.M)
-    if not race or "$(PKGS)" not in race.group(1):
+    race_at = next((i for i, rec in enumerate(recs) if not rec.tab and re.match(r"^test-race\s*:(?!=)", rec.code)),
+                   None)
+    race = " ".join(body for _, body in mp.recipe_lines(recs, race_at + 1)) if race_at is not None else ""
+    if "$(PKGS)" not in race:
         g.fail("the test-race target does not use $(PKGS)", "Its selection is not the one checked above.")
     else:
         g.ok("the test-race target uses $(PKGS)")
 
     # Every -run pattern must be non-empty. An empty or unmatched pattern makes
     # `go test` report success while running nothing.
-    runs = re.findall(r"-run\s+'([^']*)'", text)
+    runs = [r for rec in recs if rec.tab for r in re.findall(r"-run\s+'([^']*)'", rec.raw)]
     if not runs:
         g.fail("no -run selections found in the Makefile", "Either the lanes changed shape or this check is stale.")
         return
@@ -1083,10 +1105,14 @@ def check_makefile_pin(g: Guard, pin_path: Path) -> None:
     """Check 11: the Makefile digest pin exists, is well-formed, covers the Makefile and matches."""
     root = pin_path.parent.parent
     r = mp.verify_pin(root, pin_path)
+    # THE GRAMMAR (queue 2p), the same function the anchor runs before make: every pinned makefile line
+    # outside the allowed shapes is refused here by name and line number.
+    for p in r.grammar:
+        g.fail(p.message, "The workflow anchor refuses this Makefile before invoking make.")
     if r.ok:
         g.ok(f"{pin_path.name} pins {len(r.pins)} makefile(s) ({', '.join(sorted(r.pins))}), "
              f"covers the Makefile, and every digest matches the tree; make will read exactly "
-             f"{', '.join(r.order)} (the anchor's own verify_pin)")
+             f"{', '.join(r.order)} (the anchor's own verify_pin), every line of which fits the allowlist grammar")
         return
     changed = [p for p in r.problems if p.kind in ("mismatch", "absent")]
     for p in r.problems:
