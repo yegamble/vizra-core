@@ -71,7 +71,10 @@ It prints the executed/passed/failed/skipped counts, names every failure and
 every skip, and fails below the floor recorded in `scripts/test-floors.json`.
 Use `--suite integration` with `-tags=integration` for the other suite.
 
-The two out-of-make guards, which CI runs as their own steps before any `make`:
+The two out-of-make guards. CI runs `make-integrity-guard.sh` as its own step
+**immediately before every** `make` step, and the make steps themselves are
+pinned byte-for-byte in `.github/pinned-steps.yml` — the control is default-deny
+on the step's shape, not a parser for shell:
 
 ```sh
 ./scripts/make-integrity-guard.sh   # the Makefile and everything it includes

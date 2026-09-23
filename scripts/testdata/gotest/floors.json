@@ -1,13 +1,17 @@
 {
-  "_why": "Fixture floors for scripts_test.go. The repository's own floors are scripts/test-floors.json.",
+  "_why": "Fixture floors for scripts_test.go. The repository's own floors are scripts/test-floors.json. Every package a fixture executes carries a floor, because a whole-suite floor does not detect ONE package disappearing.",
   "suites": {
     "unit": {
       "min_tests": 4,
-      "allowed_skips": {}
+      "allowed_skips": {},
+      "min_package_tests": {
+        "github.com/yegamble/vizra-core/internal/thing": 4
+      }
     },
     "integration": {
       "min_tests": 40,
       "min_package_tests": {
+        "github.com/yegamble/vizra-core/internal/thing": 40,
         "github.com/yegamble/vizra-core/internal/integration": 4
       },
       "allowed_skips": {}

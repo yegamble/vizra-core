@@ -116,8 +116,20 @@ func TestMigrateLintPassesOnTheRealMigrations(t *testing.T) {
 // ci-required-guard
 // ---------------------------------------------------------------------------
 
-// Every one of these is a way to neuter a required lane while the old
-// regex-based guard printed "ok no continue-on-error on any lane".
+// Every one of these is a way to neuter a required lane. Since sweep B1 round 2
+// the control is DEFAULT-DENY on the SHAPE of the two kinds of step that carry
+// the gate, not a blacklist of shell spellings: a verifier found thirteen
+// spellings the flag-parsing version could not see (PR#9 VERIFY, § 3b), and a
+// blacklist over arbitrary shell cannot be exhaustive.
+//
+//	check 8b  a step mentioning `make` must be BYTE-EQUAL to a body in
+//	          .github/pinned-steps.yml, carry no key but name/run/id, and be
+//	          IMMEDIATELY preceded by the anchor
+//	check 8c  the lane must actually RUN its required invocations — the
+//	          positive half, which closes indirection (`$M -i ci`) without
+//	          parsing any shell, because it does not care what replaced them
+//	check 9   the direct test steps are pinned the same way
+//	check 10  a lane that checks out records which tree it stood in
 func TestCIRequiredGuardFixtures(t *testing.T) {
 	cases := []struct {
 		dir      string
@@ -125,111 +137,76 @@ func TestCIRequiredGuardFixtures(t *testing.T) {
 		wantText string
 	}{
 		{dir: "good", wantFail: false},
-
-		// The manifest is editable by the PR it gates.
-		{dir: "floor-deleted", wantFail: true, wantText: "missing"},
-		// VZ-FOUND-007: deleting the deterministic-corpus lane from the
-		// manifest must turn the floor red by name. Without that, a PR that
-		// moved the fixture bytes could drop the lane that would have noticed
-		// and every later media assertion would still report green.
+		{dir: "floor-deleted", wantFail: true, wantText: "is missing"},
 		{dir: "fixtures-floor-deleted", wantFail: true, wantText: "'fixtures' is missing"},
 		{dir: "floor-commented", wantFail: true, wantText: "commented out"},
-
-		// Every spelling of continue-on-error. The regex saw only the first.
+		{dir: "missing-job", wantFail: true, wantText: "matches no job"},
 		{dir: "coe-bare", wantFail: true, wantText: "continue-on-error"},
 		{dir: "coe-quoted", wantFail: true, wantText: "continue-on-error"},
 		{dir: "coe-capitalised", wantFail: true, wantText: "continue-on-error"},
 		{dir: "coe-expression", wantFail: true, wantText: "continue-on-error"},
 		{dir: "coe-underscore", wantFail: true, wantText: "continue-on-error"},
-		{dir: "coe-step", wantFail: true, wantText: "continue-on-error"},
-
-		// A floor lane that never runs on a PR gates nothing.
+		{dir: "coe-step", wantFail: true, wantText: "carries ['continue-on-error']"},
 		{dir: "not-on-pull-request", wantFail: true, wantText: "pull_request"},
-
-		// Checks 8 and 9: the out-of-make controls on the make-driven gate.
-		// Every required lane here runs through `make`, and ONE line in a
-		// Makefile no-ops every recipe, so these assert the anchor step and the
-		// direct test lane are present AND armed. Each fixture changes exactly
-		// one thing relative to "good".
-		{dir: "anchor-missing", wantFail: true, wantText: "with no make-integrity-guard step before it"},
-		{dir: "anchor-after-make", wantFail: true, wantText: "after `make` at position"},
-		{dir: "anchor-conditional", wantFail: true, wantText: "conditional"},
-		{dir: "anchor-continue-on-error", wantFail: true, wantText: "continue-on-error"},
-		// An aggregate floor lane whose `needs:` leg runs make with no anchor.
-		// This is the shape `cache-matrix` really has: checking only the named
-		// job would have printed ok while the job that invokes make was
-		// unanchored.
-		{dir: "needs-leg-unanchored", wantFail: true, wantText: "needs:cache-matrix-leg"},
-		// The Actions analogue of `SHELL := /usr/bin/true`.
-		{dir: "defaults-shell-workflow", wantFail: true, wantText: "defaults.run.shell"},
-		{dir: "defaults-shell-job", wantFail: true, wantText: "defaults.run.shell"},
-		{dir: "no-direct-test-lane", wantFail: true, wantText: "every unit test invocation goes through"},
-
 		{dir: "bad-runner", wantFail: true, wantText: "runner"},
 		{dir: "unpinned-action", wantFail: true, wantText: "pinned"},
-		{dir: "missing-job", wantFail: true, wantText: "matches no job"},
-
-		// ------------------------------------------------------------------
-		// Sweep B1, check 8b: the make step's own WORKFLOW LINE.
-		//
-		// The anchor runs `make -pn` in its own process and reads its own
-		// environment; it cannot see another step's argv or `env:`. A verifier
-		// measured four spellings that left BOTH guards exiting 0 while every
-		// make-driven lane went silent (PR#6 VERIFY, FINDING 1). Each fixture
-		// below changes exactly one thing relative to "good".
-		// ------------------------------------------------------------------
-		{dir: "make-flag-override", wantFail: true, wantText: "-i/--ignore-errors"},
-		{dir: "make-var-override", wantFail: true, wantText: "variable override 'shell=/usr/bin/true'"},
-		// make applies a command-line override wherever it sits, so putting it
-		// after the target must be refused identically.
-		{dir: "make-var-override-after-target", wantFail: true, wantText: "variable override 'shell=/usr/bin/true'"},
-		{dir: "make-env-prefix", wantFail: true, wantText: "environment prefix 'makeflags=-i'"},
-		{dir: "make-env-command", wantFail: true, wantText: "environment prefix 'gnumakeflags=-i'"},
-		// GNU make accepts any unambiguous abbreviation of a long option, so a
-		// literal-string check for "--ignore-errors" would miss this.
-		{dir: "make-flag-long-abbrev", wantFail: true, wantText: "-i/--ignore-errors"},
-		// The harmful letter inside a cluster of harmless ones.
-		{dir: "make-flag-cluster", wantFail: true, wantText: "carries -i"},
-		{dir: "make-file-elsewhere", wantFail: true, wantText: "different makefile"},
-		{dir: "make-directory", wantFail: true, wantText: "changes directory"},
-		// The command hidden inside a quoted sub-shell.
-		{dir: "make-wrapped-shell", wantFail: true, wantText: "inside the quoted script"},
-		// Buried after an `&&` in a multi-line script.
-		{dir: "make-multiline-chain", wantFail: true, wantText: "--keep-going"},
-		// Split off the command by a line continuation.
-		{dir: "make-line-continuation", wantFail: true, wantText: "--dry-run"},
-		// The same reach, through `env:` at each of the three levels.
-		{dir: "step-env-makeflags", wantFail: true, wantText: "sets makeflags"},
-		{dir: "job-env-makeflags", wantFail: true, wantText: "job-level env sets makeflags"},
-		{dir: "workflow-env-makeflags", wantFail: true, wantText: "workflow-level env sets gnumakeflags"},
-		{dir: "job-env-makefiles", wantFail: true, wantText: "sets makefiles"},
-		// A `run:` this guard cannot read is a FAILURE, not a skip: otherwise an
-		// unbalanced quote would be a way to hide the argv from check 8b.
-		{dir: "untokenisable-run", wantFail: true, wantText: "cannot be tokenised as shell"},
-		// The ANCHOR heuristic is deliberately WIDER than the tokeniser: a bare
-		// `make` token in a COMMENT still demands the anchor. Over-demanding
-		// fails closed; under-demanding does not. This pins that property.
+		{dir: "anchor-missing", wantFail: true, wantText: "not immediately preceded by"},
+		{dir: "anchor-after-make", wantFail: true, wantText: "not immediately preceded by"},
+		{dir: "anchor-conditional", wantFail: true, wantText: "the anchor step before 'make ci' carries ['if']"},
+		{dir: "anchor-continue-on-error", wantFail: true, wantText: "continue-on-error"},
+		{dir: "anchor-not-adjacent", wantFail: true, wantText: "not immediately preceded by"},
+		{dir: "needs-leg-unanchored", wantFail: true, wantText: "needs:cache-matrix-leg"},
 		{dir: "make-in-comment-needs-anchor", wantFail: true, wantText: "with no make-integrity-guard step before it"},
-
-		// ------------------------------------------------------------------
-		// Sweep B1: the CHECKED SET is floor ∪ required (PR#6 VERIFY, FINDING 6).
-		// ------------------------------------------------------------------
-		// A lane that is REQUIRED but absent from FLOOR_LANES used to get one
-		// line — "ok … resolves to a job" — while carrying continue-on-error,
-		// an unanchored `make -i ci` and no pull_request trigger.
-		{dir: "required-not-floor", wantFail: true, wantText: "'extra-lane'"},
-
-		// Sweep B1, check 9: the INTEGRATION suite needs a make-free invocation
-		// too (PR#6 VERIFY, FINDING 2).
-		{dir: "no-direct-integration-lane", wantFail: true, wantText: "runs the integration suite directly"},
-
-		// Sweep B1, check 10: a lane that checks out says which tree it stood
-		// in (PR#6 VERIFY, FINDING 4).
+		{dir: "defaults-shell-workflow", wantFail: true, wantText: "defaults.run"},
+		{dir: "defaults-shell-job", wantFail: true, wantText: "defaults.run"},
+		{dir: "job-container", wantFail: true, wantText: "container:"},
+		{dir: "service-image-unpinned", wantFail: true, wantText: "is not digest-pinned"},
+		{dir: "job-env-makeflags", wantFail: true, wantText: "job-level env sets makeflags"},
+		{dir: "job-env-makefiles", wantFail: true, wantText: "job-level env sets makefiles"},
+		{dir: "job-env-path", wantFail: true, wantText: "job-level env sets path"},
+		{dir: "job-env-bash-env", wantFail: true, wantText: "job-level env sets bash_env"},
+		{dir: "workflow-env-makeflags", wantFail: true, wantText: "workflow-level env sets gnumakeflags"},
+		{dir: "make-flag-override", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-var-override", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-var-override-after-target", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-env-prefix", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-env-command", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-flag-long-abbrev", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-flag-cluster", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-file-elsewhere", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-directory", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-wrapped-shell", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-jobs-optarg-swallow", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-load-optarg-swallow", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-export-makeflags", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-export-gnumakeflags", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-path-shadow", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-shell-function", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-backtick", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-multiline-chain", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-line-continuation", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "untokenisable-run", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "make-step-conditional", wantFail: true, wantText: "carries ['if']"},
+		{dir: "make-step-working-directory", wantFail: true, wantText: "carries ['working-directory']"},
+		{dir: "make-step-custom-shell", wantFail: true, wantText: "carries ['shell']"},
+		{dir: "make-step-env", wantFail: true, wantText: "carries ['env']"},
+		{dir: "make-step-timeout", wantFail: true, wantText: "carries ['timeout-minutes']"},
+		{dir: "make-indirect-variable", wantFail: true, wantText: "does not run required invocation(s) ['make ci']"},
+		{dir: "make-indirect-default", wantFail: true, wantText: "does not run required invocation(s) ['make ci']"},
+		{dir: "no-direct-test-lane", wantFail: true, wantText: "runs the unit suite directly from a pinned body"},
+		{dir: "no-direct-integration-lane", wantFail: true, wantText: "runs the integration suite directly from a pinned body"},
+		{dir: "direct-lane-without-report", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "direct-lane-without-exit-rc", wantFail: true, wantText: "not byte-equal to any entry"},
+		{dir: "direct-lane-conditional", wantFail: true, wantText: "direct test step"},
 		{dir: "no-provenance", wantFail: true, wantText: "has no scripts/provenance.sh step"},
 		{dir: "provenance-conditional", wantFail: true, wantText: "provenance step conditional"},
+		{dir: "required-not-floor", wantFail: true, wantText: "'extra-lane'"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {
+			// Each fixture is independent and only READ, and each spawns a python or
+			// shell process; serially they doubled this package's time under -race.
+			t.Parallel()
 			base := filepath.Join("scripts", "testdata", "guard", tc.dir)
 			out, code := run(t, "ci-required-guard.sh",
 				"--workflows", filepath.Join(base, "workflows"),
@@ -266,8 +243,10 @@ func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
 		// been satisfied by the unit lane alone.
 		"the unit suite runs directly, without make",
 		"the integration suite runs directly, without make",
-		// Checks 8b and 10, reported rather than merely not-failed.
-		"carry no no-op flag, no variable override and no MAKEFLAGS-family env",
+		// Checks 8b, 8c and 10, reported rather than merely not-failed. A check
+		// that silently stopped running prints nothing at all.
+		"are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor",
+		"runs all 3 required invocation(s) for 'build-test'",
 		"runs scripts/provenance.sh after checking out",
 	} {
 		if !strings.Contains(out, want) {
@@ -328,6 +307,9 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {
+			// Each fixture is independent and only READ, and each spawns a python or
+			// shell process; serially they doubled this package's time under -race.
+			t.Parallel()
 			out, code := run(t, "make-integrity-guard.sh",
 				"--root", filepath.Join("scripts", "testdata", "makeguard", tc.dir),
 				"--targets", "ci")
@@ -441,6 +423,18 @@ func TestGoTestReportFixtures(t *testing.T) {
 		{dir: "integration-good", suite: "integration", wantFail: false},
 		{dir: "integration-package-emptied", suite: "integration", wantFail: true,
 			wantText: "internal/integration executed 0 test(s)"},
+
+		// PR#9 VERIFY, FINDING 7. A whole-suite floor does not detect ONE package
+		// disappearing: with 1047 unit tests against a floor of 900, twelve of
+		// fourteen packages fit inside the headroom. Here the emptied package's
+		// tests are inside the suite headroom too, so the suite floor is met and
+		// only the PER-PACKAGE floor makes it red.
+		{dir: "unit-package-emptied", suite: "unit", floors: "floors-two-packages.json",
+			wantFail: true, wantText: "internal/other executed 0 test(s)"},
+		// And a package that RAN with no floor at all: nobody would notice its
+		// absence next time, so it is refused until a floor is recorded for it.
+		{dir: "package-with-no-floor", suite: "unit", wantFail: true,
+			wantText: "executed tests with no recorded floor"},
 	}
 	for _, tc := range cases {
 		name := tc.dir + "/" + tc.suite
@@ -448,6 +442,9 @@ func TestGoTestReportFixtures(t *testing.T) {
 			name += "/" + tc.floors
 		}
 		t.Run(name, func(t *testing.T) {
+			// Each fixture is independent and only READ, and each spawns a python or
+			// shell process; serially they doubled this package's time under -race.
+			t.Parallel()
 			base := filepath.Join("scripts", "testdata", "gotest")
 			floors := tc.floors
 			if floors == "" {
@@ -539,9 +536,19 @@ func TestTheRepositoryFloorsAreUsable(t *testing.T) {
 	// The integration suite is a superset of the unit suite, so without a
 	// per-package floor its whole-suite number says nothing about the
 	// integration tests themselves.
-	if len(doc.Suites["integration"].MinPackageTests) == 0 {
-		t.Error("the integration suite has no min_package_tests, so emptying internal/integration " +
-			"would still clear its whole-suite floor")
+	for _, suite := range []string{"unit", "integration"} {
+		if len(doc.Suites[suite].MinPackageTests) < 10 {
+			t.Errorf("suite %q records per-package floors for only %d package(s). A whole-suite "+
+				"floor does not detect ONE package disappearing — twelve of fourteen unit packages "+
+				"fit inside the headroom (PR#9 VERIFY, FINDING 7) — so EVERY package carries one.",
+				suite, len(doc.Suites[suite].MinPackageTests))
+		}
+		for pkg, floor := range doc.Suites[suite].MinPackageTests {
+			if floor < 1 {
+				t.Errorf("suite %q: package %q has a floor of %d; a floor of zero is not a floor",
+					suite, pkg, floor)
+			}
+		}
 	}
 }
 
@@ -570,6 +577,12 @@ func TestAssertRuntimeImageFixtures(t *testing.T) {
 		// THE finding. A failed `docker run` is a FAILED ASSERTION, never a
 		// clean image — nothing looked inside it.
 		{stub: "broken", wantFail: true, wantText: "the container did not run"},
+		// PR#9 VERIFY, FINDING 5. `broken` fails EVERY probe including the middle
+		// dpkg one, which had no outer `|| true`, so main's inline shape exits 125
+		// against it — not 0, as my first D6 transcript claimed. This stub fails
+		// only probes 1 and 3, the two whose results that shape swallowed, and is
+		// what actually reproduces main's EXIT=0. The NEW script is red against it.
+		{stub: "broken-probes-1-3", wantFail: true, wantText: "the container did not run"},
 		// And the assertions still catch what they were always for.
 		{stub: "has-toolchain", wantFail: true, wantText: "carries build tooling"},
 		{stub: "has-src", wantFail: true, wantText: "source tree is still in the runtime image"},
@@ -580,6 +593,9 @@ func TestAssertRuntimeImageFixtures(t *testing.T) {
 	root := repoRoot(t)
 	for _, tc := range cases {
 		t.Run(tc.stub, func(t *testing.T) {
+			// Each fixture is independent and only READ, and each spawns a python or
+			// shell process; serially they doubled this package's time under -race.
+			t.Parallel()
 			cmd := exec.Command(filepath.Join(root, "scripts", "assert-runtime-image.sh"), "vizra-core:ci")
 			cmd.Dir = root
 			cmd.Env = append(os.Environ(),

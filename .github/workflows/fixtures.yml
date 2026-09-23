@@ -124,6 +124,11 @@ jobs:
       # The lane itself: regenerate into a scratch directory and compare every
       # byte, the generator's own source digest, the committed codec inputs and
       # both toolchain pins against the committed manifest.
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
       - name: Reproduce the manifest byte-identically
         run: make fixtures-verify
 

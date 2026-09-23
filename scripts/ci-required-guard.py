@@ -69,88 +69,78 @@ or `MAKEFLAGS += -i` — makes every recipe exit 0 without running
 (PR#6 VERIFY, FINDING 1). No check written inside a Makefile can prevent
 either; these say the out-of-make controls are present and armed.
 
-CHECK 8b — HOW A `run:` IS READ, AND WHAT IS REFUSED
-----------------------------------------------------
-The anchor (check 8) runs `make -pn` in its OWN process and reads its OWN
-environment. It cannot see the argv or the `env:` of a DIFFERENT workflow step.
-So this check reads the step's `run:` text itself.
+CHECK 8b/8c — DEFAULT-DENY ON THE SHAPE, NOT A BLACKLIST OF SHELL
+-----------------------------------------------------------------
+The anchor (check 8) runs `make -pn` in its OWN process. It cannot see the argv
+or the `env:` of a DIFFERENT workflow step.
 
-It is read as SHELL TEXT, not grepped:
+Sweep B1 answered that by reading the step's `run:` as shell and refusing a
+blacklist of flags, `VAR=value` overrides and `env:` names. A verifier then
+found THIRTEEN spellings that left both guards green (PR#9 VERIFY, § 3b):
+`make -j -i ci` and `make -l -i ci` (the `-i` eaten as `-j`'s optional
+argument, which getopt only accepts attached), `export MAKEFLAGS=-i` on the
+line above, a `$GITHUB_ENV`/`$GITHUB_PATH` write by an earlier step,
+`M=make; $M -i ci`, `${MAKE:-make}`, a shell function named `make`, a PATH
+shadow, backticks, a step-level `if:`, `working-directory:`, and
+`shell: bash -c '{0} || true'`.
 
-  * line continuations (`\` + newline) are joined first;
-  * each line is tokenised with `shlex` (POSIX mode, `#` comments stripped,
-    quotes honoured) and split on `;`, `&&`, `||`, `|`, `(`, `)`;
-  * in each command, the first token that IS `make` (or `gmake`, or a path
-    ending `/make`) starts the make argv;
-  * a token before it of the form `VAR=value` is a shell environment prefix —
-    refused only for the MAKEFLAGS family, because `CGO_ENABLED=1 make build`
-    is legitimate and `MAKEFLAGS=-i make ci` is not. `env VAR=… make` and
-    `command make` land on the same rule, since the assignment is still a token
-    before `make`;
-  * a token in the make argv of the form `VAR=value` is a make VARIABLE
-    OVERRIDE and is refused whatever its name and WHEREVER it sits, before or
-    after the target — `make SHELL=/usr/bin/true ci` and `make ci SHELL=…` are
-    the same thing to make;
-  * short flags are read as CLUSTERS (`-ik`, `-kn`), with the GNU
-    argument-taking letters (`CfIjloWE`) consuming their argument;
-  * long options are matched BY PREFIX, because GNU make accepts any
-    unambiguous abbreviation: `--ign`, `--dry` and `--touch` are all refused;
-  * a quoted token that itself contains a make command is re-read, so
-    `bash -c "make -i ci"` and `sh -c 'make MAKEFLAGS=-i ci'` are refused too
-    (three levels deep, then it is reported rather than parsed).
+A blacklist over arbitrary shell CANNOT be exhaustive — the shell has unbounded
+ways to name a command — so the control was inverted:
 
-Refused flags, each because it makes the recipes stop being the gate:
-`-i`/`--ignore-errors`, `-k`/`--keep-going`, `-t`/`--touch`,
-`-q`/`--question`, `-n`/`--dry-run`/`--just-print`/`--recon`,
-`-e`/`--environment-overrides`, `-f`/`--file`/`--makefile`, `-C`/`--directory`,
-`-o`/`--old-file`/`--assume-old`, `-W`/`--what-if`/`--new-file`/`--assume-new`.
-`-j`, `-s`, `-B`, `-r`, `-R`, `--no-print-directory` and `--warn-undefined-
-variables` are NOT refused: none of them stops a recipe failing.
+  8b  A step in a checked lane whose `run:` mentions `make` at all (the wide,
+      fail-closed classifier below decides that, a token in a comment included)
+      must be BYTE-EQUAL to a literal in .github/pinned-steps.yml after
+      trimming one trailing newline, may carry no key but `name`/`run`/`id`,
+      and must be IMMEDIATELY preceded by the anchor step — which must itself
+      carry no key but those. No flags, no overrides, no chains, one invocation
+      per step. Every one of the thirteen fails this by construction, because
+      every one changes the bytes or adds a key.
 
-Refused `env:` names, at step, job and workflow level, on a job that invokes
-make: MAKEFLAGS, GNUMAKEFLAGS, MFLAGS, MAKEFILES, SHELL. MAKEFILES makes make
-read extra makefiles the integrity guard never saw. SHELL is refused belt-and-
-braces: GNU make does not import SHELL from the environment (it is the one
-variable that is never taken from it), so this one is defence in depth rather
-than a live hole, and it is listed here so nobody later reads its presence as
-evidence that the hole exists.
+  8c  The lane must actually RUN the invocations pinned-steps.yml records for
+      it, byte-equal. Pinning a shape does not stop a step being DELETED or
+      replaced by one that reaches make through an indirection no classifier
+      can see. This is the positive half, and it does not care what replaced
+      them.
 
-The ANCHOR heuristic stays FAIL-CLOSED and is deliberately WIDER than the
-tokeniser: a bare `make` token anywhere in a `run:` — a comment included —
-makes the step count as a make step that needs an anchor. When the regex says
-"make step" and the tokeniser finds no make COMMAND, the step is reported as
-parsed-but-not-a-command rather than passed silently. If a `run:` cannot be
-tokenised at all (unbalanced quotes), that is a FAILURE, not a skip.
+Adjacency is what makes the anchor's environment assertions mean anything: a
+`$GITHUB_ENV` or `$GITHUB_PATH` write applies to LATER steps, so with a step in
+between, the anchor would inspect a clean environment and make would run in a
+poisoned one.
 
-WHAT CHECKS 8, 8b, 9 AND 10 DO NOT GIVE YOU
---------------------------------------------
-This list is meant to be EXHAUSTIVE. If you find something that belongs on it
-and is not here, that is a defect in this docstring, not a detail.
+`timeout-minutes` is refused on these steps too. Not because it is dangerous —
+it can only make a step fail sooner — but because nothing here uses one, and an
+unused key is surface for no benefit.
 
-  * **A wrapper script that calls make is not read.** `run: ./scripts/x.sh`
-    where `x.sh` runs `make -i ci` carries no `make` token, so it is not even
-    classified as a make step: no anchor is demanded and no argv is checked.
-    REVIEW-ONLY. The same is true of a `Makefile` recipe that shells out.
-  * **`uses:` is not read.** A step that runs a composite action — including a
-    local `./.github/actions/…` — can invoke make with any flags. Its argv is
-    in the action's own `action.yml`, which this guard does not open.
-    REVIEW-ONLY.
-  * **A reusable workflow (`jobs.<id>.uses:`) is not followed.** Such a job has
-    no `steps:` here at all, so checks 4, 8, 8b and 10 have nothing to read; it
-    would still have to resolve to a check name (check 2) and would be reported
-    as having no steps. REVIEW-ONLY.
-  * **`defaults.run.shell` is refused, but `shell:` on an individual step is
-    not** — a step-level `shell: python` on a make step would make the `run:`
-    text not a shell script at all. It is still tokenised and still anchored, so
-    this fails closed toward refusing, not toward passing.
-  * **Check 9 asserts a lane INVOKES the suites, not that they passed with a
-    non-empty selection.** The executed-test floor and the skip allowlist live
-    in `scripts/go-test-report.py`, which is the step's own assertion, not this
-    guard's.
-  * The guard, the workflows, `scripts/go-test-report.py` and this file are all
-    checked out from the pull request under test and can be edited in it — every
-    such edit is visible in the diff, and CODEOWNERS is **advisory only** until
-    the owner's ruleset exists (it currently returns 403 on their plan).
+The tokeniser that used to be the control is KEPT, but it decides nothing: it
+only adds a friendlier sentence to a red.
+
+WHAT THESE CHECKS ARE, AND WHAT THEY ARE NOT
+---------------------------------------------
+They are DEFAULT-DENY on the shape and surroundings of make steps and direct
+test steps in floor lanes. That is the whole claim. This list is deliberately
+not called exhaustive: the previous one was, and thirteen things were missing
+from it.
+
+  * They do not constrain what any OTHER step does to the machine. A checked
+    lane may contain arbitrary `run:` steps and `uses:` actions, and through
+    them anything at all before the anchor runs — replacing the Go toolchain,
+    rewriting the Makefile or the test files on disk, installing a different
+    python3. The anchor observes what its own assertions cover and nothing
+    else. REVIEW is the control for that, and CODEOWNERS is ADVISORY until the
+    owner's ruleset exists (it currently returns 403 on their plan).
+  * A wrapper script or composite action that calls make is not read: it
+    carries no `make` token on the workflow line. Check 8c bounds the damage —
+    the required invocations must still be present — but a lane may run one in
+    addition.
+  * A reusable workflow (`jobs.<id>.uses:`) has no `steps:` here at all, so
+    checks 4, 8, 8b, 8c, 9 and 10 have nothing to read.
+  * The pins, the floors and the skip allowlist are committed files. Widening
+    .github/pinned-steps.yml is a visible, reviewed diff in a file whose only
+    purpose is to be a gate — the same posture as FLOOR_LANES. It is not
+    prevented; it is made visible.
+  * A `run:` this guard cannot tokenise is a FAILURE, not a skip.
+  * This file, the workflows, go-test-report.py and test-floors.json are all
+    checked out from the pull request under test and can be edited in it.
 
 Usage:
     ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE]
@@ -472,53 +462,141 @@ def env_problems(scope: str, env) -> list[str]:
     return out
 
 
-def check_make_command_lines(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
-    """Check 8b: the make step's own argv and environment.
+# --- the pinned-shape control (sweep B1 round 2) ----------------------------
 
-    Only a job that actually invokes make is judged: a lane with no make step
-    has no MAKEFLAGS hazard, and refusing its `env:` would be noise.
+STEP_KEYS_ALLOWED = {"name", "run", "id"}
+# Environment names that reach into make, or into the shell that runs it.
+# PATH is here because a stub `make` earlier on PATH is a complete bypass;
+# BASH_ENV/ENV because a non-interactive shell sources them and can define a
+# `make` function before the recipe is ever reached.
+DANGEROUS_ENV_NAMES = {
+    "MAKEFLAGS", "GNUMAKEFLAGS", "MFLAGS", "MAKEFILES",
+    "SHELL", "PATH", "BASH_ENV", "ENV",
+}
+
+
+def trim_one_newline(text: str) -> str:
+    return text[:-1] if text.endswith("\n") else text
+
+
+def load_pins(path: Path) -> tuple[list[str], list[str]]:
+    """The committed allowlist of `run:` bodies. Missing or empty is a FAILURE."""
+    if not path.exists():
+        raise SystemExit(
+            f"ci-required-guard: {path} is missing. It is the allowlist that makes a floor "
+            f"lane's make step and direct test step default-deny; without it there is no gate."
+        )
+    doc = yaml.safe_load(path.read_text()) or {}
+    make_steps = [trim_one_newline(x) for x in (doc.get("make_steps") or [])]
+    direct = [trim_one_newline(x) for x in (doc.get("direct_test_steps") or [])]
+    required_inv = {
+        str(k): [trim_one_newline(x) for x in (v or [])]
+        for k, v in (doc.get("required_invocations") or {}).items()
+    }
+    unknown = {b for bodies in required_inv.values() for b in bodies} - set(make_steps)
+    if unknown:
+        raise SystemExit(
+            f"ci-required-guard: {path} requires invocation(s) {sorted(unknown)} that are not in "
+            f"make_steps, so they could never satisfy check 8b."
+        )
+    if not make_steps or not direct or not required_inv:
+        raise SystemExit(
+            f"ci-required-guard: {path} lists no make_steps, direct_test_steps or "
+            f"required_invocations. "
+            f"An empty allowlist would refuse everything or assert nothing."
+        )
+    return make_steps, direct, required_inv
+
+
+def extra_keys(step: dict) -> list[str]:
+    return sorted(k for k in step if str(k) not in STEP_KEYS_ALLOWED)
+
+
+def env_problems(scope: str, env) -> list[str]:
+    if not isinstance(env, dict):
+        return []
+    return [
+        f"{scope} env sets {key}: {value!r}"
+        for key, value in env.items()
+        if str(key).strip().upper() in DANGEROUS_ENV_NAMES
+    ]
+
+
+def check_pinned_make_steps(g: Guard, lane: str, path: Path, doc, job: dict, pins: list[str]) -> None:
+    """Check 8b: a make step's SHAPE, default-deny.
+
+    This does not parse flags. A step in a checked lane whose `run:` mentions
+    `make` at all — the wide, fail-closed ANCHOR classifier decides that, a
+    token in a comment included — must be BYTE-EQUAL to one of the literals in
+    .github/pinned-steps.yml, and may carry no keys but name/run/id.
+
+    The tokeniser that used to be the control is kept ONLY to add a friendlier
+    sentence to the red; it decides nothing.
     """
     steps = [s for s in (job.get("steps") or []) if isinstance(s, dict)]
-    make_steps = [(i, s) for i, s in enumerate(steps) if step_runs_make(s)]
+    make_steps = [(i, s) for i, s in enumerate(steps) if step_runs_make(s) and not step_is_the_anchor(s)]
     if not make_steps:
         return
 
     failed_here = False
     for i, step in make_steps:
         label = step.get("name") or f"step {i}"
-        run = step.get("run") or ""
-        try:
-            problems, found = make_command_line_problems(run)
-        except TokeniseError as exc:
+        body = trim_one_newline(step.get("run") or "")
+        if body not in pins:
+            detail = []
+            try:
+                problems, _ = make_command_line_problems(step.get("run") or "")
+                detail = [f"(for what it is worth: {p})" for p in problems[:2]]
+            except TokeniseError:
+                detail = ["(and its `run:` cannot even be tokenised as shell)"]
             g.fail(
-                f"checked lane {lane!r} ({path.name}) has a `make` step {label!r} whose `run:` "
-                f"cannot be tokenised as shell: {exc}",
-                "This guard must read a make step's command line. A `run:` it cannot parse is a",
-                "FAILURE, not a skip — otherwise unbalanced quotes would be a way to hide the argv.",
+                f"checked lane {lane!r} ({path.name}) step {label!r} mentions `make` but its `run:` "
+                f"is not byte-equal to any entry in .github/pinned-steps.yml.",
+                f"got: {body!r}",
+                *detail,
+                "A floor lane's make step is DEFAULT-DENY on its whole body: no flags, no variable",
+                "overrides, no chains, no indirection, one invocation per step. Thirteen spellings",
+                "defeated the flag-parsing version of this check, so the bytes are the control now.",
+                "If this invocation is legitimate, add it to .github/pinned-steps.yml in a reviewed diff.",
             )
             failed_here = True
-            continue
-        if problems:
+        extra = extra_keys(step)
+        if extra:
             g.fail(
-                f"checked lane {lane!r} ({path.name}) step {label!r} no-ops `make` from the "
-                f"WORKFLOW LINE:",
-                *problems,
-                "The make-integrity anchor cannot see this: it runs its own `make -pn` and reads its",
-                "own environment, never another step's argv. One word here silences every",
-                "make-driven lane while both guards exit 0 (PR#6 VERIFY, FINDING 1).",
+                f"checked lane {lane!r} ({path.name}) make step {label!r} carries {extra}.",
+                "A make step may carry only `name`, `run` and `id`. `if:` skips it while the job stays",
+                "green; `env:` reaches make; `shell:` can discard its exit status; `working-directory:`",
+                "is `-C` by another name; `continue-on-error:` discards the failure. `timeout-minutes`",
+                "is refused too — not because it is dangerous (it can only make a step fail sooner) but",
+                "because nothing here uses it, and an unused key is surface for no benefit.",
             )
             failed_here = True
-        elif found == 0:
-            g.ok(
-                f"checked lane {lane!r} step {label!r}: `make` appears only in a comment or inside "
-                f"a word, not as a command — the anchor is still required (fail-closed)"
-            )
 
-        for problem in env_problems(f"step {label!r}", step.get("env")):
+        # ADJACENCY. The anchor must be the step IMMEDIATELY before this one, so
+        # that nothing can run in between and write MAKEFLAGS (or a stub `make`
+        # onto PATH) through $GITHUB_ENV / $GITHUB_PATH — those persist into
+        # LATER steps, so a non-adjacent anchor would observe a clean
+        # environment and make would not.
+        if i and step_is_the_anchor(steps[i - 1]):
+            anchor_extra = extra_keys(steps[i - 1])
+            if anchor_extra:
+                g.fail(
+                    f"checked lane {lane!r} ({path.name}) the anchor step before {label!r} carries "
+                    f"{anchor_extra}.",
+                    "The anchor may carry only `name`, `run` and `id`. An `if:` skips it, a",
+                    "`continue-on-error:` discards its verdict, an `env:` or `shell:` changes the very",
+                    "environment it exists to inspect — and it is the anchor ADJACENT to this make",
+                    "step that matters, not merely the first one in the job.",
+                )
+                failed_here = True
+        if i == 0 or not step_is_the_anchor(steps[i - 1]):
+            before = (steps[i - 1].get("name") if i else None) or (f"step {i - 1}" if i else "(nothing)")
             g.fail(
-                f"checked lane {lane!r} ({path.name}) {problem} on a `make` step.",
-                "make reads MAKEFLAGS/GNUMAKEFLAGS/MFLAGS from the environment as if they had been",
-                "typed on the command line, and MAKEFILES makes it read makefiles nothing scanned.",
+                f"checked lane {lane!r} ({path.name}) make step {label!r} is not IMMEDIATELY preceded "
+                f"by the {MAKE_INTEGRITY_GUARD} step; the step before it is {before!r}.",
+                "Any step between the anchor and make can write MAKEFLAGS to $GITHUB_ENV or a stub",
+                "`make` to $GITHUB_PATH, which GitHub applies to LATER steps only — so the anchor",
+                "would check a clean environment and make would run in a poisoned one.",
             )
             failed_here = True
 
@@ -526,16 +604,75 @@ def check_make_command_lines(g: Guard, lane: str, path: Path, doc, job: dict) ->
         for problem in env_problems(scope, (holder or {}).get("env")):
             g.fail(
                 f"checked lane {lane!r} ({path.name}) {problem}, and this job invokes `make`.",
-                "A job- or workflow-level env reaches every step, so it no-ops the make steps",
-                "without appearing on any of their lines.",
+                "It reaches every step, the anchor and the make steps included.",
             )
             failed_here = True
 
     if not failed_here:
         g.ok(
-            f"checked lane {lane!r}: {len(make_steps)} `make` step(s) carry no no-op flag, no "
-            f"variable override and no MAKEFLAGS-family env"
+            f"checked lane {lane!r}: {len(make_steps)} make step(s) are byte-equal to a pinned body, "
+            f"carry no key but name/run/id, and each is immediately preceded by the anchor"
         )
+
+
+def check_required_invocations(g: Guard, lane: str, path: Path, job_key: str, job: dict,
+                              required_inv: dict) -> None:
+    """Check 8c: the lane actually RUNS its gate invocations.
+
+    Pinning the shape of a make step stops one being turned into something else.
+    It does not stop one being DELETED, or replaced by a step that reaches make
+    through an indirection no classifier can see:
+
+        M=make ; $M -i ci        ${MAKE:-make} -i ci
+
+    Neither carries a `make` token, so neither is classified as a make step and
+    neither is pinned — but both leave the lane with no `make ci` step at all.
+    This is the positive assertion: what MUST be there, byte-equal. It closes
+    the indirection class for the gate invocations without parsing shell,
+    because it does not care what replaced them.
+    """
+    wanted = required_inv.get(job_key)
+    if not wanted:
+        return
+    bodies = {trim_one_newline(s.get("run") or "") for s in (job.get("steps") or []) if isinstance(s, dict)}
+    missing = [w for w in wanted if w not in bodies]
+    if missing:
+        g.fail(
+            f"checked lane {lane!r} ({path.name}) does not run required invocation(s) {missing}.",
+            ".github/pinned-steps.yml lists these as invocations this job MUST contain, byte-equal.",
+            "Deleting one, or replacing it with a step that reaches make through a variable, a",
+            "function, an alias or a PATH edit, leaves the gate uninvoked — and no amount of",
+            "reading the replacement's shell could tell you that.",
+        )
+    else:
+        g.ok(f"checked lane {lane!r} runs all {len(wanted)} required invocation(s) for {job_key!r}")
+
+
+def check_job_surroundings(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
+    """Checks that apply to a checked lane whether or not it invokes make."""
+    for scope, holder in (("workflow", doc or {}), ("job", job)):
+        defaults_run = ((holder or {}).get("defaults") or {}).get("run")
+        if defaults_run is not None:
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) sets a {scope}-level defaults.run: {defaults_run!r}.",
+                "It rewrites how EVERY `run:` step is executed — shell, working directory — so it",
+                "no-ops the anchor and every pinned step at once. Nothing here needs one.",
+            )
+    if job.get("container") is not None:
+        g.fail(
+            f"checked lane {lane!r} ({path.name}) runs in a job-level `container:` "
+            f"({job['container']!r}).",
+            "The whole lane would then execute inside an image this repository does not pin or",
+            "assert, with its own make, go and shell. Nothing here needs one.",
+        )
+    for name, svc in (job.get("services") or {}).items():
+        image = svc.get("image") if isinstance(svc, dict) else None
+        if isinstance(image, str) and "@sha256:" not in image:
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) service {name!r} image {image!r} is not "
+                f"digest-pinned.",
+                "A floating tag lets the database or cache this lane tests against change underneath it.",
+            )
 
 
 PROVENANCE = "provenance.sh"
@@ -680,54 +817,77 @@ def _needs_of(job: dict) -> list[str]:
 INTEGRATION_TAG = "-tags=integration"
 
 
-def check_direct_test_lane(g: Guard, required: list[str], jobs: dict) -> None:
-    """Check 9: a required lane runs BOTH suites over ./... without make.
+def check_direct_test_lane(g: Guard, required: list[str], jobs: dict, pins: list[str]) -> None:
+    """Check 9: a required lane runs BOTH suites without make, from a PINNED body.
 
     The anchor refuses a neutered Makefile BY NAME. This is the separate control
     for what the anchor cannot cover: whatever make did, a real failing test must
     still fail a required lane.
 
-    Before sweep B1 this asked only for a `go test ./...` with no make, which the
-    UNIT lane satisfied — so under any make evasion a failing INTEGRATION test
-    (the migrator against real PostgreSQL 18, the permanent Valkey/Redis-7.2
-    matrix ADR-001 Q-004 exists for) was silent, not red (PR#6 VERIFY, FINDING
-    2). Both suites are now required to have a make-free invocation.
-
-    Scope: this asserts the lane INVOKES each suite. The executed-test floor and
-    the skip allowlist are asserted by scripts/go-test-report.py, which is the
-    step's own assertion, not this guard's.
+    Why the body is pinned rather than pattern-matched. At main the step was a
+    bare `go test -race -count=1 ./...`, so a failing test failed it directly.
+    Sweep B1 replaced that with a script that CAPTURES `go test`'s status into
+    `$rc` in order to hand it to the report — and so deleting the single
+    `go-test-report.py` line left a planted `t.Fatal` exiting 0 while this check
+    still printed `ok` (PR#9 VERIFY, FINDING 6 — a regression against main). A
+    substring test cannot see that; byte-equality can. The pinned bodies end
+    `exit "$rc"`, so `go test`'s own failure fails the step even if the report
+    line were gone, and `|| exit 1` on the report makes its verdict fail the step
+    too.
     """
+    unit_pins = [p for p in pins if INTEGRATION_TAG not in p]
+    int_pins = [p for p in pins if INTEGRATION_TAG in p]
     found: dict[str, str] = {}
+
     for name in required:
         entry = jobs.get(name)
         if entry is None:
             continue
-        _, _, job = entry
-        for step in job.get("steps") or []:
-            if not isinstance(step, dict):
-                continue
+        path, _, job = entry
+        steps = [s for s in (job.get("steps") or []) if isinstance(s, dict)]
+        for i, step in enumerate(steps):
             run = step.get("run")
             if not isinstance(run, str):
                 continue
-            if "go test" not in run or MAKE_INVOCATION.search(run):
+            body = trim_one_newline(run)
+            if body in pins:
+                extra = extra_keys(step)
+                if extra:
+                    g.fail(
+                        f"required lane {name!r} ({path.name}) direct test step "
+                        f"{(step.get('name') or f'step {i}')!r} carries {extra}.",
+                        "A direct test step may carry only `name`, `run` and `id`, for the same reasons",
+                        "a make step may: `if:` skips it, `shell:` can discard its exit status.",
+                    )
+                    continue
+                kind = "integration" if INTEGRATION_TAG in body else "unit"
+                found.setdefault(kind, f"{name!r} step {(step.get('name') or i)!r}")
                 continue
-            if "./..." not in run:
-                continue
-            if "if" in step:
-                continue  # a conditional lane is not a floor
-            kind = "integration" if INTEGRATION_TAG in run else "unit"
-            found.setdefault(kind, f"{name!r}: {' '.join(run.split())[:110]!r}")
+            # A step that LOOKS like a direct suite invocation but is not pinned.
+            # Named separately so an edited body reds with the real reason rather
+            # than only through the "no required lane runs …" message below.
+            if "go test" in run and "./..." in run and not MAKE_INVOCATION.search(run):
+                g.fail(
+                    f"required lane {name!r} ({path.name}) step "
+                    f"{(step.get('name') or f'step {i}')!r} invokes `go test` over `./...` but its "
+                    f"`run:` is not byte-equal to any entry in .github/pinned-steps.yml.",
+                    f"got: {body!r}",
+                    "The direct test steps are DEFAULT-DENY on their whole body: the exit handling",
+                    "(`|| exit 1` on the report, `exit \"$rc\"` last) is what makes a failing test fail",
+                    "this lane, and a substring check cannot see it being removed.",
+                )
 
-    for kind in ("unit", "integration"):
-        if kind in found:
-            g.ok(f"the {kind} suite runs directly, without make, in required lane {found[kind]}")
+    for kind, kind_pins in (("unit", unit_pins), ("integration", int_pins)):
+        if not kind_pins:
+            g.fail(f".github/pinned-steps.yml has no {kind} direct-test body; nothing can satisfy check 9.")
+        elif kind in found:
+            g.ok(f"the {kind} suite runs directly, without make, from a pinned body in lane {found[kind]}")
         else:
             g.fail(
-                f"no required lane runs the {kind.upper()} suite directly; every {kind} test "
-                f"invocation goes through `make`.",
-                "A Makefile turned into a no-op would then make that suite SILENT rather than red,",
-                "and `ci-required` would be green with nothing tested. One lane must invoke",
-                f"`go test{' ' + INTEGRATION_TAG if kind == 'integration' else ''} ./...` itself.",
+                f"no required lane runs the {kind.upper()} suite directly from a pinned body; every "
+                f"{kind} test invocation goes through `make` or has been edited.",
+                "A Makefile turned into a no-op would then make that suite SILENT rather than red, and",
+                "`ci-required` would be green with nothing tested.",
             )
 
 
@@ -781,6 +941,7 @@ def main() -> int:
     ap.add_argument("--workflows", type=Path, default=root / ".github" / "workflows")
     ap.add_argument("--manifest", type=Path, default=root / ".github" / "required-checks.txt")
     ap.add_argument("--makefile", type=Path, default=root / "Makefile")
+    ap.add_argument("--pins", type=Path, default=root / ".github" / "pinned-steps.yml")
     ap.add_argument("--skip-makefile", action="store_true", help="for fixture runs that ship no Makefile")
     args = ap.parse_args()
 
@@ -805,6 +966,10 @@ def main() -> int:
     if not required:
         g.fail(f"{args.manifest} lists no checks; ci-required would pass with nothing verified")
         return 1
+
+    make_pins, direct_pins, required_inv = load_pins(args.pins)
+    g.ok(f"pinned-steps.yml: {len(make_pins)} make body(ies), {len(direct_pins)} direct-test "
+         f"body(ies), required invocations for {sorted(required_inv)}")
 
     workflows = load_workflows(args.workflows)
 
@@ -883,7 +1048,11 @@ def main() -> int:
         # job that actually invokes make unanchored while this printed ok.
         for label, entry2 in expand_needs(lane, path, doc, job, jobs_by_key):
             check_anchor(g, label, entry2[0], entry2[1], entry2[2])
-            check_make_command_lines(g, label, entry2[0], entry2[1], entry2[2])
+            check_pinned_make_steps(g, label, entry2[0], entry2[1], entry2[2], make_pins)
+            check_required_invocations(
+                g, label, entry2[0], job_display_name(label.split(":")[-1], entry2[2]),
+                entry2[2], required_inv)
+            check_job_surroundings(g, label, entry2[0], entry2[1], entry2[2])
             check_provenance(g, label, entry2[0], entry2[2])
 
         sites = continue_on_error_sites(job)
@@ -898,7 +1067,7 @@ def main() -> int:
             g.ok(f"checked lane {lane!r} carries no continue-on-error")
 
     # --- 9. one required lane that does not go through make -----------------
-    check_direct_test_lane(g, required, jobs)
+    check_direct_test_lane(g, required, jobs, direct_pins)
 
     # --- 5. the test selection the lanes actually run -----------------------
     if not args.skip_makefile:

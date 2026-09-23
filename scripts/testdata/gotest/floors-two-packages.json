@@ -1,0 +1,13 @@
+{
+  "_why": "The same fixture floors, but `internal/other` carries one too. It is the difference between a whole-suite floor and a per-package floor: the emptied package's tests are inside the suite headroom, so only the per-package floor makes it red (PR#9 VERIFY, FINDING 7).",
+  "suites": {
+    "unit": {
+      "min_tests": 4,
+      "min_package_tests": {
+        "github.com/yegamble/vizra-core/internal/thing": 4,
+        "github.com/yegamble/vizra-core/internal/other": 1
+      },
+      "allowed_skips": {}
+    }
+  }
+}

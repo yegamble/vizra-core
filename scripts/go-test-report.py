@@ -61,6 +61,12 @@ def main() -> int:
     ap.add_argument("--suite", required=True, help="the key in the floors file")
     ap.add_argument("--floors", type=Path, required=True)
     ap.add_argument(
+        "--emit-floors",
+        action="store_true",
+        help="print a min_package_tests block generated from this run, with modest headroom, "
+        "instead of judging it. This is how the committed floors are produced.",
+    )
+    ap.add_argument(
         "--go-exit-file",
         type=Path,
         help="a file holding `go test`'s own exit code. Its absence is a FAILURE: a lane "
@@ -194,6 +200,20 @@ def main() -> int:
     for pkg, _ in every:
         per_package[pkg] = per_package.get(pkg, 0) + 1
 
+    if args.emit_floors:
+        # A floor is not an expected count: it exists to catch a package being
+        # emptied, not to pin churn. 15% headroom, at least 2 tests of slack, and
+        # never below 1.
+        print(f'      "min_tests": {max(1, executed - max(5, round(executed * 0.15)))},')
+        print('      "min_package_tests": {')
+        rows = sorted(per_package.items())
+        for n, (pkg, count) in enumerate(rows):
+            floor_n = max(1, count - max(2, round(count * 0.15)))
+            comma = "" if n == len(rows) - 1 else ","
+            print(f'        "{pkg}": {floor_n}{comma}          // measured {count}')
+        print("      }")
+        return 0
+
     # --- the report, printed whatever the verdict ---------------------------
     print(f"go-test-report: suite {args.suite!r} from {args.events.name}")
     print(f"  packages ok:              {len(pkg_ok)}")
@@ -253,10 +273,25 @@ def main() -> int:
         if got < want:
             fail(
                 f"package {pkg} executed {got} test(s); its recorded floor is {want}.",
-                "This suite is a superset — emptying one package would barely move the whole-suite",
-                "count. This per-package floor is what makes that package's absence red.",
+                "A whole-suite floor does not detect ONE package disappearing: with 1047 unit tests",
+                "against a floor of 900, twelve of fourteen packages fit inside the headroom",
+                "(PR#9 VERIFY, FINDING 7). The per-package floor is what makes that red.",
             )
             problems += 1
+
+    # And a package that RAN with no recorded floor is a package whose absence
+    # nobody would notice next time. Adding one is a one-line reviewed diff.
+    unfloored = sorted(set(per_package) - set(min_package_tests))
+    if unfloored:
+        fail(
+            f"{len(unfloored)} package(s) executed tests with no recorded floor in "
+            f"{args.floors.name}: {unfloored}",
+            "Every package in a suite carries a floor, so that emptying any one of them is red",
+            "rather than absorbed by the whole-suite headroom. Add each with a modest floor:",
+            "  python3 scripts/go-test-report.py --events <events.json> --suite <name> \\",
+            "    --floors <file> --go-exit-file <file> --emit-floors",
+        )
+        problems += 1
 
     # --- 4. go test's own verdict ------------------------------------------
     if go_exit != 0 and not failed and not pkg_failed:

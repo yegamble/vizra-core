@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# fakedocker/broken-probes-1-3 — the stub that reproduces the REAL shape of the
+# defect PR#7's FINDING 1 recorded, and that PR#9's verifier corrected me on.
+#
+# `broken` fails EVERY probe, including the middle `dpkg-query` one. That middle
+# assertion had no `|| true` on the OUTER command substitution, so under the
+# step's own `set -euo pipefail` a failure there KILLED the step: main's inline
+# shape exits 125 against `broken`, not 0. My D6 transcript claimed 0. It was
+# wrong, and the number was stronger than the thing being demonstrated.
+#
+# This stub fails only probes 1 (toolchain) and 3 (/src) — the two whose results
+# main's shape swallowed — and succeeds on the dpkg probe. Against it, main's
+# step prints all three reassuring lines and exits 0, which is the defect:
+# assertions 1 and 3 each PASS on a docker failure.
+#
+# PR#7's FINDING 1 claimed exactly that — the step "prints 'no build tooling on
+# PATH' and PASSES" for that assertion — not that the whole step exits 0.
+set -u
+args="$*"
+case "$args" in
+  *"test -e /src"*)
+    echo "docker: Error response from daemon: no such image" >&2; exit 125 ;;
+  *dpkg-query*)
+    exit 0 ;;                       # the middle probe succeeds, printing nothing
+  *)
+    echo "docker: Error response from daemon: no such image" >&2; exit 125 ;;
+esac

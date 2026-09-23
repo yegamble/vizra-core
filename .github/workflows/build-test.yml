@@ -109,6 +109,13 @@ jobs:
 
   build-test:
     name: build-test
+    # Job-level, not step-level: a pinned make step and a pinned direct test
+    # step may carry no key but name/run/id, so their environment lives here
+    # where ci-required-guard checks it against the MAKEFLAGS/PATH/SHELL family.
+    env:
+      VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+      VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+      VIZRA_TEST_CACHE_FLAVOUR: valkey
     # GitHub-hosted ubuntu-24.04 is the clean target (ADR-009). The owner's
     # machine is arm64 and is not a substitute.
     runs-on: ubuntu-24.04
@@ -201,6 +208,11 @@ jobs:
       - name: go.mod and go.sum are tidy
         run: make tidy-check
 
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
       - name: make ci
         run: make ci
 
@@ -230,10 +242,17 @@ jobs:
           echo "go test (unit) exited $rc"
           python3 scripts/go-test-report.py \
             --events unit-events.json --suite unit \
-            --floors scripts/test-floors.json --go-exit-file unit-exit.txt
+            --floors scripts/test-floors.json --go-exit-file unit-exit.txt || exit 1
+          exit "$rc"
 
       - name: ci-required guard
         run: ./scripts/ci-required-guard.sh
+
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
 
       - name: Build all three entry points
         run: make build
@@ -271,17 +290,8 @@ jobs:
       # legs below, so nothing is traded away. It costs NO extra runtime: this
       # step replaces the recipe invocation that used to stand here.
       - name: Integration suite, invoked directly (no make), with counts
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: valkey
         run: |
           set -uo pipefail
-          # The same refusal the `test-integration` recipe carries: a lane whose
-          # services are absent is BLOCKED, never a pass. (Written without the
-          # bare word that names the build tool, so this step reads cleanly as a
-          # make-free invocation to ci-required-guard check 9 — its ANCHOR
-          # heuristic counts that word even inside a comment, by design.)
           if [ -z "${VIZRA_TEST_DATABASE_URL:-}" ]; then
             echo "::error::VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."
             exit 1
@@ -292,7 +302,8 @@ jobs:
           echo "go test (integration) exited $rc"
           python3 scripts/go-test-report.py \
             --events int-events.json --suite integration \
-            --floors scripts/test-floors.json --go-exit-file int-exit.txt
+            --floors scripts/test-floors.json --go-exit-file int-exit.txt || exit 1
+          exit "$rc"
 
       # The SAME suite in a random permutation. Verifier FINDING V-1 was an
       # order- and timing-dependent failure that the fixed source order exposed
@@ -300,10 +311,6 @@ jobs:
       # green, and at that point it has stopped being evidence. The seed is in
       # the log, so a failing permutation is reproducible with -shuffle=<seed>.
       - name: Integration suite, shuffled order, invoked directly (no make)
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: valkey
         run: |
           set -uo pipefail
           rc=0
@@ -312,7 +319,8 @@ jobs:
           echo "go test (integration, shuffled) exited $rc"
           python3 scripts/go-test-report.py \
             --events int-shuffle-events.json --suite integration \
-            --floors scripts/test-floors.json --go-exit-file int-shuffle-exit.txt
+            --floors scripts/test-floors.json --go-exit-file int-shuffle-exit.txt || exit 1
+          exit "$rc"
 
       # The machine-readable event streams the counts above were read from, so
       # a reviewer can re-derive them rather than trusting the summary. The
@@ -340,6 +348,13 @@ jobs:
   # Redis-using code, for the life of the project.
   cache-matrix-leg:
     name: cache-matrix-leg
+    # Job-level, not step-level: a pinned make step and a pinned direct test
+    # step may carry no key but name/run/id, so their environment lives here
+    # where ci-required-guard checks it against the MAKEFLAGS/PATH/SHELL family.
+    env:
+      VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+      VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+      VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -433,21 +448,18 @@ jobs:
         run: ./scripts/make-integrity-guard.sh
 
       - name: Integration tests against ${{ matrix.flavour }}
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration
 
       # See the shuffled step in build-test: order dependence is checked on
       # BOTH cache flavours, because an order-dependent failure that only
       # appears against one server is exactly the kind of thing this permanent
       # matrix exists to catch (ADR-001 Q-004).
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh
       - name: Integration tests against ${{ matrix.flavour }}, shuffled order
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration-shuffle
 
   # The aggregate. `ci-required` requires the context `cache-matrix`; GitHub
