@@ -1,55 +1,17 @@
-NOTE: attempt 2. Attempt 1 recorded UNIT_EXIT=1 from a 10-minute default-timeout panic in internal/fixtures (which does not import internal/ownerclaim) under host load; INT_EXIT was 0. Re-run with -timeout 1800s.
+src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
+# MUT-53 (review-only) re-measured against the closing slice's code
+# The previous measurement (at 95afb62, before classifyRefusal existed) is in this file's git history.
 
-/private/tmp/claude-501/-Users-yosefgamble-github-vizra/7321b930-95d2-4a95-ba2e-61ef2ce3c13c/scratchpad/m1a5-8g8TW6/mut53.sh: line 8: hdr: command not found
-before: 3070761ad2da8c39af857943e224cf74bfcd5ac0741f128d3123177c7d5c9064  internal/ownerclaim/ownerclaim.go
-after:  3c6c672831d17835c677ffe5f3b742633fa202cac81671f7cda94adfcbe4a4db  internal/ownerclaim/ownerclaim.go
---- the mutation ---
-diff --git a/internal/ownerclaim/ownerclaim.go b/internal/ownerclaim/ownerclaim.go
-index 85c7515..4792005 100644
---- a/internal/ownerclaim/ownerclaim.go
-+++ b/internal/ownerclaim/ownerclaim.go
-@@ -475,13 +475,6 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
- 
- 	// THE authoritative gate. The read-phase check above is an optimisation; this
- 	// one decides, inside the transaction that does the writing.
--	claimed, err = qtx.AnyUserExists(ctx)
--	if err != nil {
--		return Result{}, unavailable("checking claimed state", err)
--	}
--	if claimed {
--		return Result{}, ErrAlreadyClaimed
--	}
- 
- 	created, err := qtx.ClaimOwner(ctx, sqlcgen.ClaimOwnerParams{
- 		// The ROW'S OWN digest, never the presented value: attacker-controlled
---- end ---
-ok  	github.com/yegamble/vizra-core/cmd/api	1.733s
-?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
-?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
-ok  	github.com/yegamble/vizra-core/cmd/vizra	3.959s
-?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/audit	2.600s
-ok  	github.com/yegamble/vizra-core/internal/authz	2.173s
-?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/cache	3.121s
-ok  	github.com/yegamble/vizra-core/internal/config	3.451s
-ok  	github.com/yegamble/vizra-core/internal/credential	10.886s
-?   	github.com/yegamble/vizra-core/internal/db	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/doctor	3.966s
-ok  	github.com/yegamble/vizra-core/internal/fixtures	203.027s
-ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.000s
-ok  	github.com/yegamble/vizra-core/internal/httpapi	5.288s
-ok  	github.com/yegamble/vizra-core/internal/jobs	12.205s
-?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/obs	4.287s
-ok  	github.com/yegamble/vizra-core/internal/ownerclaim	4.230s
-ok  	github.com/yegamble/vizra-core/internal/search	4.011s
-ok  	github.com/yegamble/vizra-core/internal/site	2.879s
-?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
-?   	github.com/yegamble/vizra-core/migrations	[no test files]
-ok  	github.com/yegamble/vizra-core/scripts	18.124s
-UNIT_EXIT=0
-ok  	github.com/yegamble/vizra-core/internal/integration	180.169s
-INT_EXIT=0
-restored: 3070761ad2da8c39af857943e224cf74bfcd5ac0741f128d3123177c7d5c9064  internal/ownerclaim/ownerclaim.go
-tree clean after restore: yes
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  date: 2026-09-23T08:01:58Z  cache: valkey 9.1.2  db: PostgreSQL 18.6  shell: bash
+MUT-53: delete ONLY the in-transaction AnyUserExists gate in ownerclaim.Claim (the redeem statement's users guard stays)
+file sha256 before/after: (this line was garbled by a quoting defect in the wrapper;
+  recomputed afterwards by applying the same perl mutation to a COPY: before c4e72cbcdc5f8586..., after d8eb0689017748e8...;
+  the git diff --stat below, taken during the run, shows the 7-line deletion applied)
+ internal/ownerclaim/ownerclaim.go | 7 -------
+ 1 file changed, 7 deletions(-)
+$ go test -race -count=1 -tags=integration ./internal/integration/ ./internal/ownerclaim/ ./internal/httpapi/
+ok  	github.com/yegamble/vizra-core/internal/integration	125.381s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	2.415s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	4.790s
+exit=0  (0 = nothing reddened: the deletion is not observable, as declared)
+restored: c4e72cbcdc5f8586…  tree clean: yes

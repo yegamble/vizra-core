@@ -1,13 +1,9 @@
-# VZ-INSTALL-003 M1-A — make ci
-date:  2026-09-23T03:08:34Z
-host:  Darwin/arm64
-go:    go version go1.27.1 darwin/arm64
-src:   95afb6223b4ce6ca06ce3d13986a48ce35ea9458 (tree 8f591d8beeda905b8a261f6e947304435babf085)
-base:  5eb2829eb4f830206029f8e2a836f93a44a93a02 (origin/main)
-pg:    PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
-cache: valkey_version:9.1.2
-cmd:   make ci
+src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
+# make ci
 
+## The run that counts: make ci ALONE (nothing else of this builder's running)
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  date: 2026-09-23T06:35:23Z  load: 250.85 301.29 291.14
+$ make ci
 ==> fmt-check
   ok    all Go files are gofmt-clean
 ==> vet
@@ -26,13 +22,14 @@ migrate-lint: migrations
   ok    append-only manifest matches (10 migrations)
 migrate-lint: passed
 ==> config-template-check
-ok  	github.com/yegamble/vizra-core/internal/config	0.499s
+ok  	github.com/yegamble/vizra-core/internal/config	1.019s
 ==> openapi-verify
-ok  	github.com/yegamble/vizra-core/internal/httpapi	0.735s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.891s
 ==> sqlc-verify
   ok    internal/store/sqlcgen matches store/queries + migrations
 ==> ci-guard
 ci-required-guard:
+  ok    pinned-steps.yml: 8 make body(ies), 3 direct-test body(ies), required invocations for ['build-test', 'cache-matrix-leg', 'fixtures', 'govulncheck']
   ok    all 6 floor lane(s) are present and non-optional
   ok    required check 'append-only' resolves to a job
   ok    required check 'build-test' resolves to a job
@@ -40,26 +37,42 @@ ci-required-guard:
   ok    required check 'fixtures' resolves to a job
   ok    required check 'govulncheck' resolves to a job
   ok    required check 'docker-build' resolves to a job
-  ok    floor lane 'append-only' runs on pull_request
-  ok    floor lane 'append-only' invokes no `make`, so it needs no make-integrity anchor
-  ok    floor lane 'append-only' carries no continue-on-error
-  ok    floor lane 'build-test' runs on pull_request
-  ok    floor lane 'build-test' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
-  ok    floor lane 'build-test' carries no continue-on-error
-  ok    floor lane 'cache-matrix' runs on pull_request
-  ok    floor lane 'cache-matrix' invokes no `make`, so it needs no make-integrity anchor
-  ok    floor lane 'cache-matrix -> needs:cache-matrix-leg' runs the make-integrity-guard anchor (step 4) before `make` (step 5), unconditionally and without continue-on-error
-  ok    floor lane 'cache-matrix' carries no continue-on-error
-  ok    floor lane 'fixtures' runs on pull_request
-  ok    floor lane 'fixtures' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
-  ok    floor lane 'fixtures' carries no continue-on-error
-  ok    floor lane 'govulncheck' runs on pull_request
-  ok    floor lane 'govulncheck' runs the make-integrity-guard anchor (step 3) before `make` (step 4), unconditionally and without continue-on-error
-  ok    floor lane 'govulncheck' carries no continue-on-error
-  ok    floor lane 'docker-build' runs on pull_request
-  ok    floor lane 'docker-build' invokes no `make`, so it needs no make-integrity anchor
-  ok    floor lane 'docker-build' carries no continue-on-error
-  ok    required lane 'build-test' runs the suite directly, without make: 'go test -race -count=1 ./...'
+  ok    checked lane 'append-only' runs on pull_request
+  ok    checked lane 'append-only' invokes no `make`, so it needs no make-integrity anchor
+  ok    checked lane 'append-only' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'append-only' carries no continue-on-error
+  ok    checked lane 'build-test' runs on pull_request
+  ok    checked lane 'build-test' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
+  ok    checked lane 'build-test': 3 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'build-test' runs all 3 required invocation(s) for 'build-test'
+  ok    checked lane 'build-test' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'build-test' carries no continue-on-error
+  ok    checked lane 'cache-matrix' runs on pull_request
+  ok    checked lane 'cache-matrix' invokes no `make`, so it needs no make-integrity anchor
+  ok    checked lane 'cache-matrix' performs no checkout, so it needs no provenance step
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg' runs the make-integrity-guard anchor (step 4) before `make` (step 5), unconditionally and without continue-on-error
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg': 2 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg' runs all 2 required invocation(s) for 'cache-matrix-leg'
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'cache-matrix' carries no continue-on-error
+  ok    checked lane 'docker-build' runs on pull_request
+  ok    checked lane 'docker-build' invokes no `make`, so it needs no make-integrity anchor
+  ok    checked lane 'docker-build' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'docker-build' carries no continue-on-error
+  ok    checked lane 'fixtures' runs on pull_request
+  ok    checked lane 'fixtures' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
+  ok    checked lane 'fixtures': 2 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'fixtures' runs all 2 required invocation(s) for 'fixtures'
+  ok    checked lane 'fixtures' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'fixtures' carries no continue-on-error
+  ok    checked lane 'govulncheck' runs on pull_request
+  ok    checked lane 'govulncheck' runs the make-integrity-guard anchor (step 3) before `make` (step 4), unconditionally and without continue-on-error
+  ok    checked lane 'govulncheck': 1 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'govulncheck' runs all 1 required invocation(s) for 'govulncheck'
+  ok    checked lane 'govulncheck' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'govulncheck' carries no continue-on-error
+  ok    the unit suite runs directly, without make, from a pinned body in lane 'build-test' step 'Unit suite, invoked directly (no make), with counts'
+  ok    the integration suite runs directly, without make, from a pinned body in lane 'build-test' step 'Integration suite, invoked directly (no make), with counts'
   ok    the test-race lane selects the whole module (PKGS = ./...)
   ok    the test-race target uses $(PKGS)
   ok    all 2 -run selections are non-empty
@@ -68,7 +81,8 @@ ci-required-guard:
 ci-required-guard: passed (6 required check(s))
 make-integrity-guard: /Users/yosefgamble/github/vizra/.claude/worktrees/core-m1-owner-claim
   gate targets: ci, tidy-check, build, test-integration, test-integration-shuffle, fixtures, fixtures-verify, govulncheck
-  ok    the environment carries no MAKEFLAGS/GNUMAKEFLAGS that would disarm a recipe
+  ok    [local parity (allowlist)] every MAKEFLAGS/GNUMAKEFLAGS/MFLAGS word is one make exports itself; MAKEFILES/BASH_ENV/ENV unset; SHELL is a real shell
+  ok    `make` resolves to /usr/bin/make (type -t: file; real file /usr/bin/make, named make, in an approved system directory). This does not inspect the program's CONTENT: a forwarding stub planted there by an earlier step is outside what this guard can see.
   closure: 17 target(s); 9 reached through prerequisites (fmt-check, vet, lint-imports, migrate-lint, config-template-check, openapi-verify, sqlc-verify, ci-guard, test-race)
   ok    make read 1 makefile(s): Makefile
   ok    the root Makefile pins SHELL and .SHELLFLAGS to the approved values, and nothing else assigns them
@@ -89,6 +103,7 @@ make-integrity-guard: /Users/yosefgamble/github/vizra/.claude/worktrees/core-m1-
   ok    gate target `sqlc-verify` is defined exactly once (Makefile:89)
   ok    gate target `ci-guard` is defined exactly once (Makefile:103)
   ok    gate target `test-race` is defined exactly once (Makefile:157)
+  ok    [local parity] the environment may set these makefile variables: ['BUILT_AT', 'COMMIT', 'GO', 'GOFLAGS', 'RELEASE', 'SQLC']
   ok    `ci`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `ci`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `ci`: `.ONESHELL:` is not in effect
@@ -135,31 +150,66 @@ fixtures-verify: ok — 12 fixtures, 1791508 bytes, generator 1 (4ff582ba6959), 
   every fixture regenerated byte-identically, the generator source digest matches,
   the committed codec inputs match, and the toolchain is the pinned one.
 ==> test-race
-ok  	github.com/yegamble/vizra-core/cmd/api	1.766s
+ok  	github.com/yegamble/vizra-core/cmd/api	1.786s
 ?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
 ?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
-ok  	github.com/yegamble/vizra-core/cmd/vizra	4.483s
+ok  	github.com/yegamble/vizra-core/cmd/vizra	2.733s
 ?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/audit	3.817s
-ok  	github.com/yegamble/vizra-core/internal/authz	2.574s
+ok  	github.com/yegamble/vizra-core/internal/audit	4.958s
+ok  	github.com/yegamble/vizra-core/internal/authz	3.602s
 ?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/cache	2.225s
-ok  	github.com/yegamble/vizra-core/internal/config	3.420s
-ok  	github.com/yegamble/vizra-core/internal/credential	14.924s
+ok  	github.com/yegamble/vizra-core/internal/cache	3.106s
+ok  	github.com/yegamble/vizra-core/internal/config	4.024s
+ok  	github.com/yegamble/vizra-core/internal/credential	15.377s
 ?   	github.com/yegamble/vizra-core/internal/db	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/doctor	3.137s
-ok  	github.com/yegamble/vizra-core/internal/fixtures	287.102s
-ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.016s
-ok  	github.com/yegamble/vizra-core/internal/httpapi	5.631s
-ok  	github.com/yegamble/vizra-core/internal/jobs	19.384s
+ok  	github.com/yegamble/vizra-core/internal/doctor	4.465s
+ok  	github.com/yegamble/vizra-core/internal/fixtures	408.280s
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.260s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	6.290s
+ok  	github.com/yegamble/vizra-core/internal/jobs	15.744s
 ?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/obs	4.179s
-ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.929s
-ok  	github.com/yegamble/vizra-core/internal/search	4.098s
-ok  	github.com/yegamble/vizra-core/internal/site	3.494s
+ok  	github.com/yegamble/vizra-core/internal/obs	4.583s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	4.271s
+ok  	github.com/yegamble/vizra-core/internal/search	4.459s
+ok  	github.com/yegamble/vizra-core/internal/site	3.194s
 ?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
 ?   	github.com/yegamble/vizra-core/migrations	[no test files]
-ok  	github.com/yegamble/vizra-core/scripts	32.373s
+ok  	github.com/yegamble/vizra-core/scripts	42.043s
 
 make ci: all lanes passed
-CI_EXIT=0
+exit=0
+end: 2026-09-23T06:42:44Z  load: 175.16 203.83 243.67
+
+## Attempt 1 (recorded, not counted), on the pre-commit working tree while a 200x stress run was also going: exit 2 — every lane ok except test-race, where internal/fixtures panicked on the 10-minute default timeout (TestManifestDetectsEveryClassOfDrift) at host load ~300
+==> fmt-check
+==> vet
+==> lint-imports
+==> migrate-lint
+==> config-template-check
+ok  	github.com/yegamble/vizra-core/internal/config	0.619s
+==> openapi-verify
+ok  	github.com/yegamble/vizra-core/internal/httpapi	1.047s
+==> sqlc-verify
+==> ci-guard
+==> fixtures-verify
+==> test-race
+ok  	github.com/yegamble/vizra-core/cmd/api	3.553s
+ok  	github.com/yegamble/vizra-core/cmd/vizra	5.032s
+ok  	github.com/yegamble/vizra-core/internal/audit	2.715s
+ok  	github.com/yegamble/vizra-core/internal/authz	3.187s
+ok  	github.com/yegamble/vizra-core/internal/cache	7.202s
+ok  	github.com/yegamble/vizra-core/internal/config	4.894s
+ok  	github.com/yegamble/vizra-core/internal/credential	53.346s
+ok  	github.com/yegamble/vizra-core/internal/doctor	3.873s
+panic: test timed out after 10m0s
+FAIL	github.com/yegamble/vizra-core/internal/fixtures	602.779s
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.634s
+ok  	github.com/yegamble/vizra-core/internal/httpapi	13.046s
+ok  	github.com/yegamble/vizra-core/internal/jobs	37.715s
+ok  	github.com/yegamble/vizra-core/internal/obs	5.294s
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	1.695s
+ok  	github.com/yegamble/vizra-core/internal/search	3.344s
+ok  	github.com/yegamble/vizra-core/internal/site	3.871s
+ok  	github.com/yegamble/vizra-core/scripts	67.483s
+FAIL
+exit=2

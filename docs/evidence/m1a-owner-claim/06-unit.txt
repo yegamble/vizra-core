@@ -1,36 +1,50 @@
-# VZ-INSTALL-003 M1-A — unit suite without make
-date:  2026-09-23T03:20:21Z
-host:  Darwin/arm64
-go:    go version go1.27.1 darwin/arm64
-src:   95afb6223b4ce6ca06ce3d13986a48ce35ea9458 (tree 8f591d8beeda905b8a261f6e947304435babf085)
-base:  5eb2829eb4f830206029f8e2a836f93a44a93a02 (origin/main)
-pg:    PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
-cache: valkey_version:9.1.2
-cmd:   go test -race -count=1 ./...
+src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
+# Unit suite, invoked exactly as build-test's direct step (no make), judged by scripts/go-test-report.py
 
-ok  	github.com/yegamble/vizra-core/cmd/api	1.871s
-?   	github.com/yegamble/vizra-core/cmd/fixturegen	[no test files]
-?   	github.com/yegamble/vizra-core/cmd/loadcorpusgen	[no test files]
-ok  	github.com/yegamble/vizra-core/cmd/vizra	3.014s
-?   	github.com/yegamble/vizra-core/cmd/worker	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/audit	3.459s
-ok  	github.com/yegamble/vizra-core/internal/authz	2.383s
-?   	github.com/yegamble/vizra-core/internal/buildinfo	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/cache	4.013s
-ok  	github.com/yegamble/vizra-core/internal/config	4.946s
-ok  	github.com/yegamble/vizra-core/internal/credential	21.646s
-?   	github.com/yegamble/vizra-core/internal/db	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/doctor	3.616s
-ok  	github.com/yegamble/vizra-core/internal/fixtures	373.742s
-ok  	github.com/yegamble/vizra-core/internal/healthcheck	4.030s
-ok  	github.com/yegamble/vizra-core/internal/httpapi	5.781s
-ok  	github.com/yegamble/vizra-core/internal/jobs	23.542s
-?   	github.com/yegamble/vizra-core/internal/migrate	[no test files]
-ok  	github.com/yegamble/vizra-core/internal/obs	4.451s
-ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.986s
-ok  	github.com/yegamble/vizra-core/internal/search	4.100s
-ok  	github.com/yegamble/vizra-core/internal/site	7.918s
-?   	github.com/yegamble/vizra-core/internal/store/sqlcgen	[no test files]
-?   	github.com/yegamble/vizra-core/migrations	[no test files]
-ok  	github.com/yegamble/vizra-core/scripts	45.262s
-UNIT_EXIT=0
+## Attempt 2 (counts: go test exit 0, report exit 0)
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T07:37:02Z  load: 176.87 225.53 250.50
+$ go test -race -count=1 -json ./... > unit-events.json; python3 scripts/go-test-report.py --events unit-events.json --suite unit --floors scripts/test-floors.json --go-exit-file unit-exit.txt
+go test (unit) exited 0
+go-test-report: suite 'unit' from unit-events.json
+  packages ok:              17
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1184  (floor: 943)
+    top-level:              233
+    passed:                 1184
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+  github.com/yegamble/vizra-core/cmd/api: 1 test(s) (floor: 1)
+  github.com/yegamble/vizra-core/cmd/vizra: 12 test(s) (floor: 8)
+  github.com/yegamble/vizra-core/internal/audit: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/authz: 502 test(s) (floor: 427)
+  github.com/yegamble/vizra-core/internal/cache: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/config: 101 test(s) (floor: 82)
+  github.com/yegamble/vizra-core/internal/credential: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/doctor: 39 test(s) (floor: 33)
+  github.com/yegamble/vizra-core/internal/fixtures: 42 test(s) (floor: 36)
+  github.com/yegamble/vizra-core/internal/healthcheck: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 26)
+  github.com/yegamble/vizra-core/internal/jobs: 30 test(s) (floor: 26)
+  github.com/yegamble/vizra-core/internal/obs: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/ownerclaim: 19 test(s) (floor: 16)
+  github.com/yegamble/vizra-core/internal/search: 129 test(s) (floor: 110)
+  github.com/yegamble/vizra-core/internal/site: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/scripts: 189 test(s) (floor: 161)
+go-test-report: ok — 1184 test(s) executed across 17 package(s), 0 unexpected skips, floor 943 met
+report exit=0
+
+## Attempt 1 (recorded, not counted): go test exit 1 — internal/fixtures hit the 10-minute default timeout at host load ~300; 0 failed, 0 skipped elsewhere
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T06:43:15Z  load: 191.61 204.66 242.56
+go test (unit) exited 1
+  packages ok:              16
+  packages failed:          1
+  packages [no test files]: 8
+  tests executed:           1155  (floor: 943)
+    failed:                 0
+    skipped:                0
+::error::go-test-report: package github.com/yegamble/vizra-core/internal/fixtures FAILED with no failing test — a build or a panic before the harness ran.
+::error::go-test-report: package github.com/yegamble/vizra-core/internal/fixtures executed 13 test(s); its recorded floor is 36.
+         against a floor of 900, twelve of fourteen packages fit inside the headroom
+report exit=1

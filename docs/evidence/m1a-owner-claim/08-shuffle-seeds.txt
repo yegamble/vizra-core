@@ -1,0 +1,179 @@
+src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
+# Shuffled integration runs with RECORDED seeds (go test -v prints the seed per package)
+
+## shuffle-ci-seed-valkey
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T07:30:54Z  load: 158.92 272.63 271.05
+cache: valkey 9.1.2 (CI run 35814919455 failed on the valkey leg with this seed)
+$ go test -race -count=1 -shuffle=1790134723139270269 -tags=integration -v ./...
+exit=0
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/cmd/api	1.859s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/cmd/vizra	2.703s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/audit	2.118s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/authz	3.128s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/cache	3.790s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/config	2.675s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/credential	26.787s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.849s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/fixtures	354.983s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	3.096s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/httpapi	6.560s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/integration	202.831s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/jobs	25.838s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/obs	2.719s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.307s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/search	2.965s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/site	1.417s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/scripts	46.458s
+top-level PASS: 337  FAIL: 0  SKIP (any level): 0  PASS incl. subtests: 1349
+the race test under this seed:
+--- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation (34.76s)
+    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/read_committed (13.44s)
+    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/repeatable_read (10.47s)
+    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable (10.84s)
+
+## shuffle-seed-20260923
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T07:13:43Z  load: 188.56 156.90 212.51
+cache: valkey
+$ go test -race -count=1 -shuffle=20260923 -tags=integration -v ./...
+exit=0
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/cmd/api	2.259s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/cmd/vizra	3.335s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/audit	3.617s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/authz	2.600s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/cache	4.533s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/config	4.589s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/credential	48.089s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.977s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/fixtures	527.071s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	3.282s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/httpapi	8.632s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/integration	322.371s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/jobs	36.039s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/obs	4.243s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	2.790s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/search	4.366s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/internal/site	1.762s
+-test.shuffle 20260923
+ok  	github.com/yegamble/vizra-core/scripts	70.934s
+top-level PASS: 337  FAIL: 0  SKIP (any level): 0  PASS incl. subtests: 1349
+
+## shuffle-seed-424242
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T07:22:48Z  load: 312.35 280.90 253.65
+cache: valkey
+$ go test -race -count=1 -shuffle=424242 -tags=integration -v ./...
+exit=0
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/cmd/api	1.984s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/cmd/vizra	3.564s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/audit	2.791s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/authz	2.272s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/cache	4.450s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/config	3.452s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/credential	33.241s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/doctor	3.443s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/fixtures	438.677s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	3.650s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/httpapi	7.384s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/integration	305.685s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/jobs	28.881s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/obs	2.593s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	3.207s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/search	3.172s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/internal/site	1.633s
+-test.shuffle 424242
+ok  	github.com/yegamble/vizra-core/scripts	60.436s
+top-level PASS: 337  FAIL: 0  SKIP (any level): 0  PASS incl. subtests: 1349
+
+## CI's seed on Redis (recorded, not counted): internal/integration ok; internal/fixtures hit the 10-minute default timeout at host load ~300
+HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  cache: redis 7.2.16  db: PostgreSQL 18.6  date: 2026-09-23T06:14:30Z
+$ go test -race -count=1 -shuffle=1790134723139270269 -tags=integration -v ./...   (CI run 35814919455's failing seed)
+exit=1
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/cmd/api	1.816s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/cmd/vizra	2.422s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/audit	3.727s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/authz	2.904s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/cache	3.384s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/config	4.016s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/credential	37.345s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/doctor	2.582s
+-test.shuffle 1790134723139270269
+FAIL	github.com/yegamble/vizra-core/internal/fixtures	601.632s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/healthcheck	3.369s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/httpapi	7.337s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/integration	322.530s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/jobs	25.432s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/obs	4.734s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	4.490s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/search	3.495s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/internal/site	1.444s
+-test.shuffle 1790134723139270269
+ok  	github.com/yegamble/vizra-core/scripts	41.182s
+FAIL
+top-level PASS: 325  FAIL: 0  SKIP: 0  all PASS lines (incl. subtests): 1317

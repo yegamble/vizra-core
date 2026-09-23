@@ -2,17 +2,17 @@
 
 | File | What it is |
 |---|---|
-| `01-integration-pg18.txt` | the integration suite, `-race`, verbose, on real PostgreSQL 18.6 and Valkey 9.1.2 |
+| `01-integration-pg18.txt` | the integration suite exactly as `build-test`'s direct step runs it (`go test -race -count=1 -tags=integration -json ./...` + `scripts/go-test-report.py`) on PostgreSQL 18.6 and Valkey 9.1.2, plus `internal/integration`'s verbose per-test results |
 | `02-mutations.txt` | every mutation demonstration: RED under one controlled mutation, GREEN when reverted |
-| `03-shuffle.txt` | the integration slice again under `-shuffle=on`, so no test depends on another's leftovers |
+| `03-shuffle.txt` | `make test-integration-shuffle` on Valkey and on Redis, so no test depends on another's leftovers |
 | `04-make-ci.txt` | `make ci` (every `ci-required` floor lane that runs without Docker) |
-| `05-mut53-measurement.txt` | the measurement behind MUT-53's review-only status: the gate deleted, the whole unit and integration suites run, both exit 0. This is attempt 2 and says so: attempt 1's unit run panicked on the 10-minute default timeout in `internal/fixtures` (which does not import `internal/ownerclaim`) under host load, with integration exit 0 |
-| `06-unit.txt` | `go test -race -count=1 ./...` without make — what `build-test` runs directly |
+| `05-mut53-measurement.txt` | the measurement behind MUT-53's review-only status, RE-TAKEN against the closing slice's code: the in-transaction gate deleted, `internal/integration`, `internal/ownerclaim` and `internal/httpapi` run, exit 0. The earlier whole-suite measurement at `95afb62` is in this file's history |
+| `06-unit.txt` | the unit suite exactly as `build-test`'s direct step runs it (`-json` + `scripts/go-test-report.py`, floors enforced) |
 | `07-race-stress.txt` | closing slice: `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation` repeated with `-count`, on Valkey 9.1.2 and Redis 7.2.16, with and without CPU contention, plus the baseline at `655f46a` |
-| `08-shuffle-seeds.txt` | closing slice: `make test-integration-shuffle` re-run with fixed seeds, including CI's failing `1790134723139270269` |
+| `08-shuffle-seeds.txt` | closing slice: the shuffled integration suite with RECORDED seeds — CI's failing `1790134723139270269` on Valkey (the leg that failed), plus `20260923` and `424242` |
 | `demonstrate.sh` | the harness that produced `02-mutations.txt`, re-runnable by a verifier |
 
-Every transcript was produced on the tested tree recorded in its own `src:` header line. The pushed
+Every transcript was produced on the tested tree recorded in its own `src:` header line. Runs that failed for an environmental reason (the `internal/fixtures` 10-minute default timeout on a heavily loaded shared host) are kept in the transcript, labelled "recorded, not counted", beside the run that counts. The pushed
 commit is that tree plus these transcript files and nothing else (`git diff <src> <pushed> --stat`
 lists only `docs/evidence/m1a-owner-claim/`).
 
