@@ -258,6 +258,14 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 	c.JobTimeout = mustDuration(get, bad, "VIZRA_JOB_TIMEOUT")
 	c.ShutdownGrace = mustDuration(get, bad, "VIZRA_SHUTDOWN_GRACE")
 	c.OwnerClaimTTL = mustDuration(get, bad, "VIZRA_OWNER_CLAIM_TTL")
+	// A lower bound (sentinel S-0010). The TTL becomes a PostgreSQL interval,
+	// truncated to microseconds, so 500ns was accepted here and then failed
+	// owner_claim_tokens_ttl (expires_at > minted_at) on EVERY mint with a raw
+	// 23514; and a TTL of seconds is accepted but unusable — the operator has to
+	// copy the token out of a terminal and submit a form inside it.
+	if c.OwnerClaimTTL > 0 && c.OwnerClaimTTL < MinOwnerClaimTTL {
+		bad("VIZRA_OWNER_CLAIM_TTL", "must be at least "+MinOwnerClaimTTL.String())
+	}
 	c.OwnerClaimAnnounce = OwnerClaimAnnounce(strings.ToLower(get("VIZRA_OWNER_CLAIM_ANNOUNCE")))
 	switch c.OwnerClaimAnnounce {
 	case OwnerClaimAnnounceOff, OwnerClaimAnnounceStderr:
@@ -476,6 +484,9 @@ func splitList(v string) []string {
 	}
 	return out
 }
+
+// MinOwnerClaimTTL is the shortest VIZRA_OWNER_CLAIM_TTL config accepts.
+const MinOwnerClaimTTL = time.Minute
 
 func mustDuration(get func(string) string, bad func(string, string), key string) time.Duration {
 	raw := get(key)

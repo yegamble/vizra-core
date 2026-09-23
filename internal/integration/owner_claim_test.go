@@ -1408,18 +1408,25 @@ func TestARateLimitedClaimWritesNoAuditRow(t *testing.T) {
 	if limitedRequests < 5 {
 		t.Fatalf("only %d requests were rate limited; this test proves nothing", limitedRequests)
 	}
-	afterTransition := countRateLimited()
-	if afterTransition != 1 {
-		t.Fatalf("rate_limited rows after the transition = %d, want EXACTLY 1", afterTransition)
+	// One row per bucket per window (sentinel S-0004): 70 refusals from one
+	// origin cross BOTH failure buckets — per-origin at the 11th, global at the
+	// 61st — and each transition writes exactly one row naming its bucket. (This
+	// asserted "exactly 1 row" in total while one site-wide marker was shared by
+	// both buckets and every row said {"bucket":"failure"}.)
+	if got := rateLimitedRows(t, e); got["per_origin"] != 1 || got["global"] != 1 || len(got) != 2 {
+		t.Fatalf("rate_limited rows by bucket after the transitions = %v, want EXACTLY {per_origin: 1, global: 1}", got)
 	}
 
-	// Ten times more traffic must not add a second row.
+	// Ten times more traffic must not add a second row for any bucket. It does
+	// cross the claim route's hard ceiling (600 per window), which is a third
+	// bucket with its own single row.
 	refusedBefore := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
 	for i := 0; i < 600; i++ {
 		e.post(t, validBody(strings.Repeat("h", 64)), nil)
 	}
-	if got := countRateLimited(); got != 1 {
-		t.Fatalf("rate_limited rows after 600 more requests = %d, want still exactly 1", got)
+	if got := rateLimitedRows(t, e); got["per_origin"] != 1 || got["global"] != 1 || got["ceiling.claim"] != 1 || len(got) != 3 {
+		t.Fatalf("rate_limited rows by bucket after 600 more requests = %v, want still exactly one per bucket: "+
+			"{per_origin: 1, global: 1, ceiling.claim: 1}", got)
 	}
 	refusedAfter := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
 	if refusedAfter != refusedBefore {

@@ -173,7 +173,7 @@ run_case MUT-19 "change the audit actor FK to NO ACTION" \
 
 run_case MUT-11b "write an audit row for every refusal, including rate-limited ones" \
   "$HND" 'TestARateLimitedClaimWritesNoAuditRow' "$INT" \
-  perl -0pi -e 's/\t\tif s\.claimLimitTransition\(c\) \{\n\t\t\ts\.recordClaimRateLimited\(c, "failure"\)\n\t\t\}/\t\ts.recordClaimRefusal(c, audit.ReasonTokenNotAccepted)/' "$HND"
+  perl -0pi -e 's/\t\tfor _, bucket := range limited \{\n\t\t\ts\.auditRateLimited\(c, bucket\)\n\t\t\}/\t\ts.recordClaimRefusal(c, audit.ReasonTokenNotAccepted)/' "$HND"
 
 # --- the ip_prefix writer ----------------------------------------------------
 run_case MUT-10 "mask IPv4 to /32 instead of /24" \
@@ -201,9 +201,9 @@ run_case MUT-8 "remove the MaxBytesReader body bound" \
   "$HND" 'TestClaimBodyLimitAppliesToAChunkedRequest' "$INT" \
   perl -0pi -e 's/body := http\.MaxBytesReader\(c\.Response\(\), req\.Body, claimBodyLimitBytes\)/body := req.Body/' "$HND"
 
-run_case MUT-25 "allow unknown JSON fields (drop DisallowUnknownFields)" \
+run_case MUT-25 "allow unknown JSON fields (ignore a key the schema does not define)" \
   "$HND" 'TestClaimRefusesAnUnknownField' "$INT" \
-  perl -0pi -e 's/\tdec\.DisallowUnknownFields\(\)\n//' "$HND"
+  perl -0pi -e 's/\t\tfield, ok := claimOwnerFields\[key\]\n\t\tif !ok \{\n\t\t\treturn in, newCodedError\(http\.StatusBadRequest, "bad_request",\n\t\t\t\t"the request body is not the expected JSON object"\)\n\t\t\}/\t\tfield, ok := claimOwnerFields[key]\n\t\tif !ok {\n\t\t\tcontinue\n\t\t}/' "$HND"
 
 run_case MUT-26 "drop the Origin / Sec-Fetch-Site posture check" \
   "$HND" 'TestClaimRefusesACrossOriginRequest' "$INT" \
@@ -211,7 +211,7 @@ run_case MUT-26 "drop the Origin / Sec-Fetch-Site posture check" \
 
 run_case MUT-15 "spend failure budget on success too" \
   "$HND" 'TestAValidTokenIsNeverRateLimitedByTheFailureLimiter' "$INT" \
-  perl -0pi -e 's/\tpool, err := s\.poolFor\(c\)\n\tif err != nil \{\n\t\treturn newCodedError\(http\.StatusServiceUnavailable, "unavailable",\n\t\t\t"the instance state could not be read"\)\n\t\}\n\n\tresult, err := ownerclaim\.Claim/\tpool, err := s.poolFor(c)\n\tif err != nil {\n\t\treturn newCodedError(http.StatusServiceUnavailable, "unavailable",\n\t\t\t"the instance state could not be read")\n\t}\n\tif s.consumeClaimFailure(c) {\n\t\treturn newCodedError(http.StatusTooManyRequests, "rate_limited", "too many attempts")\n\t}\n\n\tresult, err := ownerclaim.Claim/' "$HND"
+  perl -0pi -e 's/(\t\treturn s\.unavailable\(c, "resolving the site.s database pool", err\)\n\t\}\n)/$1\tif len(s.consumeClaimFailure(c)) > 0 {\n\t\treturn newCodedError(http.StatusTooManyRequests, "rate_limited", "too many attempts")\n\t}\n/' "$HND"
 
 # --- the structural unclaimed guard ------------------------------------------
 run_case MUT-12 "add a route without classifying it" \
@@ -271,11 +271,11 @@ run_case MUT-30 "stamp minted_at from the application clock" \
 
 run_case MUT-33 "serve claim-status from the uncached path again" \
   "$HND" 'TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed' "$INT" \
-  perl -0pi -e 's/\tclaimed, err := s\.instanceClaimed\(c\)\n\tif err != nil \{\n\t\treturn newCodedError\(http\.StatusServiceUnavailable, "unavailable",\n\t\t\t"the instance state could not be read"\)\n\t\}\n\ts\.claimed\.set/\tclaimed, err := s.lookupClaimed(c)\n\tif err != nil {\n\t\treturn newCodedError(http.StatusServiceUnavailable, "unavailable",\n\t\t\t"the instance state could not be read")\n\t}\n\ts.claimed.set/' "$HND"
+  perl -0pi -e 's/\tclaimed, err := s\.instanceClaimed\(c\)(\n\tif err != nil \{\n(?:\t\t\/\/[^\n]*\n)*\t\treturn s\.unavailable\(c, "claim-status)/\tclaimed, err := s.lookupClaimed(c)$1/' "$HND"
 
 run_case MUT-34 "take the hard ceiling off the claim-status route" \
   "$HND" 'TestClaimStatusIsBoundedByTheHardCeiling' "$INT" \
-  perl -0pi -e 's/\tif !s\.allowSetupRequest\(c, "ceiling\.status", claimStatusCeiling\) \{\n\t\treturn newCodedError\(http\.StatusTooManyRequests, "rate_limited",\n\t\t\t"too many requests to the setup endpoint; try again shortly"\)\n\t\}\n//' "$HND"
+  perl -0pi -e 's/\tif !s\.allowSetupRequest\(c, bucketCeilingStatus, claimStatusCeiling\) \{\n\t\ts\.auditRateLimited\(c, bucketCeilingStatus\)\n\t\treturn newCodedError\(http\.StatusTooManyRequests, "rate_limited",\n\t\t\t"too many requests to the setup endpoint; try again shortly"\)\n\t\}\n//' "$HND"
 
 run_case MUT-35 "compare origins as raw strings again" \
   "$HND" 'TestOriginsAreComparedNormalisedNotAsStrings' "$INT" \
@@ -293,7 +293,7 @@ run_case MUT-38 "loosen credentials_password_is_argon2id to accept anything" \
 
 run_case MUT-39 "audit every rate-limited request instead of the transition" \
   "$HND" 'TestARateLimitedClaimWritesNoAuditRow' "$INT" \
-  perl -0pi -e 's/\t\tif s\.claimLimitTransition\(c\) \{\n\t\t\ts\.recordClaimRateLimited\(c, "failure"\)\n\t\t\}/\t\ts.recordClaimRateLimited(c, "failure")/' "$HND"
+  perl -0pi -e 's/\t\tfor _, bucket := range limited \{\n\t\t\ts\.auditRateLimited\(c, bucket\)\n\t\t\}/\t\tfor _, bucket := range limited {\n\t\t\ts.recordClaimRateLimited(c, bucket)\n\t\t}/' "$HND"
 
 run_case MUT-40 "normalise the configured origin but not the request's" \
   "$CFG" 'TestLoadStoresTheNormalisedPublicOrigin' "./internal/config/" \
@@ -303,7 +303,7 @@ run_case MUT-40 "normalise the configured origin but not the request's" \
 
 run_case MUT-41 "collapse the two setup ceilings back into one shared bucket" \
   "$HND" 'TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket' "$UNI_API" \
-  bash -c "perl -0pi -e 's/s\.allowSetupRequest\(c, \"ceiling\.status\", claimStatusCeiling\)/s.allowSetupRequest(c, \"ceiling\", claimOwnerCeiling)/' $HND && perl -0pi -e 's/s\.allowSetupRequest\(c, \"ceiling\.claim\", claimOwnerCeiling\)/s.allowSetupRequest(c, \"ceiling\", claimOwnerCeiling)/' $HND"
+  perl -0pi -e 's/s\.allowSetupRequest\(c, bucketCeilingStatus, claimStatusCeiling\)/s.allowSetupRequest(c, "ceiling", claimOwnerCeiling)/; s/s\.allowSetupRequest\(c, bucketCeilingClaim, claimOwnerCeiling\)/s.allowSetupRequest(c, "ceiling", claimOwnerCeiling)/' "$HND"
 
 run_case MUT-42 "declare no 429 on getSetupClaimStatus" \
   api/openapi.yaml 'TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs' "$UNI_API" \
@@ -317,7 +317,7 @@ run_case MUT-43 "launder a failed claimed re-read into a token refusal" \
 
 run_case MUT-44 "drop the cause from the 503 log line" \
   "$HND" 'TestADatabaseOutageIsDiagnosableFromTheLog' "$INT" \
-  perl -0pi -e 's/\ts\.deps\.Logger\.Error\("http: the claim endpoint could not reach the database",\n\t\t"where", where,\n\t\t"error", obs\.Redact\(cause\.Error\(\)\),\n\t\t"request_id", requestIDOf\(c\)\)\n//' "$HND"
+  perl -0pi -e 's/\ts\.deps\.Logger\.Error\("http: the claim endpoint could not reach the database",\n\t\t"where", obs\.Redact\(where\),\n\t\t"error", obs\.Redact\(cause\.Error\(\)\),\n\t\t"request_id", obs\.Redact\(requestIDOf\(c\)\)\)\n//' "$HND"
 
 run_case MUT-45 "allow an origin that cannot be normalised" \
   "$HND" 'TestAnUnnormalisableOriginNeverMatches' "$UNI_API" \

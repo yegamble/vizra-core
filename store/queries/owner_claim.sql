@@ -39,6 +39,20 @@ SELECT token_sha256,
 -- thesis is that an invariant of this class belongs in the database, and a
 -- future owner-transfer or re-claim route is exactly where a Go-only guard
 -- breaks. Zero rows -> pgx.ErrNoRows -> the caller's existing ErrHasUsers.
+--
+-- That NOT EXISTS alone does NOT make it a property of the statement (sentinel
+-- S-0002, RULES R16): it is evaluated once, in the statement's snapshot. A
+-- re-mint that arrives while a claim holds the token row lock (its redeem has
+-- run, its COMMIT is pending) waits on that lock, saw no users in its snapshot,
+-- and — without the predicate below — then ran the DO UPDATE against the
+-- committed, CONSUMED row: a live token on a claimed instance, and the
+-- consumption record erased. The DO UPDATE's own WHERE is evaluated against the
+-- locked, LATEST row version after the wait, so a consumed row is left alone and
+-- the statement returns no row: pgx.ErrNoRows -> ErrHasUsers, as above.
+--
+-- A consumed row is terminal: only a claim consumes a token, and a claim creates
+-- the owner in the same transaction. A superseded or expired row is not, and
+-- re-minting it is exactly what `vizra claim-token` is for.
 INSERT INTO owner_claim_tokens (id, token_sha256, generation, expires_at)
 SELECT true, sqlc.arg('token_sha256')::bytea, 1, now() + sqlc.arg('ttl')::interval
  WHERE NOT EXISTS (SELECT 1 FROM users)
@@ -49,6 +63,7 @@ ON CONFLICT (id) DO UPDATE
        expires_at    = now() + sqlc.arg('ttl')::interval,
        consumed_at   = NULL,
        superseded_at = NULL
+ WHERE owner_claim_tokens.consumed_at IS NULL
 RETURNING generation, minted_at, expires_at;
 
 -- name: SupersedeLiveOwnerClaimToken :execrows
