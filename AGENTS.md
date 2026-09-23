@@ -119,10 +119,60 @@ kinds of step that carry the gate, and it does not read their shell at all:
    package**, because a whole-suite floor does not detect one package
    disappearing.
 
+#### make runs only on reviewed Makefile bytes (sweep B5)
+
+The anchor reads the Makefile database with `make -pn`, and GNU Make
+**evaluates** a makefile while reading it: `$(shell …)`, `$(file …)`, `!=`, `+`
+and `$(MAKE)` recipe lines, makefile-remake rules and `.SECONDEXPANSION`
+prerequisites all run during that read. One Makefile line could therefore run
+code DURING the anchor step and write `$GITHUB_ENV` for the next step after the
+anchor had passed (meta `docs/evidence/warroom/2026-09-23-anchor-preflight-DESK-REVIEW-security.md`,
+FINDING 4). A scanner over the text would have to re-implement make's parser; the
+chair ruled the control is the **bytes** (tick 132):
+
+- **`.github/pinned-makefiles.yml`** records the sha256 of every file make reads
+  — today only `Makefile`. The anchor, in BOTH modes, computes the digests
+  **before invoking make at all**, and on any mismatch it refuses with make
+  **not invoked** (it says so, and `scripts/testdata/spawn-recorder.py` proves
+  it by recording every process the anchor starts).
+- **What make will read is determined without running any makefile**: the root
+  `Makefile` (a `GNUmakefile` or `makefile` beside it — read INSTEAD by GNU make
+  — is refused), plus every literal `include`/`-include`/`sinclude`/`load` path
+  in the pinned bytes, transitively; each must be pinned and present. A computed
+  or out-of-repository name, and `$(eval …)`/`$(guile …)` (which could
+  manufacture a directive), are refused; MAKEFILES is refused and scrubbed. This
+  reading is sound **only because the bytes containing those directives are
+  themselves digest-pinned** — it reads REVIEWED text; a changed byte never
+  reaches it. It is not a defence against hostile text, and does not need to be.
+- make's **first** invocation is `make -q <each pinned makefile>`, which runs no
+  recipe, asking whether make would REMAKE one of them. Measured on GNU Make
+  3.81: with a newer sibling `Makefile.sh`, `make -pn ci` ran the builtin rule
+  `cat Makefile.sh >Makefile` and read the result — no makefile line needed.
+  Every later anchor make command names the pinned makefiles as goals, so `-n`
+  applies to them. After make has run, its own MAKEFILE_LIST must equal the
+  pinned set and the pinned bytes must be unchanged.
+- Every process the anchor starts gets an environment **without** `GITHUB_ENV`,
+  `GITHUB_PATH`, `GITHUB_OUTPUT`, `GITHUB_STATE`, `GITHUB_STEP_SUMMARY`, any other
+  variable whose value is a file in the runner's command-file directory,
+  MAKEFLAGS, MAKEFILES, BASH_ENV or ENV. And a failed environment check now
+  stops the anchor before make, where before it was reported and make ran anyway.
+- **`ci-required-guard.py` check 11** asserts the pin exists, has its one
+  accepted shape, is non-empty, pins `Makefile`, and matches — so a Makefile edit
+  without the paired pin update fails `ci-guard` and the direct suite BY NAME,
+  as well as every anchor. Update it in the same diff: `shasum -a 256 Makefile`.
+
+**The guarantee, exactly:** make runs only on Makefile bytes that were reviewed
+together with their pin. Those bytes are not inert — the reviewed
+`$(shell git rev-parse …)` and `$(shell date …)` at Makefile:22-23 run while make
+reads them, and the anchor's ok line lists every such site. **The residual is
+review:** a reviewer who approves a malicious Makefile together with its pin
+update defeats this control, and CODEOWNERS is advisory.
+
 `ci-required-guard.py` runs checks 3, 4, 8, 8b, 8c, 9 and 10 over
 `set(FLOOR_LANES) | set(required)` — the floor is not also the ceiling on what
-gets checked. It also refuses, on a checked lane, a job-level `container:`, a
-`defaults.run` at either scope, an undigested service image, and a
+gets checked — and check 11 over the Makefile pin. It also refuses, on a
+checked lane, a job-level `container:`, a `defaults.run` at either scope, an
+undigested service image, and a
 MAKEFLAGS/GNUMAKEFLAGS/MFLAGS/MAKEFILES/SHELL/PATH/BASH_ENV/ENV `env:` at job or
 workflow level.
 
@@ -148,6 +198,16 @@ What they **cannot** do:
   above (`GOTOOLCHAIN`, `GODEBUG`, `CGO_ENABLED`, …) is not refused. The
   per-package floors in the direct test steps still turn a suite that was made
   to run nothing red; anything subtler is review-only.
+- **The Makefile pin is only as good as the review of the pinned bytes.** It
+  moves the question from "can the anchor parse make?" to "did a human approve
+  these bytes?" and does not answer the second. The reviewed `$(shell …)` calls
+  run whatever `git`/`date` PATH resolves to, so a program planted on PATH by an
+  earlier step runs during the anchor (the first bullet's boundary). The
+  command-file scrub hides the variables' NAMES; a process that lists the
+  runner's `_runner_file_commands` directory can still find the files. And the
+  digest is taken at one moment: a process left running by an earlier step could
+  swap a file between the anchor's read and make's (the re-check after make
+  narrows, not closes, that window).
 - **The anchor checks what `make` IS, not what it DOES.** A real file named
   `make`, written into `/usr/local/bin` by an earlier step, that forwards the
   anchor's own `make -pn` and exits 0 otherwise, passes — and the anchor's log
@@ -174,10 +234,12 @@ What they **cannot** do:
 
 Every remaining claim above maps to a fixture or a table case that goes red:
 `scripts/testdata/guard/` (75), `scripts/testdata/gotest/` (12),
-`scripts/testdata/fakedocker/` (6), and the anchor's own environment in
-`TestMakeIntegrityGuardEnvironment` (both modes, one row per variable class) —
-all driven from the required `scripts` package. The review-only bullets above
-are the ones with no fixture, and they say so.
+`scripts/testdata/fakedocker/` (6), `scripts/testdata/makeguard/` (31, each with
+its own pin), `scripts/testdata/makefilepin/` (7, check 11), the byte mutations
+of the real tree in `scripts/makefiledigest_test.go`, and the anchor's own
+environment in `TestMakeIntegrityGuardEnvironment` (both modes, one row per
+variable class) — all driven from the required `scripts` package. The
+review-only bullets above are the ones with no fixture, and they say so.
 
 Read the guarantee at exactly that strength; the guard's own docstring states it
 the same way.
@@ -245,6 +307,7 @@ decision it protects.
 | A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
 | A lane that is REQUIRED but not on the FLOOR is checked like any other — trigger, continue-on-error, anchor adjacency, pinned make steps, required invocations, provenance | `ci-required-guard.py` runs checks 3, 4, 8, 8b, 8c and 10 over `set(FLOOR_LANES) \| set(required)`; fixture `scripts/testdata/guard/required-not-floor/` |
 | A one-line edit to the **Makefile or its includes**, and any edit to a workflow's own make line, cannot turn a required lane into a no-op | DEFAULT-DENY on the step's SHAPE, not a blacklist of shell spellings. The anchor, `./scripts/make-integrity-guard.sh --workflow`, is **pinned byte-equal** and must be the step IMMEDIATELY before every make step; in that pinned strict mode it refuses, in its own process, a set MAKEFLAGS family, any make recipe variable (MAKELEVEL, …), any variable the makefiles take from the environment (`GO`, `GOFLAGS`, …), MAKEFILES/BASH_ENV/ENV, and a `make` that is not a file named make in a system directory. `ci-required-guard.py` check **8b** requires each make step's `run:` to be **byte-equal** to a literal in `.github/pinned-steps.yml` with no key but name/run/id, refuses a look-alike anchor and a duplicate YAML key, and check **8c** requires the lane to actually RUN its recorded invocations. 75 fixtures under `scripts/testdata/guard/`, `TestMakeIntegrityGuardEnvironment`, plus `scripts/testdata/makeguard/`. **Residual (review-only): what another step does to the machine — a wrapper script, a forwarding `make` binary, a variable outside the anchor's list** |
+| make runs only on REVIEWED Makefile bytes: the anchor never evaluates a makefile (whose `$(shell …)` and friends run while make reads it) whose bytes do not match `.github/pinned-makefiles.yml`, and never lets make read or remake a file that is not pinned | `scripts/make-integrity-guard.py` `check_makefile_pin` (digests before any make), `static_read_set`, `check_no_pinned_makefile_would_be_remade` (`make -q`), the MAKEFILE_LIST corroboration and post-make re-hash; `clean_env` drops the runner command-file variables. `ci-required-guard.py` check 11. Fixtures `scripts/testdata/makeguard/` and `makefilepin/`; `TestMakefileDigestMutations` (one Makefile byte, an extra include, an included file's bytes, a deleted pin entry — each red with make not started, recorded), `TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe`, `TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles`. **Residual (review-only): a reviewer approving a malicious Makefile together with its pin update; CODEOWNERS is advisory** |
 | Whatever make did, a real failing test — UNIT **or INTEGRATION** — still fails a required lane | `ci-required-guard.py` check 9 requires a make-free unit AND integration `go test ./...` in a required lane, each **byte-equal to a pinned body**: the exit handling (`\|\| exit 1` on the report, `exit "$rc"` last) is what makes a failing test fail the step, and a substring check could not see it removed (PR#9 VERIFY, FINDING 6). Fixtures `no-direct-test-lane/`, `no-direct-integration-lane/`, `direct-lane-without-report/`, `direct-lane-without-exit-rc/` |
 | A test lane cannot pass having run NOTHING, one package cannot disappear inside the headroom, and its skip count is readable from the job log | the direct steps emit `go test -json`; `scripts/go-test-report.py` judges `go test`'s own exit code, names every failure and skip, fails on any skip not allowlisted by test name with a reason, and holds the count to committed floors in `scripts/test-floors.json` — whole-suite **and one per package, for every package in both suites** (PR#9 VERIFY, FINDING 7). 12 fixtures under `scripts/testdata/gotest/` |
 | An image assertion cannot pass on a `docker run` FAILURE | `scripts/assert-runtime-image.sh` captures and judges every `docker run` exit; `$DOCKER` is injectable, and `scripts/testdata/fakedocker/` drives it against six stub daemons — including `broken-probes-1-3`, which reproduces the shape where main's inline step printed all three reassuring lines and exited 0 |

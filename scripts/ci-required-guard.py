@@ -62,6 +62,17 @@ Checks, all of which must pass:
                   runs scripts/provenance.sh, unconditionally. A lane that
                   prints a SHA without saying which tree it stood in is the
                   shape of meta-PR3 FINDING 5.
+  11. MAKEFILE    .github/pinned-makefiles.yml exists, has its one accepted
+      PIN         shape, is non-empty, pins `Makefile`, and every digest in it
+                  matches the file's bytes. A Makefile edit without the paired
+                  pin update fails here BY NAME, as well as in every anchor.
+                  The anchor is what enforces the pin at runtime — it refuses to
+                  invoke make on unpinned bytes, because make EVALUATES a
+                  makefile while reading it (chair ruling, tick 132, on
+                  docs/evidence/warroom/2026-09-23-anchor-preflight-DESK-REVIEW-security.md
+                  FINDING 4). This check is the static half: the pin is
+                  present, well-formed and current in the tree under test.
+                  Skipped under --skip-makefile, which fixture runs use.
 
 Checks 8, 8b and 9 exist because every required lane here runs through `make`,
 and a verifier measured that ONE line in a Makefile — `SHELL := /usr/bin/true`
@@ -152,12 +163,17 @@ from it.
     .github/pinned-steps.yml is a visible, reviewed diff in a file whose only
     purpose is to be a gate — the same posture as FLOOR_LANES. It is not
     prevented; it is made visible.
+  * .github/pinned-makefiles.yml (check 11) is the same kind of file. It makes
+    make run only on Makefile bytes that were reviewed together with it; a
+    reviewer who approves a malicious Makefile AND its pin update defeats it.
+    Review is the control for what the Makefile says, and CODEOWNERS is
+    advisory.
   * A `run:` this guard cannot tokenise is a FAILURE, not a skip.
   * This file, the workflows, go-test-report.py and test-floors.json are all
     checked out from the pull request under test and can be edited in it.
 
 Usage:
-    ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE]
+    ci-required-guard.py [--workflows DIR] [--manifest FILE] [--makefile FILE] [--makefile-pins FILE]
 
 scripts/scripts_test.go drives it against scripts/testdata/guard/, which holds
 one crafted workflow per evasion, so the guard has negative cases of its own.
@@ -166,6 +182,7 @@ one crafted workflow per evasion, so the guard has negative cases of its own.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import shlex
 import sys
@@ -1046,6 +1063,78 @@ def check_makefile_selection(g: Guard, makefile: Path) -> None:
         g.ok(f"all {len(runs)} -run selections are non-empty")
 
 
+# Check 11. The SAME two expressions the anchor parses the pin with
+# (scripts/make-integrity-guard.py, PIN_HEADER_RE / PIN_ENTRY_RE): the pin is
+# read with PyYAML here AND held to that line shape, so the two readers can
+# never disagree about what is pinned. A quoted key YAML would accept is refused
+# by both.
+PIN_HEADER_RE = re.compile(r"^makefiles:[ \t]*$")
+PIN_ENTRY_RE = re.compile(r"^  ([A-Za-z0-9_][A-Za-z0-9._/-]*): ([0-9a-f]{64})[ \t]*$")
+
+
+def check_makefile_pin(g: Guard, pin_path: Path) -> None:
+    """Check 11: the Makefile digest pin exists, is well-formed, covers the Makefile and matches."""
+    root = pin_path.parent.parent
+    if not pin_path.exists():
+        g.fail(
+            f"{pin_path} is missing.",
+            "It pins the sha256 of every file make reads. Without it the workflow anchor refuses to run",
+            "make at all — and nothing records which Makefile bytes were reviewed.",
+        )
+        return
+    text = pin_path.read_text()
+    bad_lines = []
+    header = False
+    for n, line in enumerate(text.split("\n"), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        if not header and PIN_HEADER_RE.match(line):
+            header = True
+            continue
+        if not header or not PIN_ENTRY_RE.match(line):
+            bad_lines.append(f"{pin_path.name}:{n}: {line!r}")
+    if bad_lines:
+        g.fail(
+            f"{pin_path} is not in its one accepted shape (`makefiles:` then `  <path>: <64 hex>` lines):",
+            *bad_lines,
+        )
+        return
+    try:
+        doc = safe_load_strict(text)
+    except yaml.YAMLError as err:
+        g.fail(f"{pin_path} is not valid YAML: {err}")
+        return
+    pins = doc.get("makefiles") if isinstance(doc, dict) else None
+    if not isinstance(doc, dict) or set(doc) != {"makefiles"} or not isinstance(pins, dict) or not pins:
+        g.fail(f"{pin_path} pins no file. An empty pin would let make read anything, so the anchor refuses it.")
+        return
+    if "Makefile" not in pins:
+        g.fail(f"{pin_path} does not pin `Makefile`, the file make reads first.")
+        return
+    stale, names = [], []
+    for rel, want in sorted(pins.items()):
+        path = root / str(rel)
+        if not path.is_file():
+            stale.append(f"{rel}: pinned, but not a file in {root}")
+            names.append(str(rel))
+            continue
+        got = hashlib.sha256(path.read_bytes()).hexdigest()
+        if got != want:
+            stale.append(f"{rel}: sha256 {got}, pinned {want}")
+            names.append(str(rel))
+    if stale:
+        g.fail(
+            f"{', '.join(names)} changed without the paired update to {pin_path.name}:",
+            *stale,
+            "A Makefile edit must land together with its pin update, in the same reviewed diff:",
+            "  shasum -a 256 Makefile   (and every other pinned file)",
+            "The workflow anchor refuses to invoke make on these bytes, so every make lane is red too.",
+        )
+        return
+    g.ok(f"{pin_path.name} pins {len(pins)} makefile(s) ({', '.join(sorted(str(r) for r in pins))}), "
+         f"covers the Makefile, and every digest matches the tree")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     root = Path(__file__).resolve().parent.parent
@@ -1053,7 +1142,9 @@ def main() -> int:
     ap.add_argument("--manifest", type=Path, default=root / ".github" / "required-checks.txt")
     ap.add_argument("--makefile", type=Path, default=root / "Makefile")
     ap.add_argument("--pins", type=Path, default=root / ".github" / "pinned-steps.yml")
-    ap.add_argument("--skip-makefile", action="store_true", help="for fixture runs that ship no Makefile")
+    ap.add_argument("--makefile-pins", type=Path, default=root / ".github" / "pinned-makefiles.yml")
+    ap.add_argument("--skip-makefile", action="store_true",
+                    help="for fixture runs that ship no Makefile: skips checks 5 and 11")
     args = ap.parse_args()
 
     g = Guard()
@@ -1184,6 +1275,10 @@ def main() -> int:
     # --- 5. the test selection the lanes actually run -----------------------
     if not args.skip_makefile:
         check_makefile_selection(g, args.makefile)
+
+    # --- 11. the Makefile bytes are the pinned, reviewed bytes ---------------
+    if not args.skip_makefile:
+        check_makefile_pin(g, args.makefile_pins)
 
     # --- 6 and 7. runner and action pinning ---------------------------------
     bad_runners: list[str] = []

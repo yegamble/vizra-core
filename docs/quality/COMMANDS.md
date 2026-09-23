@@ -41,10 +41,29 @@ are gated from outside make. CI runs both as their own steps, before any `make`.
 ./scripts/ci-required-guard.sh         # the manifest, the workflows, and each make step's own argv
 ```
 
-`make-integrity-guard` refuses a `SHELL` / `.SHELLFLAGS` / `MAKEFLAGS` /
+`make-integrity-guard` runs make only on **reviewed Makefile bytes** (sweep B5).
+Before invoking make at all, in both modes, it checks every file make will read
+against its sha256 in `.github/pinned-makefiles.yml`; what make will read is
+determined from the pinned bytes without running them (the root `Makefile` plus
+every literal `include`/`-include`/`sinclude`/`load`, transitively — sound only
+because those bytes are themselves pinned). Its first make invocation is
+`make -q` on the pinned makefiles, which runs no recipe, to refuse a makefile
+make would REMAKE from something unpinned (it does that even under `-n`).
+Every process it starts gets an environment without `GITHUB_ENV`,
+`GITHUB_PATH`, `GITHUB_OUTPUT`, `GITHUB_STATE`, `GITHUB_STEP_SUMMARY` or any other
+runner command-file variable. The reviewed bytes still run their own
+`$(shell git rev-parse …)` / `$(shell date …)` at Makefile:22-23; the residual is a
+reviewer approving a malicious Makefile together with its pin, and CODEOWNERS is
+advisory. Changing the Makefile:
+
+```
+shasum -a 256 Makefile      # paste into .github/pinned-makefiles.yml, same diff
+```
+
+On pinned bytes it then refuses a `SHELL` / `.SHELLFLAGS` / `MAKEFLAGS` /
 `GNUMAKEFLAGS` / `.ONESHELL` override, a `-`/`@-` prefix or `|| true` suffix on
 a gate recipe, and a duplicate gate target — over the prerequisite closure, with
-the include list taken from make's own `MAKEFILE_LIST`.
+make's own `MAKEFILE_LIST` required to equal the pinned set.
 
 `ci-required-guard` runs its checks over `set(FLOOR_LANES) | set(required)`.
 Since sweep B1 round 2 the make-step control is **default-deny on the shape**,
@@ -61,6 +80,9 @@ be exhaustive:
 * **9** — the direct test steps are pinned the same way, including their exit
   handling.
 * **10** — a lane that checks out runs `scripts/provenance.sh`.
+* **11** — `.github/pinned-makefiles.yml` exists, has its one accepted shape,
+  pins `Makefile`, and matches the tree: a Makefile edit without the paired pin
+  update fails by name (`scripts/testdata/makefilepin/`, 7 fixtures).
 
 It also refuses a job-level `container:`, a `defaults.run` at either scope, an
 undigested service image, and a MAKEFLAGS/GNUMAKEFLAGS/MFLAGS/MAKEFILES/SHELL/

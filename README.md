@@ -81,6 +81,16 @@ on the step's shape, not a parser for shell:
 ./scripts/ci-required-guard.sh      # the manifest, the workflows, and each make step's own argv
 ```
 
+The anchor runs make only on **reviewed Makefile bytes**: `.github/pinned-makefiles.yml`
+pins the sha256 of every file make reads, and the anchor checks it before make is
+invoked at all, because make EVALUATES a makefile while reading it. Those bytes
+still run the reviewed `$(shell git rev-parse …)` / `$(shell date …)` calls at
+Makefile:22-23; a reviewer approving a malicious Makefile together with its pin
+update is the residual, and CODEOWNERS is advisory. **Editing the Makefile? Update
+its pin in the same diff:** `shasum -a 256 Makefile` into
+`.github/pinned-makefiles.yml` — otherwise every make lane, `ci-guard` and the
+direct suite fail by name.
+
 `scripts/assert-runtime-image.sh <image>` is the image assertion `docker-build`
 runs; it reads `$DOCKER`, so `scripts/testdata/fakedocker/` can drive it with no
 daemon.

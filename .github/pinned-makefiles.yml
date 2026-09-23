@@ -1,0 +1,41 @@
+# pinned-makefiles.yml — the sha256 of EVERY file make reads in this repository.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# The workflow anchor (`./scripts/make-integrity-guard.sh --workflow`, pinned in
+# pinned-steps.yml) reads the Makefile database with `make -pn`. GNU Make
+# EVALUATES a makefile while reading it: `$(shell …)`, `$(file …)`, `!=`, `+`
+# and `$(MAKE)` recipe lines, makefile-remake rules and `.SECONDEXPANSION`
+# prerequisites all run during that read. So one Makefile line could run code
+# DURING the anchor step and write the next step's environment after the anchor
+# had passed (docs/evidence/warroom/2026-09-23-anchor-preflight-DESK-REVIEW-security.md,
+# FINDING 4). A scanner over the text would have to re-implement make's parser to
+# be sound; the chair ruled the control is the BYTES instead (tick 132).
+#
+# HOW IT IS ENFORCED
+# ------------------
+# * The anchor computes these digests BEFORE it invokes make, in both modes. On
+#   any mismatch — and when the files make would read (determined from these
+#   pinned bytes, without running them) include one not listed here, or this
+#   list names one make would not read — it refuses and make is NOT invoked.
+# * scripts/ci-required-guard.py check 11 asserts this file exists, has this
+#   exact shape, pins `Makefile`, and that every digest matches.
+#
+# WHAT THIS GUARANTEES, AND WHAT IT DOES NOT
+# ------------------------------------------
+# make runs only on bytes that were reviewed together with this file. Those
+# bytes are NOT inert: Makefile:22-23 run `$(shell git rev-parse …)` and
+# `$(shell date …)` while make reads them, and the anchor's ok line lists every
+# such site. The residual is REVIEW: a reviewer who approves a malicious
+# Makefile together with its pin update defeats this control, and CODEOWNERS is
+# advisory until the owner's ruleset exists.
+#
+# CHANGING THE MAKEFILE
+# ---------------------
+# Update the digest in the SAME reviewed diff:
+#     shasum -a 256 Makefile
+# The shape below is the ONLY accepted one: `makefiles:` then one
+# `  <repository-relative path>: <64 lowercase hex>` line per file. No quotes,
+# no tabs, no flow style — both readers refuse anything else.
+makefiles:
+  Makefile: e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2

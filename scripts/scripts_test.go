@@ -268,6 +268,8 @@ func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
 		"are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor",
 		"runs all 3 required invocation(s) for 'build-test'",
 		"runs scripts/provenance.sh after checking out",
+		// Check 11 (sweep B5), against the REAL pin and the real Makefile.
+		"pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report %q against the real workflows:\n%s", want, out)
@@ -286,9 +288,10 @@ func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
 // Makefile per way of doing that.
 func TestMakeIntegrityGuardFixtures(t *testing.T) {
 	cases := []struct {
-		dir      string
-		wantFail bool
-		wantText string
+		dir        string
+		wantFail   bool
+		notInvoked bool
+		wantText   string
 	}{
 		{dir: "good", wantFail: false},
 
@@ -324,6 +327,28 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "conditional-target", wantFail: true, wantText: "conditional"},
 
 		{dir: "missing-target", wantFail: true, wantText: "could not be established"},
+
+		// Sweep B5 — THE DIGEST PIN (chair ruling, tick 132, on the 2026-09-23 desk
+		// review, FINDING 4). make EVALUATES a makefile while reading it, so every
+		// fixture above carries its own .github/pinned-makefiles.yml: the checks
+		// above run only on pinned bytes. Each case below is refused BEFORE make is
+		// started, and says so; makefiledigest_test.go proves that line honest with
+		// a process recorder.
+		{dir: "pin-missing", wantFail: true, notInvoked: true, wantText: "pinned-makefiles.yml does not exist"},
+		{dir: "pin-empty", wantFail: true, notInvoked: true, wantText: "pins no file"},
+		{dir: "pin-malformed", wantFail: true, notInvoked: true, wantText: "not a `  <path>: <64 lowercase hex sha256>` entry"},
+		{dir: "pin-without-makefile", wantFail: true, notInvoked: true, wantText: "does not pin `Makefile`"},
+		{dir: "digest-mismatch", wantFail: true, notInvoked: true, wantText: "Makefile: sha256"},
+		{dir: "include-unpinned", wantFail: true, notInvoked: true, wantText: "make would read inc.mk, which has no entry"},
+		{dir: "include-computed", wantFail: true, notInvoked: true, wantText: "names a file make COMPUTES"},
+		{dir: "include-outside", wantFail: true, notInvoked: true, wantText: "reads a file outside the repository"},
+		{dir: "eval-in-pinned-bytes", wantFail: true, notInvoked: true, wantText: "can manufacture an include"},
+		{dir: "stale-pin-entry", wantFail: true, notInvoked: true, wantText: "pins old.mk, which make would NOT read"},
+		{dir: "gnumakefile-present", wantFail: true, notInvoked: true, wantText: "reads GNUmakefile INSTEAD of Makefile"},
+		{dir: "makefile-symlink", wantFail: true, notInvoked: true, wantText: "is not a regular file"},
+		// The positive control for includes: pinned includes are read, and make's
+		// own MAKEFILE_LIST is corroborated against the static reading.
+		{dir: "include-pinned-good", wantFail: false, wantText: "MAKEFILE_LIST ['Makefile', 'a.mk', 'b.mk'] is exactly the pinned set"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {
@@ -339,6 +364,9 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 			}
 			if tc.wantText != "" && !strings.Contains(strings.ToLower(out), strings.ToLower(tc.wantText)) {
 				t.Fatalf("the failure does not mention %q, so an author would not know what to fix:\n%s", tc.wantText, out)
+			}
+			if tc.notInvoked && !strings.Contains(out, "make was NOT invoked (0 make process(es) started)") {
+				t.Fatalf("the refusal must come BEFORE make is started, and say so:\n%s", out)
 			}
 		})
 	}
@@ -453,6 +481,11 @@ func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
 		"MAKEFLAGS carries nothing beyond",
 		"no duplicate-definition override",
 		"defined exactly once",
+		// Sweep B5: the digest pin was checked before make ran, and make's own
+		// MAKEFILE_LIST agreed with the static reading of the pinned bytes.
+		"make runs only on REVIEWED bytes",
+		"MAKEFILE_LIST ['Makefile'] is exactly the pinned set",
+		"only on the pinned bytes of Makefile",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)
