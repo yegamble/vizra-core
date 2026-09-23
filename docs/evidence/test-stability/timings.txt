@@ -78,3 +78,22 @@ run 35916976783: build-test make ci +1.7m, unit +4.5m, integration +6.4m, shuffl
 run 35914283132: build-test make ci +1.7m, unit +4.6m, integration +6.6m, shuffled +8.7m (job 10.9m); cache-matrix-leg shuffled +3.4-3.7m
 run 35914133999: build-test make ci +1.3m, unit +3.6m, integration +5.1m, shuffled +6.7m (job 8.3m); cache-matrix-leg shuffled +3.0-3.2m
 => a hang starting a package binary in the LAST step fires -timeout 8m at <= +8.7m+8m ~ 17m < 20m (build-test) and <= +3.7m+8m ~ 12m < 15m (cache-matrix-leg); at 10m (go's default) build-test would reach ~19m and cache-matrix-leg ~14m, with less than one package-build of margin.
+
+## AFTER — merged head 888a003 (main a6bc77d merged in), one lane at a time, fresh own containers (ports differ; same digests)
+tree 888a0037dba462d6348ffc87df98fd2466397e3d go version go1.27.1 darwin/arm64 GNU Make 3.81 cpus 8
+make-ci exit=0 wall=153s load-start=[29.56 25.00 25.23] load-end=[38.32 34.83 29.54] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+unit exit=0 wall=102s load-start=[38.32 34.83 29.54] load-end=[44.33 42.58 33.47] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+int-valkey exit=0 wall=209s load-start=[44.33 42.58 33.47] load-end=[30.53 44.37 36.82] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+int-redis exit=0 wall=200s load-start=[30.53 44.37 36.82] load-end=[29.02 40.66 37.01] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+lanes done
+unit-events.json fixtures=pass:97.4s scripts=pass:57.5s jobs=pass:23.6s credential=pass:16.7s
+int-valkey-events.json integration=pass:201.2s fixtures=pass:137.8s scripts=pass:73.4s jobs=pass:20.8s
+int-redis-events.json integration=pass:192.5s fixtures=pass:134.4s scripts=pass:52.6s jobs=pass:21.3s
+go-test-report: ok — 1737 test(s) executed across 19 package(s), 0 unexpected skips, floor 1214 met
+go-test-report: ok — 1737 test(s) executed across 19 package(s), 0 unexpected skips, floor 1214 met
+go-test-report: ok — 1566 test(s) executed across 18 package(s), 0 unexpected skips, floor 1070 met
+
+## CI on 888a003 (build-test run 35922912235 + both cache-matrix legs, gh run view --log)
+internal/fixtures 56.5s, 69.8s, 72.5s, 91.2s, 98.2s; internal/integration 71.2s, 73.6s, 104.5s, 112.5s (before: fixtures 84.8-139.5s, integration 56.7-93.6s)
+build-test job 7.4m (before 8.3-10.9m); cache-matrix-leg jobs 4.2m / 4.5m (before 4.6-5.6m)
+unit 1566 executed / 0 failed / 0 skipped (floor 1070); integration and shuffled 1737 / 0 / 0 (floor 1214)

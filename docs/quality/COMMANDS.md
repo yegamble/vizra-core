@@ -385,6 +385,8 @@ not from a guess:
 | CI, last 4 green build-test runs before the change | `internal/fixtures` 139.5s | 3.4x |
 | this host, two suites at once, after the change | `internal/integration` 186.4s | 2.6x |
 | this host, one lane, after the change | `internal/integration` 142.1s | 3.4x |
+| this host, one lane, merged head `888a003` at load ~44 | `internal/integration` 201.2s | 2.4x |
+| CI on `888a003` (build-test + both cache-matrix legs) | `internal/integration` 112.5s | 4.3x |
 
 It is below go's 10m default on purpose: the last test step of `build-test` starts
 about 8.7 minutes into a 20-minute job, and the second step of `cache-matrix-leg`
@@ -406,6 +408,8 @@ package generates the corpus 6 times instead of 9 (each 13-35s under `-race`).
 | direct integration step, Valkey 9.1.2 | 156s, leaves 74 MB | 150s, leaves nothing |
 | direct integration step, Redis 7.2 | 168s, leaves 75 MB | 144s, leaves nothing |
 | unit + integration(Valkey) at the same time | 238s / 236s | 145s / 198s |
+| CI `internal/fixtures` per package | 84.8–139.5s | 56.5–98.2s |
+| CI build-test job | 8.3–10.9 min | 7.4 min |
 
 Temporary files: every package with a TestMain here runs inside ONE root from
 `internal/testtmp` (`vizra-test-<pkg>-<pid>-*`, TMPDIR pointed at it), removed at
