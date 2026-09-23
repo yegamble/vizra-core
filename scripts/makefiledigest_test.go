@@ -715,3 +715,31 @@ func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
 	out, rec = runRecorded(t, dir, true)
 	assertGreen(t, "sibling removed", out, rec)
 }
+
+// Before sweep B5 a failed environment check was REPORTED and make was run
+// anyway — with BASH_ENV set, the Makefile's own reviewed `$(shell …)` calls
+// ran through a bash that sourced it. Now any failed pre-flight stops the
+// anchor before make. The rows are ones the anchor already refused; what is new
+// is that make is never started for them (recorded, not taken from the output).
+func TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake(t *testing.T) {
+	cases := []struct {
+		name     string
+		workflow bool
+		env      []string
+		wantText string
+	}{
+		{"workflow/MAKEFLAGS=-i", true, []string{"MAKEFLAGS=-i"}, "must be UNSET"},
+		{"workflow/BASH_ENV", true, []string{"BASH_ENV=/nonexistent/b5.sh"}, "BASH_ENV"},
+		{"workflow/MAKEFILES", true, []string{"MAKEFILES=/nonexistent/b5.mk"}, "MAKEFILES"},
+		{"workflow/GO=true", true, []string{"GO=true"}, "the environment sets GO='true'"},
+		{"local/MAKEFILES", false, []string{"MAKEFILES=/nonexistent/b5.mk"}, "MAKEFILES"},
+		{"local/MAKEFLAGS=-ki", false, []string{"MAKELEVEL=1", "MAKEFLAGS=-ki"}, "is not a flag make itself"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out, rec := runRecorded(t, repoRoot(t), tc.workflow, tc.env...)
+			assertRefusedBeforeMake(t, tc.name, out, rec, tc.wantText)
+		})
+	}
+}
