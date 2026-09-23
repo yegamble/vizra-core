@@ -87,29 +87,47 @@ func (s *Server) allowSetupRequest(c *echo.Context, bucket string, limit int) bo
 	return ok
 }
 
-// consumeClaimFailure charges one unit of failure budget and reports whether the
-// caller has now exceeded it. Only rejected attempts reach here.
+// The bucket names a `rate_limited` audit row records. One row per bucket per
+// window, and the row says which bucket it was (sentinel S-0004): the previous
+// shape spent ONE site-wide marker on the failure path only and always wrote
+// {"bucket":"failure"}, so a per-origin and a global transition in one window
+// wrote a single row that could not say which tripped, and the two hard
+// ceilings — the accepted residual where a stranger holds claim-owner at 429 and
+// the operator's VALID token is refused — wrote none at all.
+//
+// The marker is per bucket KIND, never per origin: a marker per source prefix
+// would let anyone with many /64s write one row each, which is the unbounded
+// writer the marker exists to prevent. So at most four rows per window.
+const (
+	bucketCeilingClaim  = "ceiling.claim"
+	bucketCeilingStatus = "ceiling.status"
+	bucketPerOrigin     = "per_origin"
+	bucketGlobal        = "global"
+)
+
+// consumeClaimFailure charges one unit of failure budget and reports which
+// buckets the caller has now exceeded (none: not limited). Only rejected
+// attempts reach here.
 //
 // The limiter fails OPEN to a per-process counter when the cache is down
 // (ADR-003), and that is right here: the endpoint can succeed exactly once in
 // the lifetime of the instance, enforced by users_one_owner, so a limiter outage
 // costs request volume and never a second owner. Failing closed would turn a
 // cache outage into "the operator cannot claim their new instance".
-func (s *Server) consumeClaimFailure(c *echo.Context) (nowLimited bool) {
+func (s *Server) consumeClaimFailure(c *echo.Context) (limited []string) {
 	if s.deps.Limiter == nil {
-		return false
+		return nil
 	}
 	ctx := c.Request().Context()
 	perOrigin, global := s.claimLimiterKeys(c)
 
-	limited := false
 	if perOrigin != "" {
 		if ok, _ := s.deps.Limiter.Allow(ctx, perOrigin, claimFailuresPerOrigin, claimRateWindow); !ok {
-			limited = true
+			limited = append(limited, bucketPerOrigin)
 		}
 	}
 	if ok, _ := s.deps.Limiter.Allow(ctx, global, claimFailuresGlobal, claimRateWindow); !ok {
-		limited = true
+		limited = append(limited, bucketGlobal)
 	}
 	return limited
 }
@@ -147,17 +165,38 @@ func (s *Server) recordClaimRefusal(c *echo.Context, reason string) {
 	}
 }
 
-// claimLimitTransition reports true at most once per window, by spending a
-// one-unit budget of its own. That is what turns "audit the rate limiting" from
-// an unbounded write into a single row per bucket per window.
-func (s *Server) claimLimitTransition(c *echo.Context) bool {
+// claimLimitTransition reports true at most once per window PER BUCKET, by
+// spending a one-unit budget of its own. That is what turns "audit the rate
+// limiting" from an unbounded write into a single row per bucket per window.
+func (s *Server) claimLimitTransition(c *echo.Context, bucket string) bool {
 	if s.deps.Limiter == nil {
 		return false
 	}
 	st, _ := site.FromContext(c.Request().Context())
 	ok, _ := s.deps.Limiter.Allow(c.Request().Context(),
-		st.CacheKey("rl", "setup.claim", "audited"), 1, claimRateWindow)
+		st.CacheKey("rl", "setup.claim", "audited", bucket), 1, claimRateWindow)
 	return ok
+}
+
+// auditRateLimited writes the bucket's one transition row for this window, if
+// this request is the transition and the instance is still UNCLAIMED.
+//
+// Unclaimed only: the hard ceilings keep answering 429 for the life of the
+// instance, and on a claimed one a sustained flood would write one row per
+// bucket every fifteen minutes into a table nothing can prune — the per-window
+// bound integrates to unbounded, which is the reason a claimed instance writes
+// no refusal rows at all. What the trail must show is a 429 that could have
+// refused the OPERATOR, and that exists only while unclaimed. The claimed read
+// happens only on a transition, so at most once per bucket per window, and on a
+// claimed instance it is answered from the monotonic cache.
+func (s *Server) auditRateLimited(c *echo.Context, bucket string) {
+	if !s.claimLimitTransition(c, bucket) {
+		return
+	}
+	if claimed, err := s.instanceClaimed(c); err != nil || claimed {
+		return
+	}
+	s.recordClaimRateLimited(c, bucket)
 }
 
 // recordClaimRateLimited writes the single transition row.

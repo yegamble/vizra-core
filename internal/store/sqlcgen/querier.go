@@ -118,6 +118,20 @@ type Querier interface {
 	// thesis is that an invariant of this class belongs in the database, and a
 	// future owner-transfer or re-claim route is exactly where a Go-only guard
 	// breaks. Zero rows -> pgx.ErrNoRows -> the caller's existing ErrHasUsers.
+	//
+	// That NOT EXISTS alone does NOT make it a property of the statement (sentinel
+	// S-0002, RULES R16): it is evaluated once, in the statement's snapshot. A
+	// re-mint that arrives while a claim holds the token row lock (its redeem has
+	// run, its COMMIT is pending) waits on that lock, saw no users in its snapshot,
+	// and — without the predicate below — then ran the DO UPDATE against the
+	// committed, CONSUMED row: a live token on a claimed instance, and the
+	// consumption record erased. The DO UPDATE's own WHERE is evaluated against the
+	// locked, LATEST row version after the wait, so a consumed row is left alone and
+	// the statement returns no row: pgx.ErrNoRows -> ErrHasUsers, as above.
+	//
+	// A consumed row is terminal: only a claim consumes a token, and a claim creates
+	// the owner in the same transaction. A superseded or expired row is not, and
+	// re-minting it is exactly what `vizra claim-token` is for.
 	MintOwnerClaimToken(ctx context.Context, arg MintOwnerClaimTokenParams) (MintOwnerClaimTokenRow, error)
 	// Feeds vizra_jobs_oldest_queued_age_seconds, which readiness and doctor read
 	// against the Q-028 threshold.

@@ -600,3 +600,30 @@ func TestProductionRefusesARetiredKeyName(t *testing.T) {
 		})
 	}
 }
+
+// sentinel S-0010: an owner-claim TTL the database cannot store is refused at
+// config load, not at the first mint. The interval is truncated to microseconds
+// on the way to PostgreSQL, so 500ns became 0 and every mint then failed
+// owner_claim_tokens_ttl (expires_at > minted_at) with a raw 23514; and a TTL of
+// a few seconds is accepted but unusable, since the operator has to copy the
+// token out of a terminal and submit a form inside it.
+func TestTheOwnerClaimTTLHasALowerBound(t *testing.T) {
+	for _, v := range []string{"500ns", "1us", "1s", "59s"} {
+		t.Run("refuses "+v, func(t *testing.T) {
+			requireProblem(t, "VIZRA_OWNER_CLAIM_TTL", v, "VIZRA_OWNER_CLAIM_TTL")
+		})
+	}
+	for _, v := range []string{"1m", "15m", "1h", "24h"} {
+		t.Run("accepts "+v, func(t *testing.T) {
+			env := validProduction()
+			env["VIZRA_OWNER_CLAIM_TTL"] = v
+			cfg, err := LoadFrom(lookupOf(env))
+			if err != nil {
+				t.Fatalf("VIZRA_OWNER_CLAIM_TTL=%s was refused: %v", v, err)
+			}
+			if cfg.OwnerClaimTTL.String() == "" {
+				t.Fatal("no TTL loaded")
+			}
+		})
+	}
+}

@@ -155,6 +155,11 @@ func TestClaimErrorMapping(t *testing.T) {
 		{"a CHECK the validator should have caught",
 			&pgconn.PgError{Code: "23514", ConstraintName: "users_email_shape"},
 			http.StatusBadRequest, "bad_request", "one of the submitted values is not acceptable"},
+		// sentinel S-0003: a value `text` cannot hold at all (NUL) is refused by
+		// the encoder with 22021 before any CHECK runs. It is the caller's input,
+		// never a 500.
+		{"a value the database encoding cannot hold (22021)", &pgconn.PgError{Code: "22021"},
+			http.StatusBadRequest, "bad_request", "one of the submitted values is not acceptable"},
 		{"hashing capacity exhausted", credentialBusy(), http.StatusServiceUnavailable,
 			"unavailable", "the server is busy; try again shortly"},
 		// F1: a connection failure is NOT a *pgconn.PgError, so without the

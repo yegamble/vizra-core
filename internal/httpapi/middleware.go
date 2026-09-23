@@ -163,7 +163,11 @@ func errorHandler(log *slog.Logger) echo.HTTPErrorHandler {
 		}
 
 		reqID, _ := c.Get(string(headerRequestID)).(string)
-		if status >= 500 {
+		// A request whose own context has ENDED — the client hung up — is not a
+		// server failure, and an ERROR line for it is noise on the signal an
+		// operator reads during a real outage (sentinel S-0005, RULES R9). It is
+		// still answered; it is not logged.
+		if status >= 500 && c.Request().Context().Err() == nil {
 			// Every value is redacted HERE, not left to the handler: Deps.Logger
 			// falls back to slog.Default(), which redacts nothing unless the
 			// process installed obs.NewLogger. An unmapped error is exactly where

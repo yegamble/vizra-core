@@ -314,7 +314,7 @@ func TestEveryLogSiteInTheAPIIsRedacted(t *testing.T) {
 	// walker no longer recognises them, the loop above finds no sites and
 	// passes vacuously. If a log site was deliberately added or removed, change
 	// this number in the same commit.
-	const want = 6
+	const want = 7
 	if r.sites != want {
 		t.Fatalf("examined %d slog call sites in internal/httpapi, expected %d. If a site was "+
 			"deliberately added or removed, update this number in the same commit — a count "+

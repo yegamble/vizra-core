@@ -145,8 +145,8 @@ func (s *Server) requireClaimedMiddleware() echo.MiddlewareFunc {
 			if err != nil {
 				// Never 403 and never allow on a lookup failure: a database
 				// outage is 503, exactly as ADR-003 requires for identity reads.
-				return newCodedError(http.StatusServiceUnavailable, "unavailable",
-					"the instance state could not be read")
+				// Through s.unavailable, so the cause is logged (sentinel S-0006).
+				return s.unavailable(c, "unclaimed guard: checking claimed state", err)
 			}
 			if !claimed {
 				return newCodedError(http.StatusForbidden, "instance_unclaimed",
@@ -209,7 +209,8 @@ func (s *Server) handleClaimStatus(c *echo.Context) error {
 	// Under the hard ceiling like the POST: this is the only unauthenticated read
 	// surface the product has, it carries Cache-Control: no-store so nothing
 	// upstream absorbs a flood, and post-claim the answer is a constant.
-	if !s.allowSetupRequest(c, "ceiling.status", claimStatusCeiling) {
+	if !s.allowSetupRequest(c, bucketCeilingStatus, claimStatusCeiling) {
+		s.auditRateLimited(c, bucketCeilingStatus)
 		return newCodedError(http.StatusTooManyRequests, "rate_limited",
 			"too many requests to the setup endpoint; try again shortly")
 	}
@@ -217,8 +218,10 @@ func (s *Server) handleClaimStatus(c *echo.Context) error {
 	// instance is claimed this performs no database work, ever again.
 	claimed, err := s.instanceClaimed(c)
 	if err != nil {
-		return newCodedError(http.StatusServiceUnavailable, "unavailable",
-			"the instance state could not be read")
+		// Through s.unavailable, so the cause is logged: this GET is the first
+		// request the claim page makes, and during an outage it used to leave
+		// only the canned message in the log (sentinel S-0006).
+		return s.unavailable(c, "claim-status: checking claimed state", err)
 	}
 	s.claimed.set(claimed, s.deps.Now())
 	return c.JSON(http.StatusOK, map[string]bool{"claimed": claimed})
@@ -229,6 +232,65 @@ type claimOwnerRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+// claimOwnerFields are the only properties ClaimOwnerRequest defines
+// (api/openapi.yaml, additionalProperties: false), spelled exactly.
+var claimOwnerFields = map[string]func(*claimOwnerRequest) *string{
+	"token":    func(r *claimOwnerRequest) *string { return &r.Token },
+	"username": func(r *claimOwnerRequest) *string { return &r.Username },
+	"email":    func(r *claimOwnerRequest) *string { return &r.Email },
+	"password": func(r *claimOwnerRequest) *string { return &r.Password },
+}
+
+// decodeClaimOwnerRequest reads exactly one JSON object whose keys are all
+// claimOwnerFields, case-sensitively, and nothing after it but whitespace.
+func decodeClaimOwnerRequest(body io.Reader) (claimOwnerRequest, error) {
+	var in claimOwnerRequest
+	dec := json.NewDecoder(body)
+	var members map[string]json.RawMessage
+	if err := dec.Decode(&members); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return in, newCodedError(http.StatusRequestEntityTooLarge, "payload_too_large",
+				"the request body is too large")
+		}
+		if errors.Is(err, io.EOF) {
+			return in, newCodedError(http.StatusBadRequest, "bad_request", "the request body is empty")
+		}
+		return in, newCodedError(http.StatusBadRequest, "bad_request",
+			"the request body is not the expected JSON object")
+	}
+	// A JSON `null` decodes into a nil map without error; it is not an object.
+	if members == nil {
+		return in, newCodedError(http.StatusBadRequest, "bad_request",
+			"the request body is not the expected JSON object")
+	}
+	// The body must END here. dec.More() is not this check: it reports false in
+	// front of a stray '}' or ']'. Token() returns io.EOF only at the true end
+	// (after whitespace); anything else — another value, a stray delimiter, a
+	// syntax error — is not exactly one object.
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return in, newCodedError(http.StatusRequestEntityTooLarge, "payload_too_large",
+				"the request body is too large")
+		}
+		return in, newCodedError(http.StatusBadRequest, "bad_request",
+			"the request body must contain exactly one JSON object")
+	}
+	for key, raw := range members {
+		field, ok := claimOwnerFields[key]
+		if !ok {
+			return in, newCodedError(http.StatusBadRequest, "bad_request",
+				"the request body is not the expected JSON object")
+		}
+		if err := json.Unmarshal(raw, field(&in)); err != nil {
+			return in, newCodedError(http.StatusBadRequest, "bad_request",
+				"the request body is not the expected JSON object")
+		}
+	}
+	return in, nil
 }
 
 type claimOwnerResponse struct {
@@ -248,7 +310,10 @@ func (s *Server) handleClaimOwner(c *echo.Context) error {
 	ctx := req.Context()
 
 	// This route's OWN hard ceiling. A claim-status flood cannot spend it.
-	if !s.allowSetupRequest(c, "ceiling.claim", claimOwnerCeiling) {
+	if !s.allowSetupRequest(c, bucketCeilingClaim, claimOwnerCeiling) {
+		// The accepted residual (allowSetupRequest): this 429 can refuse the
+		// operator's VALID token, so the trail records it — once per window.
+		s.auditRateLimited(c, bucketCeilingClaim)
 		return newCodedError(http.StatusTooManyRequests, "rate_limited",
 			"too many requests to the setup endpoint; try again shortly")
 	}
@@ -293,26 +358,17 @@ func (s *Server) handleClaimOwner(c *echo.Context) error {
 	body := http.MaxBytesReader(c.Response(), req.Body, claimBodyLimitBytes)
 	defer func() { _ = body.Close() }()
 
-	// 3. Strict decode: DisallowUnknownFields honours the spec's
-	//    additionalProperties: false, which is otherwise only documentation.
-	dec := json.NewDecoder(body)
-	dec.DisallowUnknownFields()
-	var in claimOwnerRequest
-	if err := dec.Decode(&in); err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			return newCodedError(http.StatusRequestEntityTooLarge, "payload_too_large",
-				"the request body is too large")
-		}
-		if errors.Is(err, io.EOF) {
-			return newCodedError(http.StatusBadRequest, "bad_request", "the request body is empty")
-		}
-		return newCodedError(http.StatusBadRequest, "bad_request",
-			"the request body is not the expected JSON object")
-	}
-	if dec.More() {
-		return newCodedError(http.StatusBadRequest, "bad_request",
-			"the request body must contain exactly one JSON object")
+	// 3. Strict decode. The schema says additionalProperties: false and one
+	//    object, and encoding/json alone enforces neither exactly (sentinel
+	//    S-0009): it matches field names CASE-INSENSITIVELY, so
+	//    {"TOKEN":…,"USERNAME":…} passed DisallowUnknownFields, and dec.More()
+	//    reports false in front of a '}' or ']', so `{…}}]` passed "exactly one
+	//    object". So: decode into raw members, require every key to be one of the
+	//    four the schema defines, spelled exactly, and require the stream to END
+	//    after the object.
+	in, err := decodeClaimOwnerRequest(body)
+	if err != nil {
+		return err
 	}
 
 	// 4. Origin posture. Absence of both headers is allowed: the credential is in
@@ -326,8 +382,7 @@ func (s *Server) handleClaimOwner(c *echo.Context) error {
 
 	pool, err := s.poolFor(c)
 	if err != nil {
-		return newCodedError(http.StatusServiceUnavailable, "unavailable",
-			"the instance state could not be read")
+		return s.unavailable(c, "resolving the site's database pool", err)
 	}
 
 	result, err := ownerclaim.Claim(ctx, pool, s.deps.Hasher, ownerclaim.Input{
@@ -466,6 +521,15 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 				"constraint", obs.Redact(pgErr.ConstraintName), "request_id", obs.Redact(requestIDOf(c)))
 			return newCodedError(http.StatusBadRequest, "bad_request",
 				"one of the submitted values is not acceptable")
+		case pgErr.Code == "22021":
+			// A value the database encoding cannot hold — NUL, which `text` can
+			// never store. The validator refuses control characters, so this is a
+			// backstop like 23514; it is the caller's input either way, and before
+			// this branch it fell through to a 500 (sentinel S-0003).
+			s.deps.Logger.Error("http: the database refused a value the validator accepted as unencodable",
+				"request_id", obs.Redact(requestIDOf(c)))
+			return newCodedError(http.StatusBadRequest, "bad_request",
+				"one of the submitted values is not acceptable")
 		case pgErr.Code == "40001":
 			// Unreachable: the claim transaction pins READ COMMITTED explicitly.
 			s.deps.Logger.Error("http: serialization failure on a READ COMMITTED claim",
@@ -489,7 +553,20 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 // diagnosable. The cause goes to the log with the request id, through
 // obs.Redact, so a DSN or password embedded in a driver error cannot reach a log
 // line (AGENTS.md) while the operator still gets something to act on.
+//
+// A request whose OWN context has ended is not an outage (sentinel S-0005,
+// RULES R9): the client hung up, the database call was cancelled on its
+// behalf, and logging that at ERROR as "could not reach the database" put false
+// outage lines on the one signal an operator reads to diagnose an unclaimable
+// instance. It is answered 503 — to a client that is no longer there — and not
+// logged. The test is the REQUEST context, deliberately not errors.Is(cause,
+// context.DeadlineExceeded): a pgx connect timeout wraps DeadlineExceeded too,
+// and that one IS an outage.
 func (s *Server) unavailable(c *echo.Context, where string, cause error) error {
+	if c.Request().Context().Err() != nil {
+		return newCodedError(http.StatusServiceUnavailable, "unavailable",
+			"the request could not be completed in time")
+	}
 	s.deps.Logger.Error("http: the claim endpoint could not reach the database",
 		"where", obs.Redact(where),
 		"error", obs.Redact(cause.Error()),
@@ -512,14 +589,14 @@ func (s *Server) refuseToken(c *echo.Context) error {
 	// correct token is never answered 429 by this limiter, which is what stops a
 	// stranger sending junk until the operator is locked out of their own
 	// instance.
-	if limited := s.consumeClaimFailure(c); limited {
+	if limited := s.consumeClaimFailure(c); len(limited) > 0 {
 		// Deliberately NO `refused` audit row here: a 429 answers requests that
 		// by definition have no upper bound, so auditing each one would make the
 		// limiter an unbounded writer into a table nothing can delete. Exactly
-		// one `rate_limited` row is written, on the transition into the limited
-		// state.
-		if s.claimLimitTransition(c) {
-			s.recordClaimRateLimited(c, "failure")
+		// one `rate_limited` row is written per bucket per window, on that
+		// bucket's transition into the limited state, naming the bucket.
+		for _, bucket := range limited {
+			s.auditRateLimited(c, bucket)
 		}
 		return newCodedError(http.StatusTooManyRequests, "rate_limited",
 			"too many failed attempts; try again shortly")
