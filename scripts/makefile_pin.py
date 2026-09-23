@@ -311,9 +311,14 @@ def recipe_lines(lines, start: int) -> list:
 # (check_text, REFUSED_TOKENS, …) stay as a SECOND, more specific diagnosis, and the pin, the remake probe
 # and the post-make database checks stay as defence in depth.
 #
-# Core's differences from search's grammar, all NARROWER or equal: none. The same shapes; a recipe body that
-# BEGINS with `$(NAME)` (core's `@$(GO) vet $(PKGS)`) is allowed by the grammar in both repositories — search
-# refuses it by name, core resolves it from make's own database after make (check_expanded_prefixes).
+# Core's differences from search's grammar, all NARROWER: one — a RULE or PHONY line continued with a
+# backslash is refused here (search refuses it by name, after its grammar). Otherwise the same shapes. A
+# recipe body that BEGINS with `$(NAME)` (core's `@$(GO) vet $(PKGS)`) is allowed by the grammar in both
+# repositories — search refuses it by name; core resolves the leading reference from make's own database
+# after make (check_expanded_prefixes) ONLY for recipe lines of the GATE CLOSURE's targets.
+# NOT refused before make here (verifier F-1 on #13, queued to 2o to port search's every-rule refusal): a
+# grammar-conforming recipe line on a rule OUTSIDE the gate closure — the by-name recipe checks read only
+# closure recipes, and the grammar allows `$(NAME)` in any recipe line.
 ASSIGNABLE_SPECIALS = (".SHELLFLAGS", ".DEFAULT_GOAL")
 _G_NAME = r"(?:[A-Za-z_][A-Za-z0-9_]*|\.SHELLFLAGS|\.DEFAULT_GOAL)"
 _G_ASSIGN_RE = re.compile(r"^(" + _G_NAME + r")[ \t]*(:=|\?=|=)(.*)$")
