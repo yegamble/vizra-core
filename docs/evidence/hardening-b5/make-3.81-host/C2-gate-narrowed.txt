@@ -1,6 +1,7 @@
 # C2 the pre-make gate narrowed to pin failures only (an environment failure would reach make again)
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
 
 ==============================================================
 MUTATION: C2 gate narrowed
@@ -8,32 +9,32 @@ MUTATION: C2 gate narrowed
   mutate: python3 -c "p='scripts/make-integrity-guard.py';s=open(p).read();n='    if g.failed:\n        print(f\"make-integrity-guard: FAILED — make was NOT invoked';assert s.count(n)==1;open(p,'w').write(s.replace(n,'    if pinned is None:\n        print(f\"make-integrity-guard: FAILED — make was NOT invoked'))"
   check:  gotest 'TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake'
 --------------------------------------------------------------
-  sha256 BEFORE: 814c68265f5709fc1fd30862fe79ca659eb9ea22693f5bd0aae015fa98a4b4d2
-  sha256 AFTER:  182de89b1402f72fc339d0431b05a1afe75afda3bebc51e1f2d8df25d020506e
+  sha256 BEFORE: 3fd0209840c53aa42e0fd5b930cd1b59345a2b372dcc54ba2a174a3b89626b2e
+  sha256 AFTER:  54a8a8bd970ae04ced627e5916df8632903de1b11197e2b7505c364be988cb0b
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
 --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake (0.00s)
-    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/GO=true (0.74s)
-        makefiledigest_test.go:742: workflow/GO=true: make was STARTED 1 time(s) although a pre-flight check had refused:
-    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFILES (0.83s)
-        makefiledigest_test.go:742: local/MAKEFILES: make was STARTED 1 time(s) although a pre-flight check had refused:
-    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFLAGS=-ki (0.83s)
-        makefiledigest_test.go:742: local/MAKEFLAGS=-ki: make was STARTED 1 time(s) although a pre-flight check had refused:
-    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i (0.84s)
-        makefiledigest_test.go:742: workflow/MAKEFLAGS=-i: make was STARTED 1 time(s) although a pre-flight check had refused:
-    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFILES (0.84s)
-        makefiledigest_test.go:742: workflow/MAKEFILES: make was STARTED 1 time(s) although a pre-flight check had refused:
-    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/BASH_ENV (1.01s)
-        makefiledigest_test.go:742: workflow/BASH_ENV: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/GO=true (1.18s)
+        makefiledigest_test.go:815: workflow/GO=true: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFILES (1.24s)
+        makefiledigest_test.go:815: workflow/MAKEFILES: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i (1.32s)
+        makefiledigest_test.go:815: workflow/MAKEFLAGS=-i: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/BASH_ENV (1.43s)
+        makefiledigest_test.go:815: workflow/BASH_ENV: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFLAGS=-ki (1.48s)
+        makefiledigest_test.go:815: local/MAKEFLAGS=-ki: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFILES (1.54s)
+        makefiledigest_test.go:815: local/MAKEFILES: make was STARTED 1 time(s) although a pre-flight check had refused:
 FAIL
-FAIL	github.com/yegamble/vizra-core/scripts	1.417s
+FAIL	github.com/yegamble/vizra-core/scripts	1.952s
 FAIL
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: 814c68265f5709fc1fd30862fe79ca659eb9ea22693f5bd0aae015fa98a4b4d2
+  sha256 RESTORED: 3fd0209840c53aa42e0fd5b930cd1b59345a2b372dcc54ba2a174a3b89626b2e
   restore byte-identical: yes
   RESULT: C2 gate narrowed -> exit 1
 
 == after restore ==
-ok  	github.com/yegamble/vizra-core/scripts	0.768s
+ok  	github.com/yegamble/vizra-core/scripts	1.743s
 go test exit=0

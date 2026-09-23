@@ -66,6 +66,11 @@ Checks, all of which must pass:
       PIN         shape, is non-empty, pins `Makefile`, and every digest in it
                   matches the file's bytes. A Makefile edit without the paired
                   pin update fails here BY NAME, as well as in every anchor.
+                  It calls the anchor's OWN scripts/makefile_pin.verify_pin,
+                  so it also refuses whatever the anchor refuses before make:
+                  a GNUmakefile/makefile beside the Makefile, a symlinked
+                  makefile, a stale entry, an unpinned or computed include,
+                  $(eval)/$(guile) (fix round 1, PR#10 VERIFY FINDING 3).
                   The anchor is what enforces the pin at runtime — it refuses to
                   invoke make on unpinned bytes, because make EVALUATES a
                   makefile while reading it (chair ruling, tick 132, on
@@ -182,11 +187,16 @@ one crafted workflow per evasion, so the guard has negative cases of its own.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import re
 import shlex
 import sys
 from pathlib import Path
+
+# The Makefile pin reader shared with the anchor (check 11). No bytecode is
+# written next to it: a __pycache__ in scripts/ would dirty the tree under test.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import makefile_pin as mp  # noqa: E402
 
 try:
     import yaml
@@ -386,7 +396,8 @@ DANGEROUS_SHORT = {
     "i": "-i/--ignore-errors: every recipe's failure is ignored and make exits 0",
     "k": "-k/--keep-going: make carries on past a failed target instead of stopping at it",
     "t": "-t/--touch: targets are TOUCHED, the recipes never run",
-    "q": "-q/--question: no recipe runs at all; make only reports whether a target is up to date",
+    "q": "-q/--question: no ordinary recipe runs (a `+` or `$(MAKE)` line still does); make only reports "
+         "whether a target is up to date",
     "n": "-n/--dry-run: recipes are printed, not executed",
     "e": "-e/--environment-overrides: the environment beats the makefile's own assignments",
     "f": "-f/--file: make reads a DIFFERENT makefile from the one make-integrity-guard read",
@@ -1063,76 +1074,50 @@ def check_makefile_selection(g: Guard, makefile: Path) -> None:
         g.ok(f"all {len(runs)} -run selections are non-empty")
 
 
-# Check 11. The SAME two expressions the anchor parses the pin with
-# (scripts/make-integrity-guard.py, PIN_HEADER_RE / PIN_ENTRY_RE): the pin is
-# read with PyYAML here AND held to that line shape, so the two readers can
-# never disagree about what is pinned. A quoted key YAML would accept is refused
-# by both.
-PIN_HEADER_RE = re.compile(r"^makefiles:[ \t]*$")
-PIN_ENTRY_RE = re.compile(r"^  ([A-Za-z0-9_][A-Za-z0-9._/-]*): ([0-9a-f]{64})[ \t]*$")
-
-
+# Check 11 calls scripts/makefile_pin.py verify_pin() — the SAME function the
+# anchor enforces at runtime — so this static check refuses exactly what every
+# anchor refuses. Fix round 1 (PR#10 VERIFY FINDING 3): it used to carry its own
+# copy, which accepted a GNUmakefile beside the Makefile, a symlinked Makefile,
+# and stale or missing pin entries that every anchor refused.
 def check_makefile_pin(g: Guard, pin_path: Path) -> None:
     """Check 11: the Makefile digest pin exists, is well-formed, covers the Makefile and matches."""
     root = pin_path.parent.parent
-    if not pin_path.exists():
+    r = mp.verify_pin(root, pin_path)
+    if r.ok:
+        g.ok(f"{pin_path.name} pins {len(r.pins)} makefile(s) ({', '.join(sorted(r.pins))}), "
+             f"covers the Makefile, and every digest matches the tree; make will read exactly "
+             f"{', '.join(r.order)} (the anchor's own verify_pin)")
+        return
+    changed = [p for p in r.problems if p.kind in ("mismatch", "absent")]
+    for p in r.problems:
+        if p.kind == "pin" and p.pin_kind == "missing":
+            g.fail(
+                f"{pin_path} is missing.",
+                "It pins the sha256 of every file make reads. Without it the workflow anchor refuses to run",
+                "make at all — and nothing records which Makefile bytes were reviewed.",
+            )
+        elif p.kind == "pin" and p.pin_kind == "empty":
+            g.fail(f"{pin_path} pins no file. An empty pin would let make read anything, so the anchor refuses it.")
+        elif p.kind == "pin":
+            g.fail(
+                f"{pin_path} is not in its one accepted shape (`makefiles:` then `  <path>: <64 hex>` lines):",
+                p.message,
+            )
+        elif p.kind == "no-makefile":
+            g.fail(f"{pin_path} does not pin `Makefile`, the file make reads first.")
+        elif p.kind in ("mismatch", "absent"):
+            continue  # reported together below
+        else:
+            g.fail(f"{pin_path.name}: {p.message}", "The workflow anchor refuses this tree before invoking make.")
+    if changed:
         g.fail(
-            f"{pin_path} is missing.",
-            "It pins the sha256 of every file make reads. Without it the workflow anchor refuses to run",
-            "make at all — and nothing records which Makefile bytes were reviewed.",
-        )
-        return
-    text = pin_path.read_text()
-    bad_lines = []
-    header = False
-    for n, line in enumerate(text.split("\n"), 1):
-        if not line.strip() or line.startswith("#"):
-            continue
-        if not header and PIN_HEADER_RE.match(line):
-            header = True
-            continue
-        if not header or not PIN_ENTRY_RE.match(line):
-            bad_lines.append(f"{pin_path.name}:{n}: {line!r}")
-    if bad_lines:
-        g.fail(
-            f"{pin_path} is not in its one accepted shape (`makefiles:` then `  <path>: <64 hex>` lines):",
-            *bad_lines,
-        )
-        return
-    try:
-        doc = safe_load_strict(text)
-    except yaml.YAMLError as err:
-        g.fail(f"{pin_path} is not valid YAML: {err}")
-        return
-    pins = doc.get("makefiles") if isinstance(doc, dict) else None
-    if not isinstance(doc, dict) or set(doc) != {"makefiles"} or not isinstance(pins, dict) or not pins:
-        g.fail(f"{pin_path} pins no file. An empty pin would let make read anything, so the anchor refuses it.")
-        return
-    if "Makefile" not in pins:
-        g.fail(f"{pin_path} does not pin `Makefile`, the file make reads first.")
-        return
-    stale, names = [], []
-    for rel, want in sorted(pins.items()):
-        path = root / str(rel)
-        if not path.is_file():
-            stale.append(f"{rel}: pinned, but not a file in {root}")
-            names.append(str(rel))
-            continue
-        got = hashlib.sha256(path.read_bytes()).hexdigest()
-        if got != want:
-            stale.append(f"{rel}: sha256 {got}, pinned {want}")
-            names.append(str(rel))
-    if stale:
-        g.fail(
-            f"{', '.join(names)} changed without the paired update to {pin_path.name}:",
-            *stale,
+            f"{', '.join(p.file for p in changed)} changed without the paired update to {pin_path.name}:",
+            *[f"{p.file}: sha256 {p.got}, pinned {p.want}" if p.kind == "mismatch"
+              else f"{p.file}: pinned, but not a file in {root}" for p in changed],
             "A Makefile edit must land together with its pin update, in the same reviewed diff:",
             "  shasum -a 256 Makefile   (and every other pinned file)",
             "The workflow anchor refuses to invoke make on these bytes, so every make lane is red too.",
         )
-        return
-    g.ok(f"{pin_path.name} pins {len(pins)} makefile(s) ({', '.join(sorted(str(r) for r in pins))}), "
-         f"covers the Makefile, and every digest matches the tree")
 
 
 def main() -> int:

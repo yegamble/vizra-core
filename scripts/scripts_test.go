@@ -296,37 +296,44 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "good", wantFail: false},
 
 		// The two the verifier actually measured.
-		{dir: "shell-override", wantFail: true, wantText: "shell"},
-		{dir: "makeflags-ignore", wantFail: true, wantText: "makeflags"},
+		{dir: "shell-override", wantFail: true, notInvoked: true, wantText: "shell"},
+		{dir: "makeflags-ignore", wantFail: true, notInvoked: true, wantText: "makeflags"},
 
 		// The same two reached through an `include`, which a scan of the root
 		// Makefile alone would not see. MAKEFILE_LIST comes from make itself.
-		{dir: "included-makeflags", wantFail: true, wantText: "inc.mk"},
-		{dir: "included-shell", wantFail: true, wantText: "inc.mk"},
+		{dir: "included-makeflags", wantFail: true, notInvoked: true, wantText: "inc.mk"},
+		{dir: "included-shell", wantFail: true, notInvoked: true, wantText: "inc.mk"},
 
 		// Neighbours of the same class.
-		{dir: "shell-colon", wantFail: true, wantText: "shell"},
-		{dir: "shellflags-neutered", wantFail: true, wantText: "shellflags"},
-		{dir: "gnumakeflags", wantFail: true, wantText: "gnumakeflags"},
-		{dir: "no-shell-pin", wantFail: true, wantText: "approved assignments"},
-		{dir: "oneshell", wantFail: true, wantText: "oneshell"},
+		{dir: "shell-colon", wantFail: true, notInvoked: true, wantText: "shell"},
+		{dir: "shellflags-neutered", wantFail: true, notInvoked: true, wantText: "shellflags"},
+		{dir: "gnumakeflags", wantFail: true, notInvoked: true, wantText: "gnumakeflags"},
+		{dir: "no-shell-pin", wantFail: true, notInvoked: true, wantText: "approved assignments"},
+		{dir: "oneshell", wantFail: true, notInvoked: true, wantText: "oneshell"},
 
 		// A `-` prefix is INVISIBLE to `make --dry-run`, which prints the
 		// command without it. Only the text reading can see this one, which is
 		// why there is a text reading at all.
-		{dir: "dash-prefix", wantFail: true, wantText: "prefixed `-`"},
-		{dir: "at-dash-prefix", wantFail: true, wantText: "prefixed `-`"},
-		{dir: "plus-prefix", wantFail: true, wantText: "prefixed `+`"},
+		{dir: "dash-prefix", wantFail: true, notInvoked: true, wantText: "prefixed `-`"},
+		{dir: "at-dash-prefix", wantFail: true, notInvoked: true, wantText: "prefixed `-`"},
+		{dir: "plus-prefix", wantFail: true, notInvoked: true, wantText: "prefixed `+`"},
 
-		{dir: "or-true", wantFail: true, wantText: "|| true"},
-		{dir: "semicolon-true", wantFail: true, wantText: "; true"},
+		{dir: "or-true", wantFail: true, notInvoked: true, wantText: "|| true"},
+		{dir: "semicolon-true", wantFail: true, notInvoked: true, wantText: "; true"},
 
 		// make runs the LAST definition while a reader — and any text-based
 		// check — sees the first.
-		{dir: "duplicate-target", wantFail: true, wantText: "defined 2 times"},
-		{dir: "conditional-target", wantFail: true, wantText: "conditional"},
+		{dir: "duplicate-target", wantFail: true, notInvoked: true, wantText: "defined 2 times"},
+		{dir: "conditional-target", wantFail: true, notInvoked: true, wantText: "conditional"},
 
-		{dir: "missing-target", wantFail: true, wantText: "could not be established"},
+		// Fix round 1 (PR#10 VERIFY FINDING 4): every TEXT check above now runs on
+		// the pinned read set BEFORE make, so each is refused with make not
+		// started. A missing gate target is one of them; a lane whose shape make
+		// itself cannot resolve (a prerequisite with no rule) still reaches make
+		// and is refused by the resolver, which is what `missing-prerequisite`
+		// keeps covered.
+		{dir: "missing-target", wantFail: true, notInvoked: true, wantText: "is not defined in any makefile make will read"},
+		{dir: "missing-prerequisite", wantFail: true, wantText: "could not be established"},
 
 		// Sweep B5 — THE DIGEST PIN (chair ruling, tick 132, on the 2026-09-23 desk
 		// review, FINDING 4). make EVALUATES a makefile while reading it, so every

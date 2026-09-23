@@ -46,9 +46,14 @@ Before invoking make at all, in both modes, it checks every file make will read
 against its sha256 in `.github/pinned-makefiles.yml`; what make will read is
 determined from the pinned bytes without running them (the root `Makefile` plus
 every literal `include`/`-include`/`sinclude`/`load`, transitively — sound only
-because those bytes are themselves pinned). Its first make invocation is
-`make -q` on the pinned makefiles, which runs no recipe, to refuse a makefile
-make would REMAKE from something unpinned (it does that even under `-n`).
+because those bytes are themselves pinned), and every text check (SHELL /
+MAKEFLAGS assignments, recipe prefixes and suffixes, duplicate gate targets)
+runs on those files before make too. Its first make invocation is ONE
+`make -q` naming every pinned makefile as a goal — `-q` applies in make's
+remake phase only to goals — to refuse a makefile make would REMAKE from
+something unpinned (it does that even under `-n`). `-q` runs no ordinary
+recipe, but a `+` or `$(MAKE)` recipe line still runs under it; such a line can
+come only from the pinned, reviewed bytes.
 Every process it starts gets an environment without `GITHUB_ENV`,
 `GITHUB_PATH`, `GITHUB_OUTPUT`, `GITHUB_STATE`, `GITHUB_STEP_SUMMARY` or any other
 runner command-file variable. The reviewed bytes still run their own
@@ -82,7 +87,9 @@ be exhaustive:
 * **10** — a lane that checks out runs `scripts/provenance.sh`.
 * **11** — `.github/pinned-makefiles.yml` exists, has its one accepted shape,
   pins `Makefile`, and matches the tree: a Makefile edit without the paired pin
-  update fails by name (`scripts/testdata/makefilepin/`, 7 fixtures).
+  update fails by name. It calls the anchor's own `scripts/makefile_pin.py`, so
+  it refuses whatever the anchor refuses before make
+  (`scripts/testdata/makefilepin/`, 12 fixtures).
 
 It also refuses a job-level `container:`, a `defaults.run` at either scope, an
 undigested service image, and a MAKEFLAGS/GNUMAKEFLAGS/MFLAGS/MAKEFILES/SHELL/
@@ -190,3 +197,17 @@ CI-corroborated.
 
 Red/green transcripts: `docs/evidence/hardening-b5/` (`demo.sh`, over the B1
 `mutate.sh`).
+
+### Sweep B5 fix round 1, measured on tree `ca9b21e` (scripts/ tree `70d09e55…`)
+
+Same host, heavily loaded (load average ~360). CI could not run (billing).
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | **2** | every lane before `test-race` passed (both guards included); `test-race`: 13 ok, 8 `[no test files]`, and `internal/fixtures` **timed out** (`panic: test timed out after 10m0s` in `TestManifestDetectsEveryClassOfDrift`) — an infrastructure timeout under host load, NOT a pass. This slice changes nothing under `internal/` |
+| `go test -race -count=1 -timeout 20m ./internal/fixtures/` | 0 | `ok … 409.522s` |
+| direct unit step + `go-test-report.py` | 0 | **1157 executed, 0 failed, 0 skipped**, floor 943, 14 packages; `internal/fixtures` 42, `scripts` 237 |
+| `go test -race -count=1 ./scripts/` | 0 | 237 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| GNU Make 4.3 (`ubuntu:24.04` container): both anchors, ci-required-guard, D0–D6, C7, P1 | 0 / 0 / 0 / as expected | `docs/evidence/hardening-b5/make-4.3-ubuntu24.04/` |

@@ -18,8 +18,14 @@
 #   any mismatch — and when the files make would read (determined from these
 #   pinned bytes, without running them) include one not listed here, or this
 #   list names one make would not read — it refuses and make is NOT invoked.
-# * scripts/ci-required-guard.py check 11 asserts this file exists, has this
-#   exact shape, pins `Makefile`, and that every digest matches.
+# * The anchor's first make invocation is ONE `make -q` naming every file
+#   pinned here, refusing if make would REMAKE any of them from something
+#   unpinned. -q runs no ordinary recipe; a `+` or `$(MAKE)` line in the pinned
+#   bytes would still run.
+# * scripts/ci-required-guard.py check 11 calls the same reader
+#   (scripts/makefile_pin.py): this file exists, has this exact shape, pins
+#   `Makefile`, every digest matches, and it refuses whatever the anchor
+#   refuses before make.
 #
 # WHAT THIS GUARANTEES, AND WHAT IT DOES NOT
 # ------------------------------------------

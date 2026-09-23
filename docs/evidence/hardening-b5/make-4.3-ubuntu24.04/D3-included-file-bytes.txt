@@ -1,10 +1,11 @@
 # D3 an INCLUDED file's bytes changed (fixture include-pinned-good: Makefile includes a.mk and b.mk, all pinned)
 # host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
-# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
 
 == control ==
-anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=0 processes-started=7 make-processes=6 first-make-argv=['make', '-q', 'Makefile']
-make-integrity-guard: passed (1 gate target(s); make ran 6 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
+anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=0 processes-started=5 make-processes=4 first-make-argv=['make', '-q', 'Makefile', 'a.mk', 'b.mk']
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
 ==============================================================
 MUTATION: D3 one byte of included a.mk
   file:   scripts/testdata/makeguard/include-pinned-good/a.mk
@@ -27,5 +28,5 @@ make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) starte
   RESULT: D3 one byte of included a.mk -> exit 0
 
 == after restore ==
-anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=0 processes-started=7 make-processes=6 first-make-argv=['make', '-q', 'Makefile']
-make-integrity-guard: passed (1 gate target(s); make ran 6 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
+anchor [--root scripts/testdata/makeguard/include-pinned-good --targets ci --workflow] exit=0 processes-started=5 make-processes=4 first-make-argv=['make', '-q', 'Makefile', 'a.mk', 'b.mk']
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)

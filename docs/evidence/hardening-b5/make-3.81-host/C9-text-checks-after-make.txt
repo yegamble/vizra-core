@@ -1,0 +1,54 @@
+# C9 the text checks moved back AFTER make (the 62d16aa order: refused by name, but only after make ran)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
+
+==============================================================
+MUTATION: C9 text checks after make
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 -c "p='scripts/make-integrity-guard.py';s=open(p).read();a='        check_text(g, root, pinned[0], closure, targets)\n';b='        g.ok(f\"make\'s own MAKEFILE_LIST {made} is exactly the pinned set\")\n';assert s.count(a)==1 and s.count(b)==1;s=s.replace(a,'');open(p,'w').write(s.replace(b,b+'    check_text(g, root, files, prerequisite_closure(root, files, targets), targets)\n'))"
+  check:  gotest 'TestMakeIntegrityGuardFixtures'
+--------------------------------------------------------------
+  sha256 BEFORE: 3fd0209840c53aa42e0fd5b930cd1b59345a2b372dcc54ba2a174a3b89626b2e
+  sha256 AFTER:  47bdc78c276516123c23ef07d6bf8e7940e81c1e939a453026e721268a35ebe8
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+--- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/duplicate-target (3.32s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/semicolon-true (3.51s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/conditional-target (3.63s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/or-true (3.63s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/plus-prefix (4.14s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/at-dash-prefix (3.51s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/dash-prefix (3.01s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/gnumakeflags (2.27s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/oneshell (2.57s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/no-shell-pin (3.00s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/shellflags-neutered (2.71s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/included-shell (3.34s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/included-makeflags (3.65s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/shell-colon (4.40s)
+        scripts_test.go:376: the refusal must come BEFORE make is started, and say so:
+    --- FAIL: TestMakeIntegrityGuardFixtures/makeflags-ignore (3.66s)
+go test exit=1
+------------------------------------
+  sha256 RESTORED: 3fd0209840c53aa42e0fd5b930cd1b59345a2b372dcc54ba2a174a3b89626b2e
+  restore byte-identical: yes
+  RESULT: C9 text checks after make -> exit 1
+
+== after restore ==
+ok  	github.com/yegamble/vizra-core/scripts	9.599s
+go test exit=0

@@ -72,12 +72,17 @@ not discarded:
     of make's parser defending against hostile text — a changed byte never
     reaches it. `$(eval …)` / `$(guile …)`, which could manufacture a
     directive, are refused. MAKEFILES, which would add a file, is refused and
-    scrubbed. make's first invocation is then `make -q` on the pinned
-    makefiles, which runs no recipe, to ask whether it would REMAKE one of them
-    from something nobody pinned (make does that even under -n); after make
-    has run, its own MAKEFILE_LIST must equal the pinned set and the pinned
-    bytes must be unchanged. Any failure: make is not invoked (or, for the
-    last two, the lane fails).
+    scrubbed. make's first invocation is then ONE `make -q` naming every
+    pinned makefile as a goal — -q applies in make's remake phase only to
+    makefiles that are goals — to ask whether it would REMAKE one of them from
+    something nobody pinned (make does that even under -n). -q runs no ORDINARY
+    recipe; a `+` or `$(MAKE)` recipe line still runs under it, and such a line
+    can come only from the pinned, reviewed bytes (make's builtin RCS/SCCS
+    checkout rule is a `+` line that expands to nothing for a file that exists,
+    and every pinned file must exist). After make has run, its own
+    MAKEFILE_LIST must equal the pinned set and the pinned bytes must be
+    unchanged. Any failure: make is not invoked (or, for the probe, invoked
+    only as that one `make -q`; for the last two, the lane fails).
     Those reviewed bytes are NOT inert. Reading them runs the reviewed
     parse-time calls — today `$(shell git rev-parse …)` and `$(shell date …)`
     at Makefile:22-23 — and the ok line lists every such site it finds.
@@ -86,11 +91,15 @@ not discarded:
     GITHUB_STATE, GITHUB_STEP_SUMMARY or any other variable whose value is a
     file in the runner's command-file directory (clean_env), nor MAKEFLAGS,
     MAKEFILES, BASH_ENV or ENV;
-  * a Makefile (or anything it `include`s) that overrides `SHELL`,
+  * a Makefile (or anything it `include`s) whose TEXT assigns `SHELL`,
     `.SHELLFLAGS`, `MAKEFLAGS` or `GNUMAKEFLAGS`, or sets `.ONESHELL`, fails the
-    lane BY NAME before make is ever invoked;
+    lane BY NAME before make is ever invoked — the text checks run on the
+    pinned read set, before the gate (fix round 1; they used to run after four
+    make processes). A value only make can resolve (a computed variable name,
+    say) is refused by the RESOLVER, which necessarily runs make first — on
+    the pinned bytes only;
   * a gate target whose recipe carries a `-` / `@-` prefix or a `|| true`-family
-    suffix fails the lane by name;
+    suffix fails the lane by name, before make is invoked;
   * a gate target defined twice — where make silently runs the LAST definition
     while a reader, and any text-based check, sees the first — fails the lane by
     name.
@@ -199,13 +208,18 @@ scripts/testdata/spawn-recorder.py, which records every process it starts.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import re
-import stat
 import subprocess
 import sys
 from pathlib import Path
+
+# The pin reader shared with ci-required-guard.py check 11. No bytecode is
+# written next to it: a __pycache__ in scripts/ would dirty the tree the anchor
+# is judging.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import makefile_pin as mp  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # THE GATE TARGETS.
@@ -360,312 +374,114 @@ def run_make(root: Path, args: list[str]):
 # in .github/pinned-makefiles.yml, and make is not invoked at all until it does.
 # A Makefile change then merges only together with a reviewed pin update — the
 # same discipline as .github/pinned-steps.yml.
+#
+# The pin is read, and what make will read is decided, by scripts/makefile_pin.py
+# — the SAME function ci-required-guard.py check 11 calls, so the static check
+# refuses exactly what this anchor refuses.
 
-PIN_FILE = Path(".github") / "pinned-makefiles.yml"
+PIN_FILE = mp.PIN_FILE
 
-# The pin file's ONLY accepted shape. It is a YAML subset, parsed here by these
-# two expressions (the anchor imports nothing outside the standard library) and
-# by ci-required-guard.py with PyYAML plus the same expressions; anything else —
-# a quoted key, a tab, a flow mapping, a second document — is refused, so the
-# two readers can never disagree about what is pinned.
-PIN_HEADER_RE = re.compile(r"^makefiles:[ \t]*$")
-PIN_ENTRY_RE = re.compile(r"^  ([A-Za-z0-9_][A-Za-z0-9._/-]*): ([0-9a-f]{64})[ \t]*$")
-
-# With no `-f`, GNU make reads the FIRST of these that exists in the working
-# directory (manual §3.2). A `GNUmakefile` beside the Makefile would be read
-# INSTEAD of it, so its mere presence is refused.
-DEFAULT_MAKEFILE_NAMES = ("GNUmakefile", "makefile", "Makefile")
-
-# The directives that make GNU make read (or load) another file.
-_READ_DIRECTIVE_RE = re.compile(r"^[ \t]*(-include|sinclude|include|-load|load)(?:[ \t]+(.*))?$")
-
-# Functions that can MANUFACTURE a directive at parse time: `$(eval include x)`,
-# and guile's gmk-eval. A static reading cannot see what they will produce.
-_MANUFACTURES_DIRECTIVES_RE = re.compile(r"\$[({](eval|guile)[\s)}]")
-
-# Characters that make a directive's file name something make computes.
-_COMPUTED_NAME_CHARS = set("$*?[%~`\\")
-
-# Informational only: the parse-time execution the REVIEWED bytes contain.
-_PARSE_TIME_EXEC_RE = re.compile(r"\$[({]shell[\s)}]|!=")
-
-
-class PinError(Exception):
-    pass
-
-
-def load_makefile_pin(root: Path) -> dict[str, str]:
-    """Parse .github/pinned-makefiles.yml. Every deviation from the shape is an error."""
-    path = root / PIN_FILE
-    try:
-        raw = path.read_bytes()
-    except FileNotFoundError:
-        raise PinError(f"{PIN_FILE} does not exist. It is the list of Makefile bytes make may read; "
-                       f"without it nothing says which bytes were reviewed.")
-    except OSError as err:
-        raise PinError(f"{PIN_FILE} cannot be read: {err}")
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        raise PinError(f"{PIN_FILE} is not UTF-8")
-    entries: dict[str, str] = {}
-    header = False
-    for n, line in enumerate(text.split("\n"), 1):
-        if not line.strip() or line.startswith("#"):
-            continue
-        if not header:
-            if not PIN_HEADER_RE.match(line):
-                raise PinError(f"{PIN_FILE}:{n}: expected `makefiles:` as the first entry, found {line!r}")
-            header = True
-            continue
-        m = PIN_ENTRY_RE.match(line)
-        if not m:
-            raise PinError(f"{PIN_FILE}:{n}: not a `  <path>: <64 lowercase hex sha256>` entry: {line!r}")
-        name, digest = m.group(1), m.group(2)
-        if name != os.path.normpath(name) or name.startswith("../") or name == "..":
-            raise PinError(f"{PIN_FILE}:{n}: {name!r} is not a normalised path inside the repository")
-        if name in entries:
-            raise PinError(f"{PIN_FILE}:{n}: {name!r} is pinned twice")
-        entries[name] = digest
-    if not header or not entries:
-        raise PinError(f"{PIN_FILE} pins no file. An empty pin would let make read anything.")
-    return entries
-
-
-def _logical_lines(text: str):
-    """(first line number, joined line) with backslash continuations joined and comments cut."""
-    lines = text.split("\n")
-    i = 0
-    while i < len(lines):
-        first, line = i + 1, lines[i]
-        # An ODD number of trailing backslashes continues the line.
-        while line.endswith("\\") and (len(line) - len(line.rstrip("\\"))) % 2 == 1 and i + 1 < len(lines):
-            i += 1
-            line = line[:-1] + " " + lines[i].lstrip()
-        # A `#` starts a comment unless escaped. Cutting it can only REMOVE a
-        # directive argument, never add one, and the bytes are pinned anyway.
-        out, j = [], 0
-        while j < len(line):
-            c = line[j]
-            if c == "\\" and j + 1 < len(line):
-                out.append(line[j:j + 2])
-                j += 2
-                continue
-            if c == "#":
-                break
-            out.append(c)
-            j += 1
-        yield first, "".join(out)
-        i += 1
-
-
-def static_read_set(root: Path, texts: dict[str, str]):
-    """What make WILL read, determined without running a line of any makefile.
-
-    Returns (ordered list of files, list of problems). It is sound ONLY because
-    it is run over bytes whose sha256 already matched the pin — i.e. bytes a
-    reviewer approved together with that pin. It is not a model of make's
-    parser and is not a defence against hostile text; it answers one narrow
-    question about REVIEWED text: which other files do these bytes name?
-
-      1. The root makefile. With no `-f`, make reads the first of GNUmakefile,
-         makefile, Makefile in the working directory. Only `Makefile` may exist.
-      2. MAKEFILES from the environment would be read before it. It is refused
-         in check_environment and dropped from every subprocess by clean_env.
-      3. Every `include` / `-include` / `sinclude` / `load` / `-load` directive
-         in a file already in the set, followed transitively. Each name must be
-         a literal, repository-relative path that is itself pinned and exists —
-         existence matters: make searches -I and /usr/include-style
-         directories only for a name NOT found relative to the working
-         directory, so a pinned, present file is the one make opens.
-      4. Nothing in the set may call `$(eval …)` or `$(guile …)`, which can
-         manufacture a directive the static reading would not see.
-
-    Anything this cannot determine is a problem, and a problem means make is
-    not invoked. The result is corroborated AFTER make runs by comparing it
-    with the MAKEFILE_LIST make itself reports.
-    """
-    problems: list[str] = []
-    try:
-        present = set(os.listdir(root))
-    except OSError as err:
-        return [], [f"cannot list {root}: {err}"]
-    for name in DEFAULT_MAKEFILE_NAMES[:-1]:
-        if name in present:  # exact directory-entry names, so a case-insensitive disk cannot hide one
-            problems.append(f"{name} exists beside the Makefile. With no -f, GNU make reads {name} INSTEAD "
-                            f"of Makefile, so the pinned Makefile would not be what runs.")
-    order: list[str] = []
-    queue = ["Makefile"]
-    while queue:
-        rel = queue.pop(0)
-        if rel in order:
-            continue
-        order.append(rel)
-        text = texts.get(rel)
-        if text is None:
-            continue  # unpinned or unreadable — reported by the caller
-        # Searched in the RAW text, comments and recipes included: a `#` is not
-        # a comment inside a recipe, and a recipe is expanded under `-n` too.
-        for n, line in enumerate(text.split("\n"), 1):
-            if _MANUFACTURES_DIRECTIVES_RE.search(line):
-                problems.append(f"{rel}:{n} calls $(eval …) or $(guile …), which can manufacture an include "
-                                f"the static reading cannot see: `{line.strip()[:120]}`")
-        for n, line in _logical_lines(text):
-            m = _READ_DIRECTIVE_RE.match(line)
-            if not m:
-                continue
-            directive, args = m.group(1), (m.group(2) or "").strip()
-            if not args:
-                continue
-            for word in args.split():
-                if directive.endswith("load"):
-                    word = word.split("(", 1)[0]
-                if _COMPUTED_NAME_CHARS & set(word):
-                    problems.append(f"{rel}:{n} `{directive} {word}` names a file make COMPUTES; which file it "
-                                    f"reads cannot be determined without running the makefile.")
-                    continue
-                norm = os.path.normpath(word)
-                if os.path.isabs(word) or norm == ".." or norm.startswith("../"):
-                    problems.append(f"{rel}:{n} `{directive} {word}` reads a file outside the repository.")
-                    continue
-                queue.append(norm)
-    return order, problems
-
-
-def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+_PIN_FAIL_DETAIL = {
+    "mismatch": lambda p: (
+        "These are not the bytes that were reviewed. make would EVALUATE them while this guard",
+        "reads its database — `$(shell …)` and friends run at parse time — so it is not invoked.",
+        f"If the edit is intended, update {PIN_FILE} in the same reviewed diff:",
+        f"  shasum -a 256 {p.file}",
+    ),
+    "pin": lambda p: ("make is only ever run on bytes a reviewer approved together with this pin.",),
+    "unpinned": lambda p: (
+        "Every file make reads is pinned by digest, or make is not run: an unpinned include is",
+        "bytes nobody reviewed, evaluated while this guard reads the Makefile database.",
+    ),
+    "stale": lambda p: (
+        "The pin must be exactly what make reads; a stale entry means the pin and the Makefile drifted.",
+    ),
+}
 
 
 def check_makefile_pin(g: Guard, root: Path):
-    """Digest every file make will read, BEFORE make is invoked. Returns (files, texts) or None.
+    """Digest every file make will read, BEFORE make is invoked. Returns (files, digests) or None.
 
     None means: do NOT invoke make. The caller returns without running it.
     """
-    try:
-        pins = load_makefile_pin(root)
-    except PinError as err:
-        g.fail(str(err), "make is only ever run on bytes a reviewer approved together with this pin.")
+    r = mp.verify_pin(root)
+    for p in r.problems:
+        g.fail(p.message, *_PIN_FAIL_DETAIL.get(p.kind, lambda _p: ())(p))
+    if not r.ok:
         return None
-    if "Makefile" not in pins:
-        g.fail(f"{PIN_FILE} does not pin `Makefile`, the file make reads first.")
-        return None
-
-    texts: dict[str, str] = {}
-    digests: dict[str, str] = {}
-    bad = False
-    for rel in sorted(pins):
-        path = root / rel
-        try:
-            st = os.lstat(path)
-        except FileNotFoundError:
-            g.fail(f"{rel} is pinned in {PIN_FILE} but does not exist.")
-            bad = True
-            continue
-        if not stat.S_ISREG(st.st_mode):
-            g.fail(f"{rel} is not a regular file (a symlink, FIFO or device is refused): make would read "
-                   f"whatever it points at, which is not what was digested.")
-            bad = True
-            continue
-        data = path.read_bytes()
-        digests[rel] = _sha256(data)
-        if digests[rel] != pins[rel]:
-            g.fail(
-                f"{rel}: sha256 {digests[rel]} does not match {PIN_FILE} ({pins[rel]}).",
-                "These are not the bytes that were reviewed. make would EVALUATE them while this guard",
-                "reads its database — `$(shell …)` and friends run at parse time — so it is not invoked.",
-                f"If the edit is intended, update {PIN_FILE} in the same reviewed diff:",
-                f"  shasum -a 256 {rel}",
-            )
-            bad = True
-            continue
-        try:
-            texts[rel] = data.decode("utf-8")
-        except UnicodeDecodeError:
-            g.fail(f"{rel} is not UTF-8 text; the files make may read cannot be determined from it.")
-            bad = True
-
-    order, problems = static_read_set(root, texts)
-    for p in problems:
-        g.fail(p)
-        bad = True
-    unpinned = [f for f in order if f not in pins]
-    for f in unpinned:
-        g.fail(
-            f"make would read {f}, which has no entry in {PIN_FILE}.",
-            "Every file make reads is pinned by digest, or make is not run: an unpinned include is",
-            "bytes nobody reviewed, evaluated while this guard reads the Makefile database.",
-        )
-        bad = True
-    stale = sorted(set(pins) - set(order))
-    if stale and not bad:
-        g.fail(
-            f"{PIN_FILE} pins {', '.join(stale)}, which make would NOT read from the pinned bytes.",
-            "The pin must be exactly what make reads; a stale entry means the pin and the Makefile drifted.",
-        )
-        bad = True
-    if bad:
-        return None
-
-    sites = []
-    for rel in order:
-        for n, line in _logical_lines(texts[rel]):
-            if _PARSE_TIME_EXEC_RE.search(line):
-                sites.append(f"{rel}:{n} `{line.strip()[:90]}`")
     g.ok(
-        f"make runs only on REVIEWED bytes: the {len(order)} file(s) it will read ({', '.join(order)}) "
+        f"make runs only on REVIEWED bytes: the {len(r.order)} file(s) it will read ({', '.join(r.order)}) "
         f"match the sha256 pins in {PIN_FILE}, checked before make was invoked. Those bytes are not "
         f"inert — reading them runs the reviewed parse-time call(s) "
-        + ("; ".join(sites) if sites else "(none)")
+        + ("; ".join(r.sites) if r.sites else "(none)")
         + ". Review of a Makefile together with its pin is the control; CODEOWNERS is advisory."
     )
-    return order, {rel: digests[rel] for rel in order}
+    return r.order, {rel: r.digests[rel] for rel in r.order}
 
 
-# The pinned makefiles, named as GOALS on every later make command line. GNU
-# make remakes an out-of-date makefile BEFORE anything else — and does it even
-# under -n, -q and -t, because an out-of-date makefile would give wrong answers
-# (manual §3.5). Only a makefile that is also named as a goal has -n / -q
-# applied to it. MEASURED on GNU Make 3.81 with a newer sibling `Makefile.sh`
-# (the builtin rule `%: %.sh`): `make -pn ci` EXECUTED `cat Makefile.sh
-# >Makefile` and re-read the result; `make -q Makefile` exited 1 and changed
-# nothing; `make -pn Makefile ci` printed that recipe without running it.
+# The pinned makefiles, named as GOALS on every make command line after the
+# probe. GNU make remakes an out-of-date makefile BEFORE anything else — and
+# does it even under -n, -q and -t, because an out-of-date makefile would give
+# wrong answers (manual §3.5). -n / -q apply in that phase ONLY to makefiles
+# that are also command-line goals; for every other makefile make clears them
+# and runs the remake recipe for real. MEASURED on GNU Make 3.81 and 4.3 with a
+# newer sibling `Makefile.sh` (the builtin rule `%: %.sh`): `make -pn ci`
+# EXECUTED `cat Makefile.sh >Makefile` and re-read the result; `make -q Makefile`
+# exited 1 and changed nothing; `make -pn Makefile ci` printed that recipe
+# without running it.
 PINNED_MAKEFILE_GOALS: list[str] = []
 
 
 def check_no_pinned_makefile_would_be_remade(g: Guard, root: Path, files: list[str]) -> None:
-    """Ask make — with -q, which runs NO recipe — whether it would remake a pinned makefile.
+    """Ask make, with ONE `make -q` naming EVERY pinned makefile, whether it would remake any.
 
     A makefile can be remade from files nobody pinned: make's own builtin
-    implicit rules turn a newer `Makefile.sh` into the Makefile (`cat`), and a
+    implicit rules turn a newer `Makefile.sh` into the Makefile (`cat`) and a
     `Makefile.c` into one (the C compiler), with no line in any makefile saying
     so. The static reading of the pinned bytes cannot see make's builtin rules,
-    so make itself is asked, on the pinned bytes only, with each pinned makefile
-    named as a goal so that -q applies to it. Exit 0 is "up to date"; anything
-    else is refused before any other make invocation.
+    so make itself is asked, on the pinned bytes only.
+
+    ONE invocation, every pinned file a goal. Fix round 1 (PR#10 VERIFY,
+    FINDING 1): the probe used to run `make -q Makefile`, then `make -q a.mk`, …
+    — and in `make -q Makefile` the pinned include a.mk is NOT a goal, so make
+    really ran `cat a.mk.sh >a.mk`, re-read the result and reported "up to
+    date". Measured on 3.81 and 4.3; `make -q Makefile a.mk b.mk` exits 1 and
+    changes nothing.
+
+    What -q does NOT stop: GNU make runs a recipe line that starts with `+` or
+    names `$(MAKE)` even under -q (and -n). Such a line can come only from the
+    pinned, reviewed bytes, or from make's builtin RCS/SCCS checkout rule
+    (`+$(if $(wildcard $@),,$(CO) …)`), which expands to nothing for a file that
+    exists — and every pinned file must exist. (Measured by the PR#10 verifier:
+    `Makefile,v` and `RCS/Makefile,v` siblings → `make -q` exit 0, nothing run.)
     """
+    probes = [files]  # ONE invocation; every pinned makefile is a goal, so -q applies to each
     bad = []
-    for rel in files:
-        proc = run_make(root, ["-q", rel])
+    for goals in probes:
+        proc = run_make(root, ["-q", *goals])
         if proc.returncode != 0:
-            bad.append((rel, proc.returncode, (proc.stdout + proc.stderr).strip().splitlines()[:4]))
-    for rel, code, lines in bad:
+            bad.append((goals, proc.returncode, (proc.stdout + proc.stderr).strip().splitlines()[:4]))
+    for goals, code, lines in bad:
         g.fail(
-            f"make would REMAKE {rel} before reading it (`make -q {rel}` exit {code}).",
+            f"make would REMAKE one of {', '.join(goals)} before reading it (`make -q {' '.join(goals)}` "
+            f"exit {code}).",
             "make remakes an out-of-date makefile even under -n, from a rule or a builtin implicit rule",
             "(a newer `Makefile.sh` or `Makefile.c` is enough), and then reads the NEW bytes — which",
-            "nobody pinned. Nothing was remade: -q runs no recipe.",
+            "nobody pinned. -q runs no ordinary recipe; only a `+` or `$(MAKE)` line in the pinned bytes",
+            "would have run.",
             *lines,
         )
     if not bad:
-        g.ok(f"`make -q` (no recipe run) reports none of {', '.join(files)} would be remade, so make reads "
-             f"exactly the pinned bytes; every later make command names them as goals so -n applies to them")
+        g.ok(f"`make -q {' '.join(files)}` (every pinned makefile a goal, so -q applies to each) reports none "
+             f"would be remade; every later make command names them as goals so -n applies to them. -q runs "
+             f"no ordinary recipe — only `+`/`$(MAKE)` lines, which can come only from the pinned bytes")
 
 
 def recheck_pinned_bytes(g: Guard, root: Path, digests: dict[str, str]) -> None:
     """After make ran: the pinned bytes are still the pinned bytes."""
     for rel, want in digests.items():
         try:
-            got = _sha256((root / rel).read_bytes())
+            got = mp.sha256((root / rel).read_bytes())
         except OSError as err:
             g.fail(f"{rel} could not be re-read after make ran: {err}")
             continue
@@ -889,7 +705,7 @@ def check_environment_overrides(g: Guard, root: Path, files: list[str], workflow
     variables the Makefile deliberately takes from the environment were not.
     An earlier step's `$GITHUB_ENV` write reaches make exactly as MAKEFLAGS does.
 
-    So, from every file make read (MAKEFILE_LIST, includes too): a variable
+    So, from every file make will read (the pinned read set, includes too): a variable
     assigned with `?=`, or referenced as `$(NAME)` without ever being assigned,
     is one the environment can set — and in `--workflow` mode it must be ABSENT.
     `GOFLAGS` is refused as well whether or not a makefile names it, because
@@ -930,16 +746,18 @@ def check_environment_overrides(g: Guard, root: Path, files: list[str], workflow
 
 
 def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds: list[str]) -> None:
-    """Read the files make said it read.
+    """Read the files make will read — BEFORE make is invoked.
 
-    MAKEFILE_LIST comes from make itself, so an `include` cannot hide a file
-    from this scan — which matters, because an included makefile carrying
-    `MAKEFLAGS += -i` no-ops the whole repository just as well as the root one.
+    The list is the pinned read set (makefile_pin.static_read_set over the
+    pinned bytes), so an `include` cannot hide a file from this scan — which
+    matters, because an included makefile carrying `MAKEFLAGS += -i` no-ops the
+    whole repository just as well as the root one. After make has run, its own
+    MAKEFILE_LIST is required to equal the same set.
     """
     if not files:
-        g.fail("make reported an empty MAKEFILE_LIST; there is nothing to read")
+        g.fail("the pinned read set is empty; there is nothing to read")
         return
-    g.ok(f"make read {len(files)} makefile(s): {', '.join(files)}")
+    g.ok(f"make will read {len(files)} makefile(s), from the pinned bytes: {', '.join(files)}")
 
     assignment_re = re.compile(
         r"^\s*(?:export\s+|override\s+)*(" + "|".join(
@@ -955,7 +773,7 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
         try:
             text = path.read_text()
         except OSError as err:
-            g.fail(f"cannot read {rel}, which make says it read: {err}")
+            g.fail(f"cannot read {rel}, which make will read: {err}")
             continue
         lines = text.split("\n")
         is_root = Path(rel).name == "Makefile" and Path(rel).parent in (Path("."), Path(""))
@@ -1031,7 +849,7 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
         if not where:
             if t in seeds:
                 g.fail(
-                    f"gate target `{t}` is not defined in any makefile make read.",
+                    f"gate target `{t}` is not defined in any makefile make will read.",
                     "A required CI lane invokes it by that name.",
                 )
             else:
@@ -1321,13 +1139,28 @@ def main() -> int:
     check_environment(g, args.workflow)
     check_make_resolves_to_a_real_program(g)
     if pinned is not None:
-        # The static read set is known now, so the environment-override check
-        # no longer needs make's MAKEFILE_LIST — and runs before make as well.
+        # The static read set is known now, so every TEXT check — the
+        # environment overrides, and the SHELL / .SHELLFLAGS / MAKEFLAGS /
+        # GNUMAKEFLAGS / .ONESHELL assignments, recipe prefixes and suffixes,
+        # duplicate and conditional gate targets — runs before make as well.
+        # Fix round 1 (PR#10 VERIFY FINDING 4): these used to run after four
+        # make processes, while the docstring said "before make is ever invoked".
         check_environment_overrides(g, root, pinned[0], args.workflow)
+
+        # The named targets are what CI invokes; the CLOSURE is what actually
+        # runs. `make ci` is one word in a workflow and ten lanes here, and it
+        # is `test-race`'s recipe — not `ci`'s, which has none — that runs the
+        # tests.
+        closure = prerequisite_closure(root, pinned[0], targets)
+        derived = [t for t in closure if t not in targets]
+        print(f"  closure: {len(closure)} target(s); {len(derived)} reached through prerequisites"
+              + (f" ({', '.join(derived)})" if derived else ""))
+        check_text(g, root, pinned[0], closure, targets)
 
     # THE GATE. Any failure so far — an unpinned or changed makefile, a
     # MAKEFILES / BASH_ENV / MAKEFLAGS in the environment, a `make` that is not
-    # the system's — and make is never started. Before sweep B5 a failed
+    # the system's, a neutering assignment or recipe line in the pinned text —
+    # and make is never started. Before sweep B5 a failed
     # environment check was reported and make was run anyway.
     if g.failed:
         print(f"make-integrity-guard: FAILED — make was NOT invoked ({MAKE_INVOCATIONS} make process(es) "
@@ -1337,12 +1170,13 @@ def main() -> int:
     pinned_files, pinned_digests = pinned
 
     # make's first invocation, on the pinned bytes only: would it remake any of
-    # them? -q runs no recipe. If it would, stop — nothing else runs make.
+    # them? ONE `make -q` naming every pinned makefile. If it would, stop —
+    # nothing else runs make.
     check_no_pinned_makefile_would_be_remade(g, root, pinned_files)
     if g.failed:
         recheck_pinned_bytes(g, root, pinned_digests)
         print(f"make-integrity-guard: FAILED — make was invoked only as `make -q` ({MAKE_INVOCATIONS} "
-              f"process(es)), which runs no recipe.", file=sys.stderr)
+              f"process(es)), which runs no ordinary recipe.", file=sys.stderr)
         return 1
     PINNED_MAKEFILE_GOALS[:] = pinned_files
 
@@ -1364,16 +1198,6 @@ def main() -> int:
         )
     else:
         g.ok(f"make's own MAKEFILE_LIST {made} is exactly the pinned set")
-
-    # The named targets are what CI invokes; the CLOSURE is what actually runs.
-    # `make ci` is one word in a workflow and ten lanes here, and it is
-    # `test-race`'s recipe — not `ci`'s, which has none — that runs the tests.
-    closure = prerequisite_closure(root, files, targets)
-    derived = [t for t in closure if t not in targets]
-    print(f"  closure: {len(closure)} target(s); {len(derived)} reached through prerequisites"
-          + (f" ({', '.join(derived)})" if derived else ""))
-
-    check_text(g, root, files, closure, targets)
 
     # The resolver checks read make's own variable database, which is global to
     # the invocation, and make reports a duplicate definition at PARSE time — so

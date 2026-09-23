@@ -46,7 +46,7 @@ ci-required-guard:
   ok    the test-race lane selects the whole module (PKGS = ./...)
   ok    the test-race target uses $(PKGS)
   ok    all 2 -run selections are non-empty
-  ok    pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree
+  ok    pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree; make will read exactly Makefile (the anchor's own verify_pin)
   ok    every job runs on GitHub-hosted ubuntu-24.04
   ok    every third-party action is pinned to a commit SHA
 ci-required-guard: passed (6 required check(s))

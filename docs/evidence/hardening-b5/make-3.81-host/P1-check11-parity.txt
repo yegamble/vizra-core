@@ -1,0 +1,10 @@
+# P1 check 11 parity: the 62d16aa ci-required-guard vs this tree's, on the new makefilepin fixtures
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
+
+gnumakefile-present: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: GNUmakefile exists beside the Makefile. With no -f, GNU make reads GNUmakefile INSTEAD of Makefile, so the pinned Makefi
+makefile-symlink: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: Makefile is not a regular file (a symlink, FIFO or device is refused): make would read whatever it points at, which is n
+stale-entry: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: .github/pinned-makefiles.yml pins old.mk, which make would NOT read from the pinned bytes.
+include-unpinned: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: make would read inc.mk, which has no entry in .github/pinned-makefiles.yml.
+include-computed: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: Makefile:5 `include $(INC)` names a file make COMPUTES; which file it reads cannot be determined without running the mak

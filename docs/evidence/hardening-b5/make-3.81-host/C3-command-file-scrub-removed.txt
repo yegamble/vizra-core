@@ -1,6 +1,7 @@
 # C3 clean_env keeps the runner command-file variables (named list AND directory rule removed)
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
 
 ==============================================================
 MUTATION: C3 scrub removed
@@ -8,17 +9,17 @@ MUTATION: C3 scrub removed
   mutate: python3 -c "p='scripts/make-integrity-guard.py';s=open(p).read();a='    drop = set(_ALWAYS_DROPPED) | set(RUNNER_COMMAND_FILES)\n';b='    drop |= {k for k, v in env.items() if _is_runner_command_file(v, command_dirs)}\n';assert s.count(a)==1 and s.count(b)==1;open(p,'w').write(s.replace(a,'    drop = set(_ALWAYS_DROPPED)\n').replace(b,''))"
   check:  gotest 'TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles'
 --------------------------------------------------------------
-  sha256 BEFORE: 814c68265f5709fc1fd30862fe79ca659eb9ea22693f5bd0aae015fa98a4b4d2
-  sha256 AFTER:  b9ca78b9b852030c369eb4e5ef9753fb61648918621d9c79e252bcd1046cc4e0
+  sha256 BEFORE: 3fd0209840c53aa42e0fd5b930cd1b59345a2b372dcc54ba2a174a3b89626b2e
+  sha256 AFTER:  e6097365ccd4fb8e6d1680fcc2100dea777ba07a3c0e00476b989de7420db4df
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
---- FAIL: TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles (0.95s)
-    makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_STATE is visible to the child
-    makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_STEP_SUMMARY is visible to the child
-    makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_SOME_FUTURE_COMMAND is visible to the child
+--- FAIL: TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles (2.82s)
     makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_ENV is visible to the child
     makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_PATH is visible to the child
     makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_OUTPUT is visible to the child
+    makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_STATE is visible to the child
+    makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_STEP_SUMMARY is visible to the child
+    makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: GITHUB_SOME_FUTURE_COMMAND is visible to the child
     makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: a value pointing into the runner's command-file directory is visible: "/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestTheAnchorsSubproces
     makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: a value pointing into the runner's command-file directory is visible: "/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestTheAnchorsSubproces
     makefiledigest_test.go:539: spawn bash -c type -t make; command -v make: a value pointing into the runner's command-file directory is visible: "/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestTheAnchorsSubproces
@@ -37,17 +38,17 @@ MUTATION: C3 scrub removed
     makefiledigest_test.go:539: spawn make -q Makefile: a value pointing into the runner's command-file directory is visible: "/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestTheAnchorsSubprocessesCannotSeeTheRunner
     makefiledigest_test.go:539: spawn make -q Makefile: a value pointing into the runner's command-file directory is visible: "/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestTheAnchorsSubprocessesCannotSeeTheRunner
     makefiledigest_test.go:539: spawn make -q Makefile: a value pointing into the runner's command-file directory is visible: "/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestTheAnchorsSubprocessesCannotSeeTheRunner
+    makefiledigest_test.go:539: spawn make -pn Makefile ci: GITHUB_PATH is visible to the child
     makefiledigest_test.go:539: spawn make -pn Makefile ci: GITHUB_OUTPUT is visible to the child
     makefiledigest_test.go:539: spawn make -pn Makefile ci: GITHUB_STATE is visible to the child
     makefiledigest_test.go:539: spawn make -pn Makefile ci: GITHUB_STEP_SUMMARY is visible to the child
     makefiledigest_test.go:539: spawn make -pn Makefile ci: GITHUB_SOME_FUTURE_COMMAND is visible to the child
-    makefiledigest_test.go:539: spawn make -pn Makefile ci: GITHUB_ENV is visible to the child
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: 814c68265f5709fc1fd30862fe79ca659eb9ea22693f5bd0aae015fa98a4b4d2
+  sha256 RESTORED: 3fd0209840c53aa42e0fd5b930cd1b59345a2b372dcc54ba2a174a3b89626b2e
   restore byte-identical: yes
   RESULT: C3 scrub removed -> exit 1
 
 == after restore ==
-ok  	github.com/yegamble/vizra-core/scripts	1.602s
+ok  	github.com/yegamble/vizra-core/scripts	3.588s
 go test exit=0

@@ -4,10 +4,8 @@ make-integrity-guard: /src
   ok    [local parity (allowlist)] every MAKEFLAGS/GNUMAKEFLAGS/MFLAGS word is one make exports itself; MAKEFILES/BASH_ENV/ENV unset; SHELL is a real shell
   ok    `make` resolves to /usr/bin/make (type -t: file; real file /usr/bin/make, named make, in an approved system directory). This does not inspect the program's CONTENT: a forwarding stub planted there by an earlier step is outside what this guard can see.
   ok    [local parity] the environment may set these makefile variables: ['BUILT_AT', 'COMMIT', 'GO', 'GOFLAGS', 'RELEASE', 'SQLC']
-  ok    `make -q` (no recipe run) reports none of Makefile would be remade, so make reads exactly the pinned bytes; every later make command names them as goals so -n applies to them
-  ok    make's own MAKEFILE_LIST ['Makefile'] is exactly the pinned set
   closure: 17 target(s); 9 reached through prerequisites (fmt-check, vet, lint-imports, migrate-lint, config-template-check, openapi-verify, sqlc-verify, ci-guard, test-race)
-  ok    make read 1 makefile(s): Makefile
+  ok    make will read 1 makefile(s), from the pinned bytes: Makefile
   ok    the root Makefile pins SHELL and .SHELLFLAGS to the approved values, and nothing else assigns them
   ok    gate target `ci` is defined exactly once (Makefile:38)
   ok    gate target `tidy-check` is defined exactly once (Makefile:194)
@@ -26,6 +24,8 @@ make-integrity-guard: /src
   ok    gate target `sqlc-verify` is defined exactly once (Makefile:89)
   ok    gate target `ci-guard` is defined exactly once (Makefile:103)
   ok    gate target `test-race` is defined exactly once (Makefile:157)
+  ok    `make -q Makefile` (every pinned makefile a goal, so -q applies to each) reports none would be remade; every later make command names them as goals so -n applies to them. -q runs no ordinary recipe — only `+`/`$(MAKE)` lines, which can come only from the pinned bytes
+  ok    make's own MAKEFILE_LIST ['Makefile'] is exactly the pinned set
   ok    `ci`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `ci`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `ci`: `.ONESHELL:` is not in effect

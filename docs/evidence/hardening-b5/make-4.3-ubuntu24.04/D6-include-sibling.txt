@@ -1,0 +1,17 @@
+# D6 a newer sibling of a pinned INCLUDE (a.mk.sh beside a.mk; fix round 1, PR#10 VERIFY FINDING 1)
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
+
+== control: the include tree, pinned, no sibling ==
+anchor [--root /tmp/tmp.Gl5m08iT2F --targets ci --workflow] exit=0 processes-started=5 make-processes=4 first-make-argv=['make', '-q', 'Makefile', 'a.mk', 'b.mk']
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile, a.mk, b.mk)
+== newer a.mk.sh beside the pinned include a.mk (a.mk sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7) ==
+anchor [--workflow] exit=1 make-processes=[make -q Makefile a.mk b.mk] a.mk-after=d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7
+  FAIL  make would REMAKE one of Makefile, a.mk, b.mk before reading it (`make -q Makefile a.mk b.mk` exit 1).
+make-integrity-guard: FAILED — make was invoked only as `make -q` (1 process(es)), which runs no ordinary recipe.
+anchor [lenient] exit=1 make-processes=[make -q Makefile a.mk b.mk] a.mk-after=d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7
+  FAIL  make would REMAKE one of Makefile, a.mk, b.mk before reading it (`make -q Makefile a.mk b.mk` exit 1).
+make-integrity-guard: FAILED — make was invoked only as `make -q` (1 process(es)), which runs no ordinary recipe.
+include_sibling: control HELD (exit 0)
+include_sibling exit=0

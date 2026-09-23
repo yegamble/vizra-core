@@ -1,0 +1,38 @@
+# C8 check 11 ignores every verify_pin problem it has no special wording for (the parity rows)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
+
+==============================================================
+MUTATION: C8 check-11 parity dropped
+  file:   scripts/ci-required-guard.py
+  mutate: python3 -c "p='scripts/ci-required-guard.py';s=open(p).read();n='            g.fail(f\"{pin_path.name}: {p.message}\", \"The workflow anchor refuses this tree before invoking make.\")\n';assert s.count(n)==1,s.count(n);open(p,'w').write(s.replace(n,'            continue\n'))"
+  check:  gotest 'TestCIRequiredGuardMakefilePin'
+--------------------------------------------------------------
+  sha256 BEFORE: 284074ba9087eecd918620886865f30e8ca00133a2505ce8753ef9ef66c7a176
+  sha256 AFTER:  918f7010f9fab90637a9e0346c449667e0b9af64ebaaba2fe4b95ea08d17f955
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+--- FAIL: TestCIRequiredGuardMakefilePin (0.00s)
+    --- FAIL: TestCIRequiredGuardMakefilePin/makefile-symlink (3.28s)
+        makefiledigest_test.go:631: exit 0, want failed=true
+    --- FAIL: TestCIRequiredGuardMakefilePin/gnumakefile-present (3.76s)
+        makefiledigest_test.go:631: exit 0, want failed=true
+    --- FAIL: TestCIRequiredGuardMakefilePin/stale-entry (3.82s)
+        makefiledigest_test.go:631: exit 0, want failed=true
+    --- FAIL: TestCIRequiredGuardMakefilePin/include-computed (3.94s)
+        makefiledigest_test.go:631: exit 0, want failed=true
+    --- FAIL: TestCIRequiredGuardMakefilePin/include-unpinned (4.10s)
+        makefiledigest_test.go:631: exit 0, want failed=true
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	6.447s
+FAIL
+go test exit=1
+------------------------------------
+  sha256 RESTORED: 284074ba9087eecd918620886865f30e8ca00133a2505ce8753ef9ef66c7a176
+  restore byte-identical: yes
+  RESULT: C8 check-11 parity dropped -> exit 1
+
+== after restore ==
+ok  	github.com/yegamble/vizra-core/scripts	11.789s
+go test exit=0

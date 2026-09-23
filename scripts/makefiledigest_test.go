@@ -573,12 +573,23 @@ func TestTheSpawnRecorderSeesEveryWayTheGuardStartsAProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{"os.system", "os.popen", "os.exec", "os.spawn", "os.posix_spawn",
-		"os.fork", "import pty", "import ctypes", "multiprocessing", "asyncio"} {
-		if strings.Contains(string(src), forbidden) {
-			t.Errorf("make-integrity-guard.py uses %q, which spawn-recorder.py does not intercept; "+
-				"'make was not invoked' would no longer be proved by it", forbidden)
+	// makefile_pin.py is imported by the guard and runs in its process, so it
+	// is held to the same rule — and it must start no process at all.
+	pin, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "makefile_pin.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, text := range map[string]string{"make-integrity-guard.py": string(src), "makefile_pin.py": string(pin)} {
+		for _, forbidden := range []string{"os.system", "os.popen", "os.exec", "os.spawn", "os.posix_spawn",
+			"os.fork", "import pty", "import ctypes", "multiprocessing", "asyncio"} {
+			if strings.Contains(text, forbidden) {
+				t.Errorf("%s uses %q, which spawn-recorder.py does not intercept; "+
+					"'make was not invoked' would no longer be proved by it", name, forbidden)
+			}
 		}
+	}
+	if regexp.MustCompile(`(?m)^\s*(import|from)\s+subprocess\b`).Match(pin) {
+		t.Error("makefile_pin.py imports subprocess; it must decide everything WITHOUT starting a process")
 	}
 	if !strings.Contains(string(src), "subprocess.run(") {
 		t.Error("the guard no longer starts processes through subprocess.run; re-check the recorder")
@@ -602,6 +613,14 @@ func TestCIRequiredGuardMakefilePin(t *testing.T) {
 		// THE acceptance case: a Makefile edit without the paired pin update.
 		{pin: "stale", wantFail: true, wantText: "Makefile changed without the paired update to pinned-makefiles.yml"},
 		{pin: "pinned-file-missing", wantFail: true, wantText: "inc.mk: pinned, but not a file"},
+		// Fix round 1 (PR#10 VERIFY FINDING 3): check 11 now calls the anchor's
+		// own makefile_pin.verify_pin, so it refuses whatever the anchor refuses.
+		// Each of these was exit 0 from check 11 at 62d16aa (transcript P1).
+		{pin: "gnumakefile-present", wantFail: true, wantText: "GNUmakefile exists beside the Makefile"},
+		{pin: "makefile-symlink", wantFail: true, wantText: "Makefile is not a regular file"},
+		{pin: "stale-entry", wantFail: true, wantText: "pins old.mk, which make would NOT read"},
+		{pin: "include-unpinned", wantFail: true, wantText: "make would read inc.mk, which has no entry"},
+		{pin: "include-computed", wantFail: true, wantText: "names a file make COMPUTES"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.pin, func(t *testing.T) {
@@ -658,62 +677,116 @@ func TestEveryMakeGuardAndPinFixtureIsExercised(t *testing.T) {
 
 // A makefile can be REMADE from a file nobody pinned, by make's own builtin
 // implicit rules, with no line in any makefile saying so — and make does it
-// even under -n. MEASURED on GNU Make 3.81: with a newer sibling `Makefile.sh`
-// (builtin rule `%: %.sh`), `make -pn ci` executed `cat Makefile.sh >Makefile`
-// and re-read the result. The digest check alone cannot see it: the Makefile's
-// bytes are still the pinned bytes when the anchor looks.
+// even under -n. MEASURED on GNU Make 3.81 and 4.3: with a newer sibling
+// `Makefile.sh` (builtin rule `%: %.sh`), `make -pn ci` executed
+// `cat Makefile.sh >Makefile` and re-read the result. The digest check alone
+// cannot see it: the bytes are still the pinned bytes when the anchor looks.
 //
-// The sibling here is a byte-identical copy of the Makefile plus one comment
-// line — a byte mutation, not a payload. What is asserted: the anchor refuses,
-// the Makefile is byte-identical afterwards (nothing was remade), and every make
-// process the anchor started was `make -q`, which runs no recipe.
+// Fix round 1 (PR#10 VERIFY, FINDING 1): -q applies in make's remake phase ONLY
+// to makefiles that are command-line goals. The first probe ran `make -q
+// Makefile`, then `make -q a.mk`, … — so in the first one a pinned INCLUDE was
+// not a goal, and make really ran `cat a.mk.sh >a.mk`, re-read it, and said
+// "up to date". The probe is now ONE `make -q` naming every pinned makefile;
+// the `included` case below is red against the per-file loop (transcript C7).
+//
+// Each sibling is a byte-identical copy of its makefile plus one comment line —
+// a byte mutation, not a payload. Asserted: the anchor refuses in both modes,
+// every pinned file is byte-identical afterwards (nothing was remade), and make
+// was started exactly ONCE, as `make -q <every pinned makefile>`.
 func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
-	dir := copyRealTree(t)
-	mk := filepath.Join(dir, "Makefile")
-	out, rec := runRecorded(t, dir, true)
-	assertGreen(t, "control (no sibling)", out, rec)
-
-	original := sha256File(t, mk)
-	b, err := os.ReadFile(mk)
-	if err != nil {
-		t.Fatal(err)
+	cases := []struct {
+		name   string
+		setup  func(dir string) error // arranges a tree whose pin lists every file make reads
+		target string                 // the pinned makefile that gets a newer sibling
+		pinned []string               // every pinned makefile, in the order make reads them
+	}{
+		{name: "the Makefile", target: "Makefile", pinned: []string{"Makefile"}},
+		{
+			name: "an included makefile",
+			setup: func(dir string) error {
+				if err := os.WriteFile(filepath.Join(dir, "a.mk"), []byte("# a.mk: pinned\nA_VALUE := a\n"), 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(dir, "b.mk"), []byte("# b.mk: pinned\nB_VALUE := b\n"), 0o644); err != nil {
+					return err
+				}
+				if err := appendBytes(filepath.Join(dir, "Makefile"), "include a.mk\nsinclude b.mk\n"); err != nil {
+					return err
+				}
+				return repin(dir, "Makefile", "a.mk", "b.mk")
+			},
+			target: "a.mk",
+			pinned: []string{"Makefile", "a.mk", "b.mk"},
+		},
 	}
-	sibling := filepath.Join(dir, "Makefile.sh")
-	if err := os.WriteFile(sibling, append(b, []byte("# a sibling copy, one comment longer\n")...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// Make the sibling unambiguously NEWER, as a checkout that writes it after
-	// the Makefile would.
-	past := time.Now().Add(-time.Hour)
-	if err := os.Chtimes(mk, past, past); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("added Makefile.sh (sha256 %s), newer than Makefile (sha256 %s)", sha256File(t, sibling), original)
-
-	for _, workflow := range []bool{true, false} {
-		out, rec := runRecorded(t, dir, workflow)
-		if rec.Exit != 1 || !strings.Contains(out, "make would REMAKE Makefile before reading it") {
-			t.Fatalf("workflow=%v: exit %d; want the remake refused by name:\n%s", workflow, rec.Exit, out)
-		}
-		if got := sha256File(t, mk); got != original {
-			t.Fatalf("workflow=%v: the Makefile was REWRITTEN during the anchor (%s -> %s):\n%s",
-				workflow, original, got, out)
-		}
-		for _, c := range rec.Calls {
-			if filepath.Base(c.Argv[0]) == "make" && (len(c.Argv) < 2 || c.Argv[1] != "-q") {
-				t.Fatalf("workflow=%v: make was started as %v; only `make -q` may run before the "+
-					"remake question is answered:\n%s", workflow, c.Argv, out)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := copyRealTree(t)
+			if tc.setup != nil {
+				if err := tc.setup(dir); err != nil {
+					t.Fatalf("setup: %v", err)
+				}
 			}
-		}
-		t.Logf("workflow=%v: exit 1, Makefile byte-identical afterwards, make started %d time(s), each as `make -q`",
-			workflow, rec.makeCalls())
-	}
+			out, rec := runRecorded(t, dir, true)
+			assertGreen(t, "control (no sibling)", out, rec)
 
-	if err := os.Remove(sibling); err != nil {
-		t.Fatal(err)
+			before := map[string]string{}
+			for _, f := range tc.pinned {
+				before[f] = sha256File(t, filepath.Join(dir, f))
+			}
+			target := filepath.Join(dir, tc.target)
+			b, err := os.ReadFile(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sibling := target + ".sh"
+			if err := os.WriteFile(sibling, append(b, []byte("# a sibling copy, one comment longer\n")...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			// Make the sibling unambiguously NEWER, as a checkout that writes it
+			// after the makefile would.
+			past := time.Now().Add(-time.Hour)
+			if err := os.Chtimes(target, past, past); err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("added %s.sh (sha256 %s), newer than %s (sha256 %s)",
+				tc.target, sha256File(t, sibling), tc.target, before[tc.target])
+
+			want := append([]string{"make", "-q"}, tc.pinned...)
+			for _, workflow := range []bool{true, false} {
+				out, rec := runRecorded(t, dir, workflow)
+				if rec.Exit != 1 || !strings.Contains(out, "make would REMAKE one of "+strings.Join(tc.pinned, ", ")) {
+					t.Fatalf("workflow=%v: exit %d; want the remake refused by name:\n%s", workflow, rec.Exit, out)
+				}
+				for _, f := range tc.pinned {
+					if got := sha256File(t, filepath.Join(dir, f)); got != before[f] {
+						t.Fatalf("workflow=%v: %s was REWRITTEN during the anchor (%s -> %s):\n%s",
+							workflow, f, before[f], got, out)
+					}
+				}
+				var makes [][]string
+				for _, c := range rec.Calls {
+					if filepath.Base(c.Argv[0]) == "make" {
+						makes = append(makes, c.Argv)
+					}
+				}
+				if len(makes) != 1 || strings.Join(makes[0], " ") != strings.Join(want, " ") {
+					t.Fatalf("workflow=%v: make was started as %v; want exactly ONE process, %v — every "+
+						"pinned makefile a goal, so -q applies to each, and nothing after it:\n%s",
+						workflow, makes, want, out)
+				}
+				t.Logf("workflow=%v: exit 1, every pinned file byte-identical afterwards, make started once: %v",
+					workflow, makes[0])
+			}
+
+			if err := os.Remove(sibling); err != nil {
+				t.Fatal(err)
+			}
+			out, rec = runRecorded(t, dir, true)
+			assertGreen(t, "sibling removed", out, rec)
+		})
 	}
-	out, rec = runRecorded(t, dir, true)
-	assertGreen(t, "sibling removed", out, rec)
 }
 
 // Before sweep B5 a failed environment check was REPORTED and make was run

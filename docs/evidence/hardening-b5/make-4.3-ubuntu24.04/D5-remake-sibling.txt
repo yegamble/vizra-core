@@ -1,6 +1,7 @@
 # D5 a newer SIBLING Makefile.sh beside the Makefile (make's builtin rule `%: %.sh` would remake the Makefile)
 # host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
-# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
 
 == raw make, in a scratch dir holding only a 3-line Makefile and a newer copy of it plus one comment ==
 make -q Makefile exit=1 ; Makefile unchanged: yes
@@ -8,9 +9,9 @@ make -pn ci exit=0 ; Makefile unchanged: NO ; recipe lines make ran/printed: 1
 == the anchor, on this tree, with the same kind of sibling ==
   added Makefile.sh sha256 0b6ac0714676df77e48e97397ec55845e3013d58df70e14e941902b5464f7f2e; Makefile sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2 (mtime set older)
 anchor [--workflow] exit=1 processes-started=2 make-processes=1 first-make-argv=['make', '-q', 'Makefile']
-  FAIL  make would REMAKE Makefile before reading it (`make -q Makefile` exit 1).
+  FAIL  make would REMAKE one of Makefile before reading it (`make -q Makefile` exit 1).
 anchor [lenient] exit=1 processes-started=2 make-processes=1 first-make-argv=['make', '-q', 'Makefile']
-  FAIL  make would REMAKE Makefile before reading it (`make -q Makefile` exit 1).
+  FAIL  make would REMAKE one of Makefile before reading it (`make -q Makefile` exit 1).
   Makefile after the anchor: e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2  byte-identical: yes
 == sibling removed ==
 anchor [--workflow] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
