@@ -1,6 +1,7 @@
 # T2 integration TestMain without the testtmp root
 # host: Darwin arm64  go: go1.27.1  load: 22.86 28.28 36.87
 # tree: 8f96cd6ca968b2718c46f7ffb89c7f2d728284b3  (0 uncommitted path(s) before the run)
+# 8f96cd6 was a local pre-squash commit; its tree matches 434abe5 for every file this row mutates or runs (git diff 8f96cd6 434abe5 touches only scripts/test-floors.json and evidence files).
 
 ==============================================================
 MUTATION: T2 integration TestMain without the testtmp root

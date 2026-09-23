@@ -71,8 +71,8 @@ ok  	github.com/yegamble/vizra-core/internal/fixtures	269.566s
 load after: 16:31  up 2 days,  7:22, 5 users, load averages: 40.23 72.77 83.84
 
 ## CI per-package elapsed, last 4 successful build-test runs before this branch (gh run view --log)
-fixtures 77.4-143.5s, integration 54.9-99.5s; build-test job 7.8-10.8m, cache-matrix-leg jobs 4.5-5.8m (runs 35914283132, 35914133999, 35910352499, 35899392555; every package line of each run, corrected in fix round 1 — the first reading took only the first lines of each log)
-widest over 12 green runs before this branch (35857960260 … 35921428335): fixtures 146.1s, build-test job 10.8m, cache-matrix-leg job 6.3m
+fixtures 77.4-143.5s, integration 54.9-99.5s; build-test job 7.8-10.9m, cache-matrix-leg jobs 4.6-5.8m (runs 35914283132, 35914133999, 35910352499, 35899392555; every package line of each run, corrected in fix round 1 — the first reading took only the first lines of each log)
+widest over 12 green runs before this branch (35857960260 … 35921428335): fixtures 146.1s, build-test job 10.9m, cache-matrix-leg job 6.4m (job minutes rounded to 0.1 from the API timestamps: 7.80-10.88, 4.58-5.83, widest 6.38; fix round 2 — round 1 truncated them)
 
 ## CI step offsets (gh api …/jobs), for the -timeout budget: build-test job 20m, cache-matrix-leg job 15m
 run 35916976783: build-test make ci +1.7m, unit +4.5m, integration +6.4m, shuffled +8.4m (job 10.5m); cache-matrix-leg first step +0.5m, shuffled +3.2-3.5m (job 5.2-5.6m)
@@ -96,7 +96,7 @@ go-test-report: ok — 1566 test(s) executed across 18 package(s), 0 unexpected 
 
 ## CI on 888a003 (build-test run 35922912235 + both cache-matrix legs, gh run view --log)
 internal/fixtures 56.5s, 69.8s, 72.5s, 91.2s, 98.2s; internal/integration 71.2s, 73.6s, 104.5s, 112.5s (before, the 4 runs above: fixtures 77.4-143.5s, integration 54.9-99.5s)
-build-test job 7.4m (before 7.8-10.8m); cache-matrix-leg jobs 4.2m / 4.5m (before 4.5-5.8m)
+build-test job 7.4m (before 7.8-10.9m); cache-matrix-leg jobs 4.2m / 4.5m (before 4.6-5.8m)
 unit 1566 executed / 0 failed / 0 skipped (floor 1070); integration and shuffled 1737 / 0 / 0 (floor 1214)
 
 ## FIX ROUND 1 — 8f96cd6, one lane at a time, fresh own containers, lanes.sh running the PINNED bodies

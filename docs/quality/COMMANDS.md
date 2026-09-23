@@ -375,10 +375,17 @@ cover them.
 
 ### Test stability (sentinel S-0016 / S-0001), measured on tree `d817f33`
 
-Every `go test` lane — the Makefile's `test`, `test-race`, `test-integration`,
-`test-integration-shuffle`, the three pinned direct steps and the `fixtures`
-workflow's `internal/fixtures` step — passes `-timeout 8m`. The value comes from
-measurement (`docs/evidence/test-stability/timings.txt`), not from a guess:
+Every full-suite `go test` lane — the Makefile's `test`, `test-race`,
+`test-integration`, `test-integration-shuffle`, the three pinned direct steps and
+the `fixtures` workflow's `internal/fixtures` step — passes `-timeout 8m`. Two
+narrow `go test` recipes do not: `config-template-check` (Makefile:81, five named
+tests in `internal/config`) and `openapi-verify` (Makefile:86, seven named tests
+in `internal/httpapi`). They run under go's 10m default, and a hang there still
+prints go's goroutine dump: they run only inside `make ci`, which starts about
+1.7 minutes into build-test's 20-minute job and runs them before anything slow,
+so the 10m default fires before the job is killed (and locally there is no job
+limit at all). The value 8m comes from measurement
+(`docs/evidence/test-stability/timings.txt`), not from a guess:
 
 | Measurement | Slowest package | 8m is |
 |---|---|---|
@@ -431,8 +438,8 @@ package generates the corpus 6 times instead of 9 (each 13-35s under `-race`).
 | unit + integration(Valkey) at the same time | 238s / 236s | 145s / 198s |
 | CI `internal/fixtures` per package (the 4 runs above) | 77.4–143.5s | 56.5–98.2s |
 | CI `internal/integration` per package (the 4 runs above) | 54.9–99.5s | 71.2–112.5s |
-| CI build-test job (the 4 runs above) | 7.8–10.8 min | 7.4 min |
-| CI cache-matrix-leg jobs (the 4 runs above) | 4.5–5.8 min | 4.2–4.5 min |
+| CI build-test job (the 4 runs above) | 7.8–10.9 min | 7.4 min |
+| CI cache-matrix-leg jobs (the 4 runs above) | 4.6–5.8 min | 4.2–4.5 min |
 
 Temporary files: every package with a TestMain here runs inside ONE root from
 `internal/testtmp` (`vizra-test-<pkg>-<pid>-*`, TMPDIR pointed at it), removed at
