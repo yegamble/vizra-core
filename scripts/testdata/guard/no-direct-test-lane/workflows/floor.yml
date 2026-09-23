@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
           rc=0
-          go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+          go test -race -count=1 -timeout 8m -tags=integration -json ./... > int-events.json || rc=$?
           echo "$rc" > int-exit.txt
           echo "go test (integration) exited $rc"
           python3 scripts/go-test-report.py \

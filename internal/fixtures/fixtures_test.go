@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/yegamble/vizra-core/internal/testtmp"
 )
 
 // Generating the whole corpus is expensive — tens of seconds under the race
@@ -27,6 +29,8 @@ var (
 func sharedCorpus(t *testing.T) (string, map[string]FileInfo) {
 	t.Helper()
 	sharedOnce.Do(func() {
+		// Under the package's testtmp root (TestMain), so a run killed by the
+		// -timeout leaves nothing the next run does not sweep (S-0016).
 		sharedDir, sharedErr = os.MkdirTemp("", "vizra-fixtures-shared-")
 		if sharedErr != nil {
 			return
@@ -39,12 +43,40 @@ func sharedCorpus(t *testing.T) (string, map[string]FileInfo) {
 	return sharedDir, sharedFiles
 }
 
+// TestMain runs the package inside ONE temporary root (internal/testtmp): every
+// os.MkdirTemp and t.TempDir here lands in it, it is removed when the run ends,
+// and a run killed before that (go test's -timeout exits without running any
+// cleanup) is swept by the next run of this package.
 func TestMain(m *testing.M) {
-	code := m.Run()
-	if sharedDir != "" {
-		_ = os.RemoveAll(sharedDir)
+	os.Exit(testtmp.Run(m, "fixtures"))
+}
+
+// copySharedCorpus puts the generator's output into dir WITHOUT running the
+// generator again: a copy of the shared corpus. The generator is deterministic
+// within a process (TestGenerationIsDeterministicWithinAProcess) and the shared
+// corpus is what TestEveryFixtureIsWhatItClaimsToBe verifies, so a drift case
+// that only needs "the corpus on disk" gets exactly the bytes a Generate call
+// would write. Each full generation costs 13-35 s under -race (measured on
+// 3994893); the drift cases below used to run three of them for this alone.
+func copySharedCorpus(t *testing.T, dir string) {
+	t.Helper()
+	src, files := sharedCorpus(t)
+	if len(files) == 0 {
+		t.Fatal("the shared corpus is empty")
 	}
-	os.Exit(code)
+	for rel := range files {
+		b, err := os.ReadFile(filepath.Join(src, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(out, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 // repoRoot is the repository root from this package's directory.
@@ -92,6 +124,9 @@ func TestTheCorpusIsTheTwelveOfADR009(t *testing.T) {
 // fixture's property assertions. This is the check that stops the corpus being
 // twelve files with correct hashes and wrong contents.
 func TestEveryFixtureIsWhatItClaimsToBe(t *testing.T) {
+	// Parallel: each regenerates the corpus (or waits on the shared one) into its
+	// own directory and writes nothing another test reads.
+	t.Parallel()
 	dir, _ := sharedCorpus(t)
 	if err := Verify(dir); err != nil {
 		t.Fatal(err)
@@ -112,6 +147,9 @@ func TestEveryFixtureIsWhatItClaimsToBe(t *testing.T) {
 // The expensive half — two runs on two architectures — is the CI lane plus the
 // local transcript in docs/evidence/fixtures/.
 func TestGenerationIsDeterministicWithinAProcess(t *testing.T) {
+	// Parallel: each regenerates the corpus (or waits on the shared one) into its
+	// own directory and writes nothing another test reads.
+	t.Parallel()
 	// The shared corpus is one run; this is a second, independent one.
 	_, fa := sharedCorpus(t)
 	fb, err := Generate(t.TempDir())
@@ -176,6 +214,9 @@ func TestGeneratorSourceListCoversThePackage(t *testing.T) {
 // TestCommittedManifestMatchesTheGenerator is the lane itself, run as a unit
 // test so that `make ci` cannot be green while the corpus has drifted.
 func TestCommittedManifestMatchesTheGenerator(t *testing.T) {
+	// Parallel: each regenerates the corpus (or waits on the shared one) into its
+	// own directory and writes nothing another test reads.
+	t.Parallel()
 	probs, err := VerifyAgainstManifest(repoRoot(t), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -193,6 +234,9 @@ func TestCommittedManifestMatchesTheGenerator(t *testing.T) {
 // Each case is one of the demonstrations VZ-ISSUE-001 asks for, run as a test
 // so that it keeps being true after this PR.
 func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
+	// Parallel: each regenerates the corpus (or waits on the shared one) into its
+	// own directory and writes nothing another test reads.
+	t.Parallel()
 	cases := []struct {
 		name     string
 		mutate   func(t *testing.T, root string)
@@ -201,10 +245,8 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 		{
 			name: "a changed fixture on disk",
 			mutate: func(t *testing.T, root string) {
-				// Generate the corpus, then change one byte of one file.
-				if _, err := Generate(filepath.Join(root, filepath.FromSlash(OutputDir))); err != nil {
-					t.Fatal(err)
-				}
+				// Put the corpus on disk, then change one byte of one file.
+				copySharedCorpus(t, filepath.Join(root, filepath.FromSlash(OutputDir)))
 				p := filepath.Join(root, filepath.FromSlash(OutputDir), "png-alpha.png")
 				b, err := os.ReadFile(p)
 				if err != nil {
@@ -294,9 +336,7 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 			name: "an undeclared extra file in the corpus directory",
 			mutate: func(t *testing.T, root string) {
 				out := filepath.Join(root, filepath.FromSlash(OutputDir))
-				if _, err := Generate(out); err != nil {
-					t.Fatal(err)
-				}
+				copySharedCorpus(t, out)
 				if err := os.WriteFile(filepath.Join(out, "rogue-photograph.jpg"), []byte("not a fixture"), 0o644); err != nil {
 					t.Fatal(err)
 				}
@@ -311,9 +351,7 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 			name: "a dotfile in the corpus directory is NOT reported",
 			mutate: func(t *testing.T, root string) {
 				out := filepath.Join(root, filepath.FromSlash(OutputDir))
-				if _, err := Generate(out); err != nil {
-					t.Fatal(err)
-				}
+				copySharedCorpus(t, out)
 				if err := os.WriteFile(filepath.Join(out, ".DS_Store"), []byte("editor turd"), 0o644); err != nil {
 					t.Fatal(err)
 				}
@@ -343,8 +381,16 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 		t.Fatalf("the copied tree is already failing before any mutation: %v", probs)
 	}
 
+	// Each case has its own copy of the repository slice and its own scratch
+	// directory, so they run in parallel. VerifyAgainstManifest regenerates the
+	// corpus only when every earlier check passed — here the dotfile and the
+	// edited-hash cases — and those two, run one after the other, plus the
+	// three generations the mutations used to do, were most of this package's
+	// wall time.
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			root := copyRepoSlice(t)
 			tc.mutate(t, root)
 			probs, err := VerifyAgainstManifest(root, t.TempDir())

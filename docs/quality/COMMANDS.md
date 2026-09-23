@@ -88,9 +88,10 @@ Everything else — `include` and every other directive, conditionals, `define`,
 `export`, `override`, target- and pattern-specific assignments, `+=` / `!=`,
 special targets other than `.PHONY`, functions and substitution references,
 inline `;` recipes, multi-target, double-colon and pattern rules, and every
-character above — is outside the grammar. The real Makefile fits it unchanged
-(56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe lines; the
-anchor's ok line prints the counts). Because `include` is refused, the pinned
+character above — is outside the grammar. The real Makefile fits it (64
+blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe lines since the
+test-stability slice added its `-timeout` comment; the anchor's ok line prints
+the counts). Because `include` is refused, the pinned
 read set is the root `Makefile` alone; the include reading and the post-make
 checks below remain as defence in depth.
 
@@ -195,7 +196,7 @@ results — because `go test ./...` exits 0 having run nothing, and a non-verbos
 `go test` prints nothing at all for a skipped test.
 
 ```
-rc=0; go test -race -count=1 -json ./... > unit-events.json || rc=$?
+rc=0; go test -race -count=1 -timeout 8m -json ./... > unit-events.json || rc=$?
 echo "$rc" > unit-exit.txt
 python3 scripts/go-test-report.py --events unit-events.json --suite unit \
   --floors scripts/test-floors.json --go-exit-file unit-exit.txt
@@ -203,7 +204,7 @@ python3 scripts/go-test-report.py --events unit-events.json --suite unit \
 
 ```
 export VIZRA_TEST_DATABASE_URL='postgres://…' VIZRA_TEST_CACHE_URL='redis://…'
-rc=0; go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+rc=0; go test -race -count=1 -timeout 8m -tags=integration -json ./... > int-events.json || rc=$?
 echo "$rc" > int-exit.txt
 python3 scripts/go-test-report.py --events int-events.json --suite integration \
   --floors scripts/test-floors.json --go-exit-file int-exit.txt
@@ -371,3 +372,81 @@ The include-based rows of the earlier B5 demonstrations (D3, D6, C7 in
 the checks they were written for. Those checks stay in the code as defence in
 depth; `db-scan-probe.py` and `TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe`
 cover them.
+
+### Test stability (sentinel S-0016 / S-0001), measured on tree `d817f33`
+
+Every full-suite `go test` lane — the Makefile's `test`, `test-race`,
+`test-integration`, `test-integration-shuffle`, the three pinned direct steps and
+the `fixtures` workflow's `internal/fixtures` step — passes `-timeout 8m`. Two
+narrow `go test` recipes do not: `config-template-check` (Makefile:81, five named
+tests in `internal/config`) and `openapi-verify` (Makefile:86, seven named tests
+in `internal/httpapi`). They run under go's 10m default, and a hang there still
+prints go's goroutine dump: they run only inside `make ci`, which starts about
+1.7 minutes into build-test's 20-minute job and runs them before anything slow,
+so the 10m default fires before the job is killed (and locally there is no job
+limit at all). The value 8m comes from measurement
+(`docs/evidence/test-stability/timings.txt`), not from a guess:
+
+| Measurement | Slowest package | 8m is |
+|---|---|---|
+| CI, 4 green build-test runs before the change (35914283132, 35914133999, 35910352499, 35899392555) | `internal/fixtures` 143.5s | 3.3x |
+| CI, 12 green build-test runs before the change | `internal/fixtures` 146.1s | 3.3x |
+| this host, two suites at once, after the change | `internal/integration` 186.4s | 2.6x |
+| this host, one lane, after the change | `internal/integration` 142.1s | 3.4x |
+| this host, one lane, merged head `888a003` at load ~44 | `internal/integration` 201.2s | 2.4x |
+| CI on `888a003` (build-test + both cache-matrix legs) | `internal/integration` 112.5s | 4.3x |
+
+It is below go's 10m default on purpose: the last test step of `build-test` starts
+about 8.7 minutes into a 20-minute job, and the second step of `cache-matrix-leg`
+about 3.7 minutes into a 15-minute one, so 8m still prints go's goroutine dump for
+a hang before the job is killed. A host whose load average is several times its
+core count can still exceed it; that is contention, not a property of the
+suite, and `go test -timeout` can be given directly there.
+
+Limits, at the strength that holds:
+
+- The flag is enforced by byte-equality only in the three pinned direct steps
+  (`.github/pinned-steps.yml`, check 9). On the Makefile recipes and on the
+  `fixtures` workflow's step it is kept by review alone: no guard checks it, and
+  a re-pinned Makefile without it passes every anchor.
+- A test binary killed by go's `-timeout` leaves the processes it started
+  running (the integration tests' `go build`). Such an orphan can still be
+  writing into its root when the next run sweeps it, and can re-create part of
+  it. The leak test avoids this by killing the whole process group; a real
+  timeout does not.
+- The sweep decides "dead" by asking the local kernel about the PID in the
+  root's name. Runs in different PID namespaces that share one TMPDIR (a
+  container with the host's /tmp mounted) cannot see each other's processes, so
+  one can remove the other's LIVE root. That set-up is not supported.
+- `TestAliveTellsALiveProcessFromADeadOne` checks the "another user's live
+  process" branch through PID 1, which answers EPERM only to a non-root caller.
+  Run as root it passes without exercising that branch, and mutation T4 would
+  survive.
+
+What was cut: `TestManifestDetectsEveryClassOfDrift` generated the corpus 6 times
+(three of them only to put files on disk for a mutation) and ran its cases one
+after another. Its mutations now copy the shared corpus, its cases run in
+parallel, and the four heavy fixtures tests run in parallel with each other; the
+package generates the corpus 6 times instead of 9 (each 13-35s under `-race`).
+
+| Lane (own TMPDIR, own containers) | before `3994893` | after `d817f33` |
+|---|---|---|
+| `make ci` | 107s, load ~12 | 89s, load ~20 |
+| direct unit step + report | 134s, load ~12 | 109s, load ~20–50 |
+| direct integration step, Valkey 9.1.2 | 156s, leaves 74 MB | 150s, leaves nothing |
+| direct integration step, Redis 7.2 | 168s, leaves 75 MB | 144s, leaves nothing |
+| unit + integration(Valkey) at the same time | 238s / 236s | 145s / 198s |
+| CI `internal/fixtures` per package (the 4 runs above) | 77.4–143.5s | 56.5–98.2s |
+| CI `internal/integration` per package (the 4 runs above) | 54.9–99.5s | 71.2–112.5s |
+| CI build-test job (the 4 runs above) | 7.8–10.9 min | 7.4 min |
+| CI cache-matrix-leg jobs (the 4 runs above) | 4.6–5.8 min | 4.2–4.5 min |
+
+Temporary files: every package with a TestMain here runs inside ONE root from
+`internal/testtmp` (`vizra-test-<pkg>-<pid>-*`, TMPDIR pointed at it), removed at
+the end of the run. A run killed before that (go's `-timeout`, an OOM kill, a job
+timeout) leaves its root, and the next run of the same package removes it once
+its PID is gone. `TestTheFixturesTestsLeaveNoTemporaryEntry` and
+`TestTheIntegrationTestsLeaveNoTemporaryEntry` run the package's own test binary
+with a TMPDIR only they own; both are red on `3994893`
+(`docs/evidence/test-stability/host-darwin-arm64/R0-red-on-main.txt`), and T1–T4
+in the same directory are the byte mutations that turn them red again.

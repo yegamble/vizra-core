@@ -363,7 +363,7 @@ make test-integration-shuffle   # the same suite, -shuffle=on
 They **fail rather than skip** when those are unset, for the same reason.
 
 CI runs both, on both cache flavours — but **`build-test` invokes the
-integration suite DIRECTLY**, `go test -race -count=1 -tags=integration ./...`
+integration suite DIRECTLY**, `go test -race -count=1 -timeout 8m -tags=integration ./...`
 with the same package set, flags and services the recipe uses, so a no-opped
 make cannot silence it (before sweep B1 every integration invocation in this
 repository went through make). The recipes keep their own required coverage in

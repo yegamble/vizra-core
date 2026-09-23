@@ -113,7 +113,7 @@ direct_test_steps:
   - |
     set -uo pipefail
     rc=0
-    go test -race -count=1 -json ./... > unit-events.json || rc=$?
+    go test -race -count=1 -timeout 8m -json ./... > unit-events.json || rc=$?
     echo "$rc" > unit-exit.txt
     echo "go test (unit) exited $rc"
     python3 scripts/go-test-report.py \
@@ -127,7 +127,7 @@ direct_test_steps:
       exit 1
     fi
     rc=0
-    go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+    go test -race -count=1 -timeout 8m -tags=integration -json ./... > int-events.json || rc=$?
     echo "$rc" > int-exit.txt
     echo "go test (integration) exited $rc"
     python3 scripts/go-test-report.py \
@@ -137,7 +137,7 @@ direct_test_steps:
   - |
     set -uo pipefail
     rc=0
-    go test -race -count=1 -shuffle=on -tags=integration -json ./... > int-shuffle-events.json || rc=$?
+    go test -race -count=1 -timeout 8m -shuffle=on -tags=integration -json ./... > int-shuffle-events.json || rc=$?
     echo "$rc" > int-shuffle-exit.txt
     echo "go test (integration, shuffled) exited $rc"
     python3 scripts/go-test-report.py \

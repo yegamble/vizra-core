@@ -62,7 +62,7 @@ directly, with no make, and then judges the machine-readable results — because
 nothing at all for a skipped test. To reproduce that locally:
 
 ```sh
-go test -race -count=1 -json ./... > unit-events.json; echo $? > unit-exit.txt
+go test -race -count=1 -timeout 8m -json ./... > unit-events.json; echo $? > unit-exit.txt
 python3 scripts/go-test-report.py --events unit-events.json --suite unit \
   --floors scripts/test-floors.json --go-exit-file unit-exit.txt
 ```
