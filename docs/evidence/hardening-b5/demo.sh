@@ -99,7 +99,18 @@ export REC
 } > "$out/D4-pin-entry-deleted.txt" 2>&1
 
 # ----------------------------------------------------------------- C: code ---
-gotest() { go test -count=1 -run "$1" ./scripts/ 2>&1 | grep -E '^(--- FAIL|    --- FAIL|ok|FAIL|panic)' | head -20; }
+# go test's OWN exit code is the check's exit code; the grep only trims the log
+# to the verdict lines and the assertion that fired.
+gotest() {
+  local log rc
+  log="$(mktemp)"
+  go test -count=1 -run "$1" ./scripts/ > "$log" 2>&1
+  rc=$?
+  grep -E '^(--- FAIL|    --- FAIL|ok|FAIL|panic)|is visible|was STARTED|REWRITTEN|want the remake|did not say make|does not (name|mention|say)|want failed' "$log" | cut -c1-220 | head -30
+  rm -f "$log"
+  echo "go test exit=$rc"
+  return "$rc"
+}
 export -f gotest
 
 {
