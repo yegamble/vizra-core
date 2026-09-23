@@ -80,9 +80,16 @@ every recipe the closure reaches is scanned — GNU make skips implicit-rule
 search for phony targets (measured on 3.81 and 4.3), so the recipe is on an
 explicit rule, and with inline and multi-target forms refused it is on the
 TAB lines under that target's own rule line, which the text reading scans
-before make. After make, every closure target's recipe as make's `-pn`
-database holds it is held to the same literal checks, which catches a recipe
-make attaches some other way (a rule whose target name make computes).
+before make; a rule whose TARGET make computes is refused before make too
+(#11 fix round 2). After make, and failing CLOSED, the closure make reports
+from its own prerequisite lists must EQUAL the text closure, each closure
+target must have exactly one readable entry in make's `-pn` database, and that
+entry's recipe must EQUAL the pinned rule's TAB lines (whitespace collapsed) —
+so every recipe of every target make reaches is one the text reading scanned
+(in-process rows: `scripts/testdata/db-scan-probe.py`). The expanded-prefix
+line count differed between versions before that normalisation — 66 on GNU
+Make 3.81, 62 on 4.3, because 3.81's database joins four continued recipe
+lines of this Makefile with different indentation (#11 R1-2); both now read 62.
 After make has run on the pinned bytes, the resolver refuses what only make can
 see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` /
 `.EXTRA_PREREQS` or declares `.SECONDEXPANSION` / `.IGNORE` / a `.DEFAULT`
@@ -273,3 +280,16 @@ Same host (GNU Make 3.81, go1.27.1). Not pushed at the time of measurement (the 
 | `./scripts/ci-required-guard.sh` | 0 | |
 | `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD; C15–C26 red, green after restore |
 | GNU Make 4.3 container: D rows, C15/C15b, C22–C26, `measure.sh`, both anchors, the guard, all 62 makeguard fixtures | as expected | 60 red, 2 green |
+
+### #11 fix round 2 (R1-1, R1-2), measured on scripts/ tree `4be7543e…`
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| direct unit step + `go-test-report.py` | 0 | **1252 executed, 0 failed, 0 skipped**, floor 943; `scripts` 332 |
+| `go test -race -count=1 ./scripts/` | 0 | 332 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | database scan: 17 targets, 62 recipe lines equal; closure make reports = text closure; 62 distinct expanded-prefix lines on 3.81 AND 4.3 |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `python3 scripts/testdata/db-scan-probe.py` | 0 | 15 rows as expected (3.81 host and 4.3 container) |
+| `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD + probe; C15–C32 red, green after restore |
+| GNU Make 4.3 container: D rows, C15/C15b, C22–C25, C27–C32, both anchors, the guard, all 62 makeguard fixtures | as expected | 60 red, 2 green |

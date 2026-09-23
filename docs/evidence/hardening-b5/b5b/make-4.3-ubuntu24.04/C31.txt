@@ -1,0 +1,29 @@
+# C31 a recipe differing from the pinned rule no longer refused
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
+
+==============================================================
+MUTATION: C31 a recipe differing from the pinned rule no longer refused
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C31
+  check:  python3 scripts/testdata/db-scan-probe.py | grep -E '^ROW BAD|^PROBE'; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
+  sha256 AFTER:  ef32aaae8628406dae9e91ab5054aa79691e0dd65427e5b27de0c7b9cf5ad545
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+/src/scripts/make-integrity-guard.py:2: SyntaxWarning: invalid escape sequence '\`'
+  """make-integrity-guard — refuse a Makefile that has been turned into a no-op.
+ROW BAD  empty entry, recipe expected: refused=False (expected True); says 'DIFFERENT recipe for gate closure target `ci`': False
+ROW BAD  a recipe line the text does not show: refused=False (expected True); says 'DIFFERENT recipe for gate closure target `ci`': False
+PROBE: FAILED — 2 of 15 rows did not behave as expected
+------------------------------------
+  sha256 RESTORED: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
+  restore byte-identical: yes
+  RESULT: C31 a recipe differing from the pinned rule no longer refused -> exit 1
+
+== after restore ==
+/src/scripts/make-integrity-guard.py:2: SyntaxWarning: invalid escape sequence '\`'
+  """make-integrity-guard — refuse a Makefile that has been turned into a no-op.
+PROBE: all 15 rows as expected

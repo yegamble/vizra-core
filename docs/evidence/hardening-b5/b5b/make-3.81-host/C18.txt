@@ -1,7 +1,7 @@
 # C18 the pattern-rule refusal removed
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
 
 ==============================================================
 MUTATION: C18 the pattern-rule refusal removed
@@ -9,25 +9,25 @@ MUTATION: C18 the pattern-rule refusal removed
   mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C18
   check:  gotest 'TestMakeIntegrityGuardFixtures/pattern-rule|TestEveryRefusedSpellingIsRefusedBeforeMake/pattern_rule'
 --------------------------------------------------------------
-  sha256 BEFORE: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
-  sha256 AFTER:  a1933a27fb15b3dcc8e76855566b4dcd76208d1d85b7793a94f60cb99ea53418
+  sha256 BEFORE: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
+  sha256 AFTER:  e9e2d7e7d0aafbaa496e43a2d269f8ea2ac44f5a76220c86a21c0d28824387a3
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
 --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake (0.00s)
-    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern_rule_double_colon (0.34s)
-    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern_rule (0.37s)
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern_rule_double_colon (0.26s)
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern_rule (0.26s)
 --- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
-    --- FAIL: TestMakeIntegrityGuardFixtures/pattern-rule (0.20s)
-        scripts_test.go:436: exit 0 (failed=false), want failed=true.
+    --- FAIL: TestMakeIntegrityGuardFixtures/pattern-rule (0.27s)
+        scripts_test.go:441: exit 0 (failed=false), want failed=true.
 FAIL
-FAIL	github.com/yegamble/vizra-core/scripts	0.752s
+FAIL	github.com/yegamble/vizra-core/scripts	0.872s
 FAIL
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  sha256 RESTORED: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
   restore byte-identical: yes
   RESULT: C18 the pattern-rule refusal removed -> exit 1
 
 == after restore ==
-ok  	github.com/yegamble/vizra-core/scripts	0.604s
+ok  	github.com/yegamble/vizra-core/scripts	2.338s
 go test exit=0

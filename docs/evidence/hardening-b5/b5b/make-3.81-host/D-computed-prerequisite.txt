@@ -1,7 +1,7 @@
 # D-computed-prerequisite: the committed fixture, gate stub failing
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
 
 fixture computed-prerequisite: raw `make ci` on these bytes (no anchor): exit 2
 anchor [--workflow] exit=1 make-processes=0

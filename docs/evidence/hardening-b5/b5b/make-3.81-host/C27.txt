@@ -1,37 +1,41 @@
-# C22 the inline-recipe refusal removed
-# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# C27 the computed-target refusal removed
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
 # tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
 # scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
 
 ==============================================================
-MUTATION: C22 the inline-recipe refusal removed
+MUTATION: C27 the computed-target refusal removed
   file:   scripts/make-integrity-guard.py
-  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C22
-  check:  fixture_scenario inline-recipe 'is a rule with an INLINE'
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C27
+  check:  fixture_scenario computed-target-recipe 'is a rule whose TARGET make computes'
 --------------------------------------------------------------
   sha256 BEFORE: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
-  sha256 AFTER:  056e6163010fae271daf7b32b6eb9922cd277b217affb3cf5e4b959bcb31eadb
+  sha256 AFTER:  5df2e251838cea20966b947c16d3866036dbab13cb1cab69236cecb85ea0eafe
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
-fixture inline-recipe: raw `make ci` on these bytes (no anchor): exit 2
+fixture computed-target-recipe: raw `make ci` on these bytes (no anchor): exit 0
 anchor [--workflow] exit=1 make-processes=4
   FAIL  make holds a DIFFERENT recipe for gate closure target `ci` than its pinned rule shows: 1 line(s) in make's database, 0 under the rule line.
+  FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a `-` prefix.
+  FAIL  make's database:0 — gate target `ci`: `-./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own database.
 make-integrity-guard: FAILED
 anchor [lenient] exit=1 make-processes=4
   FAIL  make holds a DIFFERENT recipe for gate closure target `ci` than its pinned rule shows: 1 line(s) in make's database, 0 under the rule line.
+  FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a `-` prefix.
+  FAIL  make's database:0 — gate target `ci`: `-./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own database.
 make-integrity-guard: FAILED
-fixture_scenario inline-recipe: control BROKEN (exit 1)
+fixture_scenario computed-target-recipe: control BROKEN (exit 1)
 ------------------------------------
   sha256 RESTORED: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
   restore byte-identical: yes
-  RESULT: C22 the inline-recipe refusal removed -> exit 1
+  RESULT: C27 the computed-target refusal removed -> exit 1
 
 == after restore ==
-fixture inline-recipe: raw `make ci` on these bytes (no anchor): exit 2
+fixture computed-target-recipe: raw `make ci` on these bytes (no anchor): exit 0
 anchor [--workflow] exit=1 make-processes=0
-  FAIL  Makefile:5 is a rule with an INLINE `;` recipe: `ci: ; ./run-the-real-tests.sh`
+  FAIL  Makefile:7 is a rule whose TARGET make computes: `$(GATE_NAME):`
 make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
 anchor [lenient] exit=1 make-processes=0
-  FAIL  Makefile:5 is a rule with an INLINE `;` recipe: `ci: ; ./run-the-real-tests.sh`
+  FAIL  Makefile:7 is a rule whose TARGET make computes: `$(GATE_NAME):`
 make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
-fixture_scenario inline-recipe: control HELD (exit 0)
+fixture_scenario computed-target-recipe: control HELD (exit 0)

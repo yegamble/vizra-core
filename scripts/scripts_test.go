@@ -381,7 +381,7 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "resolver-computed-shell", wantFail: true, wantText: "make resolves SHELL to '/usr/bin/true'"},
 		{dir: "resolver-computed-makeflags", wantFail: true, wantText: "make resolves MAKEFLAGS to"},
 		{dir: "resolver-computed-recipeprefix", wantFail: true, wantText: "make resolves .RECIPEPREFIX to '>'"},
-		{dir: "resolver-computed-secondexpansion", wantFail: true, wantText: "`.SECONDEXPANSION:` is in effect"},
+		{dir: "resolver-computed-secondexpansion", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
 		// Found while fixing R1-F1: make applies `-`/`+` AFTER expansion, so a
 		// prefix a VARIABLE produces ignored a failing gate with the anchor green
 		// (measured on 3.81). The leading references are now resolved from make's
@@ -402,8 +402,12 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "default-recipe", wantFail: true, notInvoked: true, wantText: "names `.DEFAULT`"},
 		{dir: "extra-prereqs", wantFail: true, notInvoked: true, wantText: "names `.EXTRA_PREREQS`"},
 		// ... and a name make COMPUTES, by the resolver after make ran.
-		{dir: "resolver-computed-ignore", wantFail: true, wantText: "`.IGNORE:` is in effect"},
-		{dir: "resolver-computed-default", wantFail: true, wantText: "`.DEFAULT` has a recipe"},
+		// #11 fix round 2 (R1-1 a): a rule whose TARGET make computes is refused
+		// before make, so these two — and resolver-computed-secondexpansion —
+		// no longer reach the resolver. Their resolver branches keep red cases
+		// in scripts/testdata/db-scan-probe.py (TestTheDatabaseChecksFailClosed).
+		{dir: "resolver-computed-ignore", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
+		{dir: "resolver-computed-default", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
 		{dir: "resolver-computed-extra-prereqs", wantFail: true, wantText: "make resolves .EXTRA_PREREQS to 'Makefile'"},
 		// Slice B5b (R2-F2): no recipe the gate closure reaches may come from
 		// anywhere but an explicit rule the text reading scans.
@@ -414,9 +418,10 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// one-target-per-line reading would not attribute.
 		{dir: "inline-recipe", wantFail: true, notInvoked: true, wantText: "is a rule with an INLINE `;` recipe"},
 		{dir: "multi-target-rule", wantFail: true, notInvoked: true, wantText: "is a MULTI-TARGET rule (ci, other)"},
-		// ... and a recipe only make can attribute (a rule whose target NAME make
-		// computes, beside a recipe-less `ci:`): refused from make's database.
-		{dir: "computed-target-recipe", wantFail: true, wantText: "make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`"},
+		// ... and a rule whose target NAME make computes, beside a recipe-less
+		// `ci:`: refused before make since #11 fix round 2 (R1-1 a). In round 1
+		// only make's database saw it (raw `make ci` exits 0 over a failing stub).
+		{dir: "computed-target-recipe", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes: `$(GATE_NAME):`"},
 		// B5c (search desk review M-1, M-5).
 		{dir: "computed-prerequisite", wantFail: true, notInvoked: true, wantText: "has a prerequisite make COMPUTES: $(LANE)"},
 		{dir: "posix", wantFail: true, notInvoked: true, wantText: "names `.POSIX`"},
@@ -569,7 +574,8 @@ func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
 		"no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`",
 		"make's own .PHONY list covers all 17 gate closure target(s)",
 		// #11 fix round 1: every closure recipe as make holds it.
-		"make's own database: the 62 recipe line(s) of the 17 gate closure target(s) carry no",
+		"make's own database: each of the 17 gate closure target(s) has ONE readable entry whose 62 recipe line(s) equal the pinned rule's",
+		"the gate closure make reports from its database equals the text closure (17 target(s))",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)

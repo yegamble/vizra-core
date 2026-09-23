@@ -1,16 +1,14 @@
-# D-computed-target-recipe: refused AFTER make, from make's own database
+# D-computed-target-recipe (round 2): a rule whose TARGET make computes, refused BEFORE make
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
 
 fixture computed-target-recipe: raw `make ci` on these bytes (no anchor): exit 0
-anchor [--workflow] exit=1
-  FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a `-` prefix.
-  FAIL  make's database:0 — gate target `ci`: `-./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own database.
-make-integrity-guard: FAILED
-anchor [lenient] exit=1
-  FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a `-` prefix.
-  FAIL  make's database:0 — gate target `ci`: `-./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own database.
-make-integrity-guard: FAILED
-fixture_scenario_post computed-target-recipe: control HELD (exit 0)
-fixture_scenario_post exit=0
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:7 is a rule whose TARGET make computes: `$(GATE_NAME):`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:7 is a rule whose TARGET make computes: `$(GATE_NAME):`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario computed-target-recipe: control HELD (exit 0)
+fixture_scenario exit=0

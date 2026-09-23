@@ -127,9 +127,6 @@ for pair in "inline-recipe:is a rule with an INLINE" "multi-target-rule:is a MUL
   { header "D-$f: the committed fixture, gate stub failing"; fixture_scenario "$f" "$n"; echo "fixture_scenario exit=$?"; } \
     > "$out/D-$f.txt" 2>&1
 done
-{ header "D-computed-target-recipe: refused AFTER make, from make's own database"
-  fixture_scenario_post computed-target-recipe "own database gives gate closure target"
-  echo "fixture_scenario_post exit=$?"; } > "$out/D-computed-target-recipe.txt" 2>&1
 
 xrow() { # id title fixture name [post]
   local fn=fixture_scenario; [ "${5:-}" = post ] && fn=fixture_scenario_post
@@ -142,7 +139,28 @@ xrow C22 "the inline-recipe refusal removed" inline-recipe "is a rule with an IN
 xrow C23 "the multi-target refusal removed" multi-target-rule "is a MULTI-TARGET rule"
 xrow C24 "the computed-prerequisite refusal removed" computed-prerequisite "has a prerequisite make COMPUTES"
 xrow C25 "the .POSIX refusal removed" posix 'names `.POSIX`'
-xrow C26 "the database recipe scan removed" computed-target-recipe "own database gives gate closure target" post
+
+# #11 fix round 2 (R1-1). C27 on the committed fixture; C28-C32 through the
+# in-process probe (scripts/testdata/db-scan-probe.py): exit 0 = every row as
+# expected, 1 = some check no longer refuses what it must. Go-free, so they run
+# on 4.3 too.
+{ header "D-computed-target-recipe (round 2): a rule whose TARGET make computes, refused BEFORE make"
+  fixture_scenario computed-target-recipe "is a rule whose TARGET make computes"
+  echo "fixture_scenario exit=$?"; } > "$out/D-computed-target-recipe.txt" 2>&1
+{ header "D-db-scan-probe: the database checks, fed strings in-process"
+  python3 scripts/testdata/db-scan-probe.py; echo "probe exit=$?"; } > "$out/D-db-scan-probe.txt" 2>&1
+xrow C27 "the computed-target refusal removed" computed-target-recipe "is a rule whose TARGET make computes"
+probe_row() { # id title
+  { header "$1 $2"
+    bash "$M" "$1 $2" scripts/make-integrity-guard.py "python3 $MUT $1" "python3 scripts/testdata/db-scan-probe.py | grep -E '^ROW BAD|^PROBE'; exit \${PIPESTATUS[0]}"
+    echo "== after restore =="; python3 scripts/testdata/db-scan-probe.py | tail -1
+  } > "$out/$1.txt" 2>&1
+}
+probe_row C28 "a missing database entry no longer refused"
+probe_row C29 "a duplicate database entry no longer refused"
+probe_row C30 "an unreadable database header no longer refused"
+probe_row C31 "a recipe differing from the pinned rule no longer refused"
+probe_row C32 "a closure make widens or narrows no longer refused"
 
 if [ "${DEMO_ONLY:-}" = "D" ]; then
   echo "DEMO_ONLY=D: the Go-test C rows skipped (they need go)."
@@ -163,5 +181,9 @@ row C18 "the pattern-rule refusal removed" "TestMakeIntegrityGuardFixtures/patte
 row C19 "the .PHONY requirement removed" "TestMakeIntegrityGuardFixtures/closure-not-phony"
 row C20 "the no-explicit-rule refusal removed (back to a 'note')" "TestMakeIntegrityGuardFixtures/missing-prerequisite"
 row C21 "the sub-make refusal removed" "TestMakeIntegrityGuardFixtures/submake|TestEveryRefusedSpellingIsRefusedBeforeMake/sub-make"
+# Since #11 fix round 2 every committed route to the database scan is refused
+# before make, so its call is held by the real-tree test's ok line, and its
+# refusals by the in-process probe rows (C28-C32).
+row C26 "the database recipe scan call removed" "TestMakeIntegrityGuardPassesOnTheRealMakefile|TestTheDatabaseChecksFailClosed"
 
 echo "tree after all demonstrations: $(git status --porcelain | wc -l | tr -d ' ') uncommitted path(s)"

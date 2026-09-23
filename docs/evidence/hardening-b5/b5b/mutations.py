@@ -25,6 +25,13 @@ MUTATIONS = {
     "C24": [(GUARD, "            if computed:", "            if False:")],
     "C25": [(GUARD, '    ".POSIX": ', '    ".POSIX-disabled-by-C25": ')],
     "C26": [(GUARD, "    check_db_recipes(g, closure)\n", "")],
+    # #11 fix round 2 (R1-1): refuse computed rule targets; the database checks fail closed.
+    "C27": [(GUARD, '            if "$" in rl.group(1):', "            if False:")],
+    "C28": [(GUARD, "        if t not in DB_RECIPES:", "        if False:")],
+    "C29": [(GUARD, "        if t in DB_DUPLICATES:", "        if False:")],
+    "C30": [(GUARD, "    if DB_UNREADABLE:", "    if False:")],
+    "C31": [(GUARD, "        if db != text_lines.get(t, []):", "        if False:")],
+    "C32": [(GUARD, "    if extra or missing:", "    if False:")],
 }
 
 for path, old, new in MUTATIONS[sys.argv[1]]:

@@ -2,7 +2,7 @@ GNU Make 4.3
 at-dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `@-./run-the-real-tests.sh`
 closure-not-phony exit=1 notinv=1   FAIL  gate closure target(s) not declared `.PHONY` in the pinned bytes: ci
 computed-prerequisite exit=1 notinv=1   FAIL  Makefile:6 — gate closure target `ci` has a prerequisite make COMPUTES: $(LANE)
-computed-target-recipe exit=1 notinv=0   FAIL  make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`, with a 
+computed-target-recipe exit=1 notinv=1   FAIL  Makefile:7 is a rule whose TARGET make computes: `$(GATE_NAME):`
 conditional-target exit=1 notinv=1   FAIL  Makefile:6 defines the gate target `ci` inside a make conditional.
 dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `-./run-the-real-tests.sh`
 default-recipe exit=1 notinv=1   FAIL  Makefile:8 names `.DEFAULT`: `.DEFAULT:`
@@ -46,12 +46,12 @@ prefix-from-pattern-specific exit=1 notinv=0   FAIL  Makefile:9 — gate target 
 prefix-from-variable exit=1 notinv=0   FAIL  Makefile:8 — gate target `ci`: `$(IGNORE_FAILURE)./run-the-real-tests.sh` expands to a recipe line p
 recipeprefix exit=1 notinv=1   FAIL  Makefile:3 names `.RECIPEPREFIX`: `.RECIPEPREFIX := >`
 resolver-cannot-resolve exit=1 notinv=0   FAIL  `make -pn ci` failed (exit 2); the lane's real shape could not be established.
-resolver-computed-default exit=1 notinv=0   FAIL  `.DEFAULT` has a recipe while resolving `ci`.
+resolver-computed-default exit=1 notinv=1   FAIL  Makefile:9 is a rule whose TARGET make computes: `$(DEFAULT_HEAD)ULT:`
 resolver-computed-extra-prereqs exit=1 notinv=0   FAIL  make resolves .EXTRA_PREREQS to 'Makefile' while resolving `ci`.
-resolver-computed-ignore exit=1 notinv=0   FAIL  `.IGNORE:` is in effect while resolving `ci`.
+resolver-computed-ignore exit=1 notinv=1   FAIL  Makefile:9 is a rule whose TARGET make computes: `$(IGNORE_HEAD)ORE:`
 resolver-computed-makeflags exit=1 notinv=0   FAIL  make resolves MAKEFLAGS to 'inp' while resolving `ci`.
 resolver-computed-recipeprefix exit=1 notinv=0   FAIL  make resolves .RECIPEPREFIX to '>' while resolving `ci`.
-resolver-computed-secondexpansion exit=1 notinv=0   FAIL  `.SECONDEXPANSION:` is in effect while resolving `ci`.
+resolver-computed-secondexpansion exit=1 notinv=1   FAIL  Makefile:9 is a rule whose TARGET make computes: `$(EXPANSION_HEAD)EXPANSION:`
 resolver-computed-shell exit=1 notinv=0   FAIL  make resolves SHELL to '/usr/bin/true' while resolving `ci`, not '/usr/bin/env bash'.
 secondexpansion exit=1 notinv=1   FAIL  Makefile:8 names `.SECONDEXPANSION`: `.SECONDEXPANSION:`
 semicolon-true exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line ending `; true`: `./run-the-real-tests.sh ; true`

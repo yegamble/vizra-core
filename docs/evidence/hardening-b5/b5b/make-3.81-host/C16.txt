@@ -1,7 +1,7 @@
 # C16 the pre-make .DEFAULT refusal removed
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: 4f58fcc1a992b19f180735b3c75300b4082bb682  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 173c57f1b62adc1bfb2407f5a0a9af2948ec6c97
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
 
 ==============================================================
 MUTATION: C16 the pre-make .DEFAULT refusal removed
@@ -9,27 +9,27 @@ MUTATION: C16 the pre-make .DEFAULT refusal removed
   mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C16
   check:  gotest 'TestMakeIntegrityGuardFixtures/default-recipe|TestEveryRefusedSpellingIsRefusedBeforeMake/default'
 --------------------------------------------------------------
-  sha256 BEFORE: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
-  sha256 AFTER:  fc498be908e16808e2183a20fa173d78b48dced89818c782472ccb3f2b5bea27
+  sha256 BEFORE: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
+  sha256 AFTER:  b598f53b9246ecaea245f0c16f1c60b70c7796842692d7ba0a9e420c2813b68a
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
 --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake (0.00s)
-    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/default_one-line_recipe (0.09s)
-        makefiledigest_test.go:932: default one-line recipe: the refusal does not name "names `.DEFAULT`":
-    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/default_rule (0.13s)
-        makefiledigest_test.go:932: default rule: the refusal does not name "names `.DEFAULT`":
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/default_one-line_recipe (0.21s)
+        makefiledigest_test.go:938: default one-line recipe: the refusal does not name "names `.DEFAULT`":
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/default_rule (0.38s)
+        makefiledigest_test.go:938: default rule: the refusal does not name "names `.DEFAULT`":
 --- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
-    --- FAIL: TestMakeIntegrityGuardFixtures/default-recipe (0.27s)
-        scripts_test.go:439: the failure does not mention "names `.DEFAULT`", so an author would not know what to fix:
+    --- FAIL: TestMakeIntegrityGuardFixtures/default-recipe (0.62s)
+        scripts_test.go:444: the failure does not mention "names `.DEFAULT`", so an author would not know what to fix:
 FAIL
-FAIL	github.com/yegamble/vizra-core/scripts	0.616s
+FAIL	github.com/yegamble/vizra-core/scripts	1.423s
 FAIL
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: 95d6125341b5e72e174cb0f0bb1eb8a25e4ed9fbe4a4ea84b60bb9808c5682f4
+  sha256 RESTORED: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
   restore byte-identical: yes
   RESULT: C16 the pre-make .DEFAULT refusal removed -> exit 1
 
 == after restore ==
-ok  	github.com/yegamble/vizra-core/scripts	0.370s
+ok  	github.com/yegamble/vizra-core/scripts	0.682s
 go test exit=0

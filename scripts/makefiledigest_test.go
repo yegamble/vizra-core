@@ -907,6 +907,12 @@ func TestEveryRefusedSpellingIsRefusedBeforeMake(t *testing.T) {
 		{"computed prerequisite", "LANE := lane\nci: $(LANE)\n", "has a prerequisite make COMPUTES: $(LANE)", nil},
 		{"computed order-only prerequisite", "LANE := lane\nci: | $(LANE)\n", "has a prerequisite make COMPUTES: $(LANE)", nil},
 		{"posix", ".POSIX:\n", "names `.POSIX`", nil},
+		// #11 fix round 2 (R1-1 a): a rule whose TARGET make computes — with a
+		// recipe, adding a prerequisite, double-colon, or target-specific.
+		{"computed target with a recipe", "G := ci\n$(G):\n\t-./run-the-real-tests.sh\n", "is a rule whose TARGET make computes", nil},
+		{"computed target adding a prerequisite", "G := ci\n$(G): extra\n", "is a rule whose TARGET make computes", nil},
+		{"computed target, braces, double colon", "G := ci\n${G}::\n\t@true\n", "is a rule whose TARGET make computes", nil},
+		{"computed target, target-specific", "G := ci\n$(G): FOO := bar\n", "is a rule whose TARGET make computes", nil},
 		{"control: .DEFAULT_GOAL", ".DEFAULT_GOAL := ci\n", "", nil},
 		{"control: pattern-specific ordinary variable", "%: FOO := bar\n", "", nil},
 		{"control: nothing added", "", "", nil},
@@ -973,4 +979,21 @@ func TestAnUnreadablePinnedFileIsRefusedByName(t *testing.T) {
 	if code != 1 || !strings.Contains(gout, "inc.mk is pinned but cannot be read") || strings.Contains(gout, "Traceback") {
 		t.Fatalf("check 11: exit %d; want exit 1 naming inc.mk, no traceback:\n%s", code, gout)
 	}
+}
+
+// #11 fix round 2 (R1-1 b, c): the post-make database checks fail CLOSED. The
+// probe feeds parse_database strings in-process — an empty database, no
+// database section, an empty entry, a duplicate, a space-containing name, a
+// recipe line the text does not show, a widened and a narrowed closure, and
+// command output printed outside the database — plus the resolver branches whose
+// committed fixtures are now refused before make, and three controls. It runs
+// no process (it replaces subprocess with a stub that raises).
+func TestTheDatabaseChecksFailClosed(t *testing.T) {
+	cmd := exec.Command("python3", filepath.Join(repoRoot(t), "scripts", "testdata", "db-scan-probe.py"))
+	cmd.Env = guardEnv()
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "PROBE: all 15 rows as expected") {
+		t.Fatalf("db-scan-probe: %v\n%s", err, out)
+	}
+	t.Logf("%s", out)
 }
