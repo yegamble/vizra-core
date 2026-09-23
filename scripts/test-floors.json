@@ -66,7 +66,12 @@
     "-count=1 -tags=integration -json ./...`: 1353 executed, internal/integration 169, 0 skipped.",
     "The generator's formula then calls for internal/integration 140 -> 144 and integration",
     "min_tests 1147 -> 1150; applied. The unit suite is unchanged (1184; generator 1006 = committed).",
-    "Every other per-package floor already equals the generator's output. Nothing was lowered."
+    "Every other per-package floor already equals the generator's output. Nothing was lowered.",
+    "",
+    "Test stability (sentinel S-0016 / S-0001): the new package internal/testtmp runs 2 tests",
+    "(its Sweep and liveness checks) in both suites; the formula (15% or 2 tests of slack, never",
+    "below 1) gives 1, in both. internal/fixtures gains one test and internal/integration two",
+    "(the temporary-file leak checks); their floors are unchanged. Nothing was lowered."
   ],
   "suites": {
     "unit": {
@@ -88,6 +93,7 @@
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
         "github.com/yegamble/vizra-core/internal/search": 110,
         "github.com/yegamble/vizra-core/internal/site": 4,
+        "github.com/yegamble/vizra-core/internal/testtmp": 1,
         "github.com/yegamble/vizra-core/scripts": 161
       },
       "allowed_skips": {}
@@ -112,6 +118,7 @@
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
         "github.com/yegamble/vizra-core/internal/search": 110,
         "github.com/yegamble/vizra-core/internal/site": 4,
+        "github.com/yegamble/vizra-core/internal/testtmp": 1,
         "github.com/yegamble/vizra-core/scripts": 161
       },
       "allowed_skips": {}
