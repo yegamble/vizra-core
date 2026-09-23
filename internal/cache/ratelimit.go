@@ -74,8 +74,10 @@ func (l *FallbackLimiter) Degraded() bool {
 // covers both the first request of a window (INCR just created the key) and a
 // counter found WITHOUT a TTL for any reason — a key with no expiry never resets,
 // which is a permanent lockout. INCR and EXPIRE NX run in one MULTI/EXEC: no
-// other client's command is interleaved, a crash applies neither, and a
-// queue-time error discards both. It is NOT "both or neither" for a runtime
+// other client's command is interleaved, a crash never leaves one applied
+// without the other (client crash before EXEC: neither; after EXEC: both; a
+// half-written AOF tail is truncated on load), and a queue-time error discards
+// both. It is NOT "both or neither" for a runtime
 // error, because Redis and Valkey have no rollback. But the only realistic one,
 // INCR on a non-integer value, still leaves EXPIRE NX to set the TTL, and a
 // counter found without a TTL is given one on its next call, so no path leaves a

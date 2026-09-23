@@ -233,8 +233,7 @@ lockout. Every other bucket had the same fault. The in-process fallback was
 already a true fixed window, so the semantics depended on cache health. The fix
 is `INCR` + `EXPIRE key window NX` in one MULTI/EXEC, and the TTL is set only
 when the key has none. What holds, at exactly this strength (verifier R5-N1):
-the two commands are not interleaved with other clients, a crash applies
-neither, and a queue-time error discards both. A runtime error is NOT rolled
+the two commands are not interleaved with other clients, a crash never leaves one applied without the other (client crash before EXEC: neither; after EXEC: both; a half-written AOF tail is truncated on load), and a queue-time error discards both. A runtime error is NOT rolled
 back, because Redis and Valkey have none. But the only realistic one, `INCR` on a
 non-integer value, still leaves `EXPIRE NX` to set the TTL, and a counter found
 without a TTL is given one on its next call, so no path leaves a permanent
