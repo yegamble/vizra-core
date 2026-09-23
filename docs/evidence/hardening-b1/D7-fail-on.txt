@@ -1,0 +1,29 @@
+# D7 — item 7: image-scan-verdict.py refuses a --fail-on that cannot fail.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c
+
+The fixture is this repository's own scripts/testdata/imagescan/findings/, which carries:
+   {'LOW': 1, 'MEDIUM': 1, 'CRITICAL': 1}  scanner exit code file: 0
+
+== BEFORE (measured at 5eb2829, B0-baseline-items-2-3-5-7.txt) ==
+  --fail-on ''   EXIT=0    'A valid scan of vizra-core:scan found nothing at or above [].'
+  --fail-on ','  EXIT=0
+
+== AFTER, at this tree ==
+  --fail-on ''               EXIT=3  ::error::image-scan: --fail-on is empty (''); a verdict with no failing severities cannot fa
+  --fail-on ','              EXIT=3  ::error::image-scan: --fail-on is empty (','); a verdict with no failing severities cannot f
+  --fail-on ' , '            EXIT=3  ::error::image-scan: --fail-on is empty (' , '); a verdict with no failing severities cannot
+  --fail-on ',,'             EXIT=3  ::error::image-scan: --fail-on is empty (',,'); a verdict with no failing severities cannot 
+  --fail-on 'HIGH,SEVERE'    EXIT=3  ::error::image-scan: --fail-on names severities Trivy does not use: ['SEVERE']
+  --fail-on 'HIGH,CRITICAL'  EXIT=1  ::error::image-scan: 1 finding(s) at or above ['CRITICAL', 'HIGH']
+
+  3 = THERE WAS NO VALID SCAN (not 'clean'); 1 = there are findings. The vocabulary
+  is asserted, not merely 'non-zero' — collapsing them is how a lane that never ran
+  gets read as a clean bill of health.
+
+== the named test, in the required `scripts` package ==
+  === RUN   TestImageScanVerdictRefusesAThresholdThatCannotFail
+  --- PASS: TestImageScanVerdictRefusesAThresholdThatCannotFail (0.25s)
+  ok  	github.com/yegamble/vizra-core/scripts	0.455s
+
+== and the whole image-scan fixture set still passes (nothing weakened) ==
+  ok  	github.com/yegamble/vizra-core/scripts	1.123s

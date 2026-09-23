@@ -1,0 +1,26 @@
+# R4 — FINDING 7: emptying ONE package other than internal/integration is RED.
+# Run in a scratch COPY of the working tree (rsync, no .git), so the checkout's
+# internal/ is never touched. The commands are the pinned unit step's, verbatim.
+# source: chore/m0-hardening-b1 working tree on top of e710c3c; 2026-09-23T01:08:54Z
+# host: Darwin/arm64, go1.27.1
+
+== internal/obs: 1 test file(s), content digest c0b5df6d25da6d44 -> 0 after moving aside ==
+  go test (unit) exited 0
+    tests executed:           1054  (floor: 910)
+    github.com/yegamble/vizra-core/internal/obs: 0 test(s) (floor: 14)
+  ::error::go-test-report: package github.com/yegamble/vizra-core/internal/obs executed 0 test(s); its recorded floor is 14.
+  report EXIT=1
+
+== internal/search: 1 test file(s), content digest d11ef4c079185a88 -> 0 after moving aside ==
+  go test (unit) exited 0
+    tests executed:           942  (floor: 910)
+    github.com/yegamble/vizra-core/internal/search: 0 test(s) (floor: 110)
+  ::error::go-test-report: package github.com/yegamble/vizra-core/internal/search executed 0 test(s); its recorded floor is 110.
+  report EXIT=1
+
+== control: nothing moved aside ==
+  report EXIT=0  go-test-report: ok — 1071 test(s) executed across 14 package(s), 0 unexpected skips, floor 910 met
+
+At e710c3c the verifier emptied internal/search and got 'ok — 918 test(s)
+executed … floor 900 met', EXIT 0. In both mutations above the whole-suite floor
+is still met; only the per-package floor makes them red.

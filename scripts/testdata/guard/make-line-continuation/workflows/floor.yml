@@ -1,0 +1,94 @@
+name: floor
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  append-only:
+    name: append-only
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
+  build-test:
+    name: build-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # A lane that checks out says which tree it stood in (check 10).
+      - name: Provenance
+        run: ./scripts/provenance.sh
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
+      - name: tidy
+        run: make tidy-check
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
+      - name: make ci
+        run: |
+          make \
+            --dry-run \
+            ci
+      # The direct lane: a no-opped Makefile cannot make the suite silent. Its
+      # body is PINNED in .github/pinned-steps.yml — the exit handling is the
+      # control, and a substring check cannot see it being removed.
+      - name: Unit suite, invoked directly (no make)
+        run: |
+          set -uo pipefail
+          rc=0
+          go test -race -count=1 -json ./... > unit-events.json || rc=$?
+          echo "$rc" > unit-exit.txt
+          echo "go test (unit) exited $rc"
+          python3 scripts/go-test-report.py \
+            --events unit-events.json --suite unit \
+            --floors scripts/test-floors.json --go-exit-file unit-exit.txt || exit 1
+          exit "$rc"
+      - name: Integration suite, invoked directly (no make)
+        run: |
+          set -uo pipefail
+          if [ -z "${VIZRA_TEST_DATABASE_URL:-}" ]; then
+            echo "::error::VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."
+            exit 1
+          fi
+          rc=0
+          go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+          echo "$rc" > int-exit.txt
+          echo "go test (integration) exited $rc"
+          python3 scripts/go-test-report.py \
+            --events int-events.json --suite integration \
+            --floors scripts/test-floors.json --go-exit-file int-exit.txt || exit 1
+          exit "$rc"
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
+      - name: build
+        run: make build
+  cache-matrix:
+    name: cache-matrix
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
+  fixtures:
+    name: fixtures
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
+      - name: fixtures
+        run: make fixtures
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
+      - name: fixtures-verify
+        run: make fixtures-verify
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
+      - name: govulncheck
+        run: make govulncheck
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-24.04
+    steps:
+      - run: docker build .

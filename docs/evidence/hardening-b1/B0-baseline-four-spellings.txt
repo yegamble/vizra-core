@@ -1,0 +1,77 @@
+# Baseline at main (5eb2829): both guards green, and the four spellings the
+# PR#6 verifier measured are STILL green. Recorded before any change in B1.
+# host: Darwin/arm64  make: GNU Make 3.81  python3: Python 3.9.6
+# tree: 5eb2829eb4f830206029f8e2a836f93a44a93a02
+
+== control: both guards on the unmodified tree ==
+ci-required-guard.sh          EXIT=0
+make-integrity-guard.sh       EXIT=0
+
+==============================================================
+MUTATION: S: run: make -i ci (at main)
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -i ci\n'))"
+  check:  ./scripts/ci-required-guard.sh >/dev/null 2>&1; echo guard-exit=$?; ./scripts/make-integrity-guard.sh >/dev/null 2>&1; echo anchor-exit=$?
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  bcace5dc877e0b7f9e9986e9172599041ec6ec4f015909f90f11540fca68e060
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+guard-exit=0
+anchor-exit=0
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: S: run: make -i ci (at main) -> exit 0
+
+==============================================================
+MUTATION: S: run: make SHELL=/usr/bin/true ci (at main)
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make SHELL=/usr/bin/true ci\n'))"
+  check:  ./scripts/ci-required-guard.sh >/dev/null 2>&1; echo guard-exit=$?; ./scripts/make-integrity-guard.sh >/dev/null 2>&1; echo anchor-exit=$?
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  189159bad2ec342245b2f03da3c493001832e057301a6292487323e0510a71c8
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+guard-exit=0
+anchor-exit=0
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: S: run: make SHELL=/usr/bin/true ci (at main) -> exit 0
+
+==============================================================
+MUTATION: S: run: make MAKEFLAGS=-i ci (at main)
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make MAKEFLAGS=-i ci\n'))"
+  check:  ./scripts/ci-required-guard.sh >/dev/null 2>&1; echo guard-exit=$?; ./scripts/make-integrity-guard.sh >/dev/null 2>&1; echo anchor-exit=$?
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  ad85c3b6c149b3c64d3c90134421f467fa2b6eac1d85477e63071750136e854b
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+guard-exit=0
+anchor-exit=0
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: S: run: make MAKEFLAGS=-i ci (at main) -> exit 0
+
+==============================================================
+MUTATION: S: step-level env: MAKEFLAGS: -i (at main)
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='      - name: make ci\n        run: make ci\n';new='      - name: make ci\n        env:\n          MAKEFLAGS: -i\n        run: make ci\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh >/dev/null 2>&1; echo guard-exit=$?; ./scripts/make-integrity-guard.sh >/dev/null 2>&1; echo anchor-exit=$?
+--------------------------------------------------------------
+  sha256 BEFORE: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  sha256 AFTER:  e7948138e26b25de95c12a0a9bd5a997921e57945eb5566bcab6485d7f89b359
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+guard-exit=0
+anchor-exit=0
+------------------------------------
+  sha256 RESTORED: c9768a93cb99f64f99a76e87bd6fba9e6188d78d108dd68f383473c9494d8462
+  restore byte-identical: yes
+  RESULT: S: step-level env: MAKEFLAGS: -i (at main) -> exit 0
+

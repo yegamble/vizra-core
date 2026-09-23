@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# fakedocker/weird-exit — see README.md. Classifies the three probes assert-runtime-image.sh makes.
+set -u
+mode=weird-exit
+args="$*"
+case "$args" in
+  *"test -e /src"*)
+    case "$mode" in
+      broken)     echo "docker: Error response from daemon: no such image" >&2; exit 125 ;;
+      has-src)    exit 0 ;;
+      weird-exit) echo "OCI runtime exec failed" >&2; exit 7 ;;
+      *)          exit 1 ;;
+    esac ;;
+  *dpkg-query*)
+    case "$mode" in
+      broken) echo "docker: Error response from daemon: no such image" >&2; exit 125 ;;
+      *)      exit 0 ;;
+    esac ;;
+  *)
+    case "$mode" in
+      broken)        echo "docker: Error response from daemon: no such image" >&2; exit 125 ;;
+      has-toolchain) echo gcc; echo make; exit 0 ;;
+      *)             exit 0 ;;
+    esac ;;
+esac

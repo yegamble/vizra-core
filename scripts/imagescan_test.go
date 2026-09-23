@@ -98,6 +98,39 @@ func TestImageScanVerdictHonoursTheSeverityThreshold(t *testing.T) {
 	}
 }
 
+// An EMPTY --fail-on names no failing severity, so every finding is compared
+// against an empty set and the one script whose whole thesis is "a scan lane
+// must not pass vacuously" passed vacuously over a CRITICAL. Measured at
+// 5eb2829 against this repository's own `findings` fixture: `--fail-on ”` and
+// `--fail-on ','` both exited 0, printing "found nothing at or above []"
+// (PR#7 VERIFY, FINDING 2). It is reachable by a one-character edit to
+// image-scan.yml.
+//
+// It reuses the existing `findings` fixture, so TestEveryImageScanFixtureIsExercised
+// stays satisfied without a new fixture directory.
+func TestImageScanVerdictRefusesAThresholdThatCannotFail(t *testing.T) {
+	for _, arg := range []string{"", ",", " , ", ",,"} {
+		out, code := verdict(t, "findings", "--fail-on", arg)
+		if code != verdictNoValidScan {
+			t.Errorf("--fail-on %q over a report carrying a CRITICAL exited %d, want %d "+
+				"(THERE WAS NO VALID SCAN). A threshold that cannot fail is a vacuous pass, "+
+				"not a clean bill of health.\n%s", arg, code, verdictNoValidScan, out)
+		}
+		if !strings.Contains(out, "--fail-on is empty") {
+			t.Errorf("--fail-on %q: the refusal does not name the reason:\n%s", arg, out)
+		}
+	}
+	// An unrecognised severity is still refused, and still distinct from empty.
+	if out, code := verdict(t, "findings", "--fail-on", "HIGH,SEVERE"); code != verdictNoValidScan {
+		t.Errorf("--fail-on HIGH,SEVERE exited %d, want %d\n%s", code, verdictNoValidScan, out)
+	}
+	// And the real threshold the lane uses still reports FINDINGS, not exit 3 —
+	// or the refusal above would have broken the control it protects.
+	if out, code := verdict(t, "findings", "--fail-on", "HIGH,CRITICAL"); code != verdictFindings {
+		t.Errorf("the lane's own --fail-on HIGH,CRITICAL exited %d, want %d\n%s", code, verdictFindings, out)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Every way the lane can pass vacuously. Each is exit 3, NOT exit 1: "nothing
 // was scanned" must never be reported in the vocabulary of "nothing was found".

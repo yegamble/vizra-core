@@ -54,6 +54,37 @@ VIZRA_TEST_CACHE_URL='redis://127.0.0.1:56379/0' \
   make test-integration
 ```
 
+### Reproducing what CI asserts about the suites
+
+CI does not run `make test-integration` in `build-test`: it invokes both suites
+directly, with no make, and then judges the machine-readable results — because
+`go test ./...` exits 0 having run nothing, and a non-verbose `go test` prints
+nothing at all for a skipped test. To reproduce that locally:
+
+```sh
+go test -race -count=1 -json ./... > unit-events.json; echo $? > unit-exit.txt
+python3 scripts/go-test-report.py --events unit-events.json --suite unit \
+  --floors scripts/test-floors.json --go-exit-file unit-exit.txt
+```
+
+It prints the executed/passed/failed/skipped counts, names every failure and
+every skip, and fails below the floor recorded in `scripts/test-floors.json`.
+Use `--suite integration` with `-tags=integration` for the other suite.
+
+The two out-of-make guards. CI runs `make-integrity-guard.sh` as its own step
+**immediately before every** `make` step, and the make steps themselves are
+pinned byte-for-byte in `.github/pinned-steps.yml` — the control is default-deny
+on the step's shape, not a parser for shell:
+
+```sh
+./scripts/make-integrity-guard.sh --workflow   # exactly as CI's pinned anchor step runs it
+./scripts/ci-required-guard.sh      # the manifest, the workflows, and each make step's own argv
+```
+
+`scripts/assert-runtime-image.sh <image>` is the image assertion `docker-build`
+runs; it reads `$DOCKER`, so `scripts/testdata/fakedocker/` can drive it with no
+daemon.
+
 ## Claiming a new instance
 
 A fresh instance has no owner, and **every route except the four probes and the

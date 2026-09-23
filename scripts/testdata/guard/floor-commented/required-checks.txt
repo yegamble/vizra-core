@@ -1,5 +1,5 @@
 append-only
-# build-test  (temporarily disabled)
+# build-test
 cache-matrix
 fixtures
 govulncheck

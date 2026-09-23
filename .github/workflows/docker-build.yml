@@ -175,38 +175,20 @@ jobs:
       # stage that compiled libvips. A purge cannot deliver this: a file removed
       # in a later layer still ships its bytes in the earlier one, so `docker
       # save` and every registry copy carried the compiler regardless.
+      # These three assertions used to live inline here, and all three passed on
+      # a `docker run` FAILURE: two carried `|| true` around the `docker run`
+      # itself (whose in-container script already ended `true`, so the `|| true`
+      # was load-bearing only when docker failed), and the third was
+      # `if docker run … test -e /src; then …`, which takes its else branch —
+      # printing "no /src" — on any docker failure. The lane reported the
+      # toolchain absent WITHOUT HAVING LOOKED (PR#7 VERIFY, FINDING 1).
+      #
+      # They are a script now so they can be TESTED: scripts_test.go drives
+      # scripts/assert-runtime-image.sh against a stub `$DOCKER` that fails, and
+      # asserts it goes red rather than green. There is no other way to
+      # demonstrate a workflow step's behaviour under a broken image.
       - name: Assert the toolchain is absent from the runtime image
-        run: |
-          set -euo pipefail
-          # The list is scripts/runtime-toolchain-denylist.txt; that file says
-          # why it is a file and not an inline list.
-          tools=$(grep -v '^#' scripts/runtime-toolchain-denylist.txt | grep -v '^$' | tr '\n' ' ')
-          echo "checking for: $tools"
-          present=$(docker run --rm -e TOOLS="$tools" vizra-core:ci sh -c '
-            for t in $TOOLS; do
-              command -v "$t" >/dev/null 2>&1 && echo "$t"
-            done
-            true') || true
-          if [ -n "$present" ]; then
-            echo "::error::the runtime image carries build tooling:"
-            printf '%s\n' "$present"
-            exit 1
-          fi
-          echo "no build tooling on PATH"
-
-          devpkgs=$(docker run --rm vizra-core:ci sh -c "dpkg-query -W -f='\${binary:Package}\n' 2>/dev/null | grep -- '-dev$' || true")
-          if [ -n "$devpkgs" ]; then
-            echo "::error::the runtime image carries -dev packages:"
-            printf '%s\n' "$devpkgs"
-            exit 1
-          fi
-          echo "no -dev packages installed"
-
-          if docker run --rm vizra-core:ci test -e /src; then
-            echo "::error::the libvips source tree is still in the runtime image"
-            exit 1
-          fi
-          echo "no /src"
+        run: ./scripts/assert-runtime-image.sh vizra-core:ci
 
       - name: Record the image size
         run: |
