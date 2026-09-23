@@ -301,7 +301,7 @@ func assertRefusedBeforeMake(t *testing.T, label, out string, rec recording, wan
 		t.Fatalf("%s: the refusal does not name %q:\n%s", label, wantText, out)
 	}
 	if n := rec.makeCalls(); n != 0 {
-		t.Fatalf("%s: make was STARTED %d time(s) on unpinned bytes:\n%s", label, n, out)
+		t.Fatalf("%s: make was STARTED %d time(s) although a pre-flight check had refused:\n%s", label, n, out)
 	}
 	if !strings.Contains(out, "make was NOT invoked (0 make process(es) started)") {
 		t.Fatalf("%s: the guard did not say make was not invoked:\n%s", label, out)
