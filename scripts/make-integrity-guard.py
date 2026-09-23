@@ -105,17 +105,43 @@ not discarded:
     `export` / `override` / `private`, with `define`, or target- or
     pattern-specifically (`%: SHELL := /usr/bin/true` applies to every target
     and the resolver's global database cannot see it; measured, fix round 2) —
-    or sets `.ONESHELL`, or NAMES `.RECIPEPREFIX` or `.SECONDEXPANSION`
-    anywhere (any operator, modifier or spelling; comments included), fails the
-    lane BY NAME before make is ever invoked: the text checks run on the pinned
-    read set, before the gate. A value only make can resolve — a variable NAME
+    or sets `.ONESHELL`, or NAMES `.RECIPEPREFIX`, `.SECONDEXPANSION`,
+    `.IGNORE`, `.DEFAULT` (whole word) or `.EXTRA_PREREQS` anywhere (any
+    operator, modifier or spelling; comments included), or holds a PATTERN
+    rule, fails the lane BY NAME before make is ever invoked: the text checks
+    run on the pinned read set, before the gate. A value only make can resolve — a variable NAME
     make computes (`$(X) := /usr/bin/true`, `$(A)PREFIX := >`,
     `$(A)EXPANSION:`) — is refused by the RESOLVER, which necessarily runs make
     first, on the pinned bytes only. Measured: GNU Make 4.3 prints
     `.RECIPEPREFIX := >` and 3.81/4.3 a `.SECONDEXPANSION:` target in the `-pn`
     database when a computed name sets them;
-  * a gate target recipe line carrying a LITERAL `-` / `@-` / `+` prefix or
-    `|| true`-family suffix fails the lane by name, before make is invoked. A
+  * every target in the gate closure must have ONE explicit rule and be
+    declared `.PHONY` in the pinned text (and appear in make's own `.PHONY`
+    list after make runs). GNU make searches no implicit, pattern or `.DEFAULT`
+    rule for a phony target (measured on 3.81 and 4.3), so every recipe the
+    closure reaches is written on an explicit rule (slice B5b, R2-F2). Every
+    such recipe is then scanned twice. BEFORE make: the TAB lines under the
+    target's single-target rule line — an INLINE `;` recipe, a MULTI-TARGET
+    rule line, a `$`-named prerequisite and a rule whose TARGET make computes
+    are refused, because the text reading could not attribute them (#11 fix
+    rounds 1 and 2; B5c). AFTER make has run on the pinned bytes, failing
+    CLOSED: (i) the closure make reports — its own prerequisite lists,
+    transitively from the named gate targets — must EQUAL the text closure,
+    any extra or missing target refused by name; (ii) each closure target must
+    have exactly ONE readable entry in make's `-pn` database (no entry, a
+    second entry, or a header this reader cannot take as one name is refused,
+    never read as "no recipe"); (iii) that entry's recipe lines must EQUAL the
+    TAB lines the text reading scanned (whitespace collapsed) and pass the same
+    literal checks. With (i)-(iii), every recipe of every target in make's own
+    closure is one the text reading scanned. Tested in-process by
+    scripts/testdata/db-scan-probe.py. NOTE (#11 R1-2): before fix round 2 the
+    expanded-prefix count on this Makefile read 66 lines on GNU Make 3.81 and
+    62 on 4.3 — 3.81's database joins four `\\`-continued recipe lines with
+    different indentation; lines are now compared with whitespace collapsed, and
+    both versions report 62;
+  * a gate target recipe line carrying a LITERAL `-` / `@-` / `+` prefix, a
+    `$(MAKE)` sub-make, or a `|| true`-family suffix fails the lane by name,
+    before make is invoked. A
     prefix or suffix that EXPANSION produces fails by name after make has run
     on the pinned bytes (see EXPANSION above). Recipe lines start with a TAB
     here, because `.RECIPEPREFIX` is refused;
@@ -311,7 +337,49 @@ REFUSED_TOKENS = {
                      "gate as exit 0).",
     ".SECONDEXPANSION": "It makes make expand prerequisite lists a SECOND time while it reads the database, "
                         "which is evaluation this guard's reading does not model. A gate Makefile has no use for it.",
+    # Slice B5b (PR#10 round-2 verification, R2-F1). MEASURED on GNU Make 3.81
+    # and 4.3 (first measurement; docs/evidence/hardening-b5/b5b/): with the
+    # gate script failing, `.IGNORE:`, `.IGNORE: ci` and a computed
+    # `$(I)ORE:` each made `make ci` exit 0.
+    ".IGNORE": "It makes make IGNORE the exit status of every recipe line of the targets it names — or of "
+               "every target, bare — so a failing gate exits 0 (measured on GNU Make 3.81 and 4.3).",
+    ".DEFAULT": "Its recipe runs for any target make finds no rule for, so a gate prerequisite can reach a "
+                "recipe that no gate rule shows. A gate Makefile has no use for it.",
+    ".EXTRA_PREREQS": "It adds prerequisites to targets without listing them in any rule the gate closure "
+                      "reads (GNU Make 4.3+). A gate Makefile has no use for it.",
+    # B5c (search desk review M-5, folded into #11 fix round 1).
+    ".POSIX": "It switches make into POSIX mode, which changes how recipes are run and how errors are "
+              "treated — behaviour this guard's checks were not measured under. A gate Makefile has no use for it.",
 }
+# `.DEFAULT` is a prefix of `.DEFAULT_GOAL`, which the Makefile sets and which is
+# harmless (it only picks the goal of a bare `make`), so the name is matched as
+# a whole word; the other names are matched as plain substrings, as before.
+_REFUSED_TOKEN_RE = {
+    token: re.compile(re.escape(token) + (r"(?![A-Za-z0-9_])" if token == ".DEFAULT" else ""))
+    for token in REFUSED_TOKENS
+}
+
+# A rule line whose target list holds a `%`: a PATTERN rule. Refused before make
+# (B5b, R2-F2): its recipe is reached through implicit-rule search, not through
+# any explicit rule the gate closure reads.
+_PATTERN_RULE_RE = re.compile(r"^(?=[^\t#=:])([^#=:]*%[^#=:]*)::?(?!=)")
+# Any explicit RULE line: `TARGETS :[:] [PREREQUISITES] [; RECIPE]` (a variable
+# assignment has `=` before or right after its `:`, so it does not match).
+# #11 fix round 1 (cross-check X-1): the recipe reader is TAB-keyed and the
+# definition match takes one target per line, so an INLINE `;` recipe and a
+# recipe on a MULTI-TARGET line were never scanned. Both forms are refused
+# before make; the real Makefile uses neither.
+_RULE_LINE_RE = re.compile(r"^(?=[^\t#=:])([^#=:]*?)(::?)(?!=)(.*)$")
+_DIRECTIVE_WORDS = ("ifeq", "ifneq", "ifdef", "ifndef", "else", "endif", "define", "endef", "include",
+                    "-include", "sinclude", "load", "-load", "export", "unexport", "override", "private",
+                    "vpath", "undefine")
+_DEFINE_START_RE = re.compile(r"^\s*(?:(?:export|override|private)\s+)*define\b")
+_DEFINE_END_RE = re.compile(r"^\s*endef\b")
+MULTI_TARGET_NAMES: set = set()
+
+# `$(MAKE)` / `${MAKE}` in a gate recipe starts a sub-make whose recipes this
+# guard never reads (and GNU make runs such a line even under -n).
+_SUBMAKE_RE = re.compile(r"\$[({]MAKE[)}]")
 
 # A target- or pattern-specific assignment: `TARGETS: [modifiers] NAME op value`.
 # `%: SHELL := /usr/bin/true` applies to EVERY target and is invisible to the
@@ -553,6 +621,110 @@ def recheck_pinned_bytes(g: Guard, root: Path, digests: dict[str, str]) -> None:
 # --------------------------------------------------------------- resolver ---
 
 
+def parse_database(stdout: str) -> dict:
+    """Read make's `-pn` database: variables, special targets, and every target's entry.
+
+    Kept separate from resolve_database so scripts/testdata/db-scan-probe.py
+    can feed it strings in-process (#11 fix round 2).
+
+    Targets: an entry is `NAME: prerequisites`, `#` comment lines, then
+    TAB-led recipe lines, ended by a blank line. The FIRST entry of a name is
+    kept in DB_RECIPES / DB_PREREQS; a name seen again goes to DB_DUPLICATES, and
+    a header whose name part this reader cannot take as ONE name (it contains
+    whitespace) goes to DB_UNREADABLE — both are refused for closure targets by
+    check_db_recipes, never silently skipped (#11 fix round 2, R1-1).
+    """
+    variables: dict = {}
+    oneshell = secondexpansion = ignore = default_recipe = False
+    phony: set = set()
+    in_default = False
+    recipes: dict = {}
+    prereqs: dict = {}
+    duplicates: set = set()
+    unreadable: list = []
+    current = None
+    # Target entries are read ONLY between make's own database markers: under
+    # -n, make also prints the commands it would run (3.81 prints them BEFORE
+    # the database), and a command line such as `echo "make ci: all lanes
+    # passed"` is not a target.
+    in_db = saw_db = False
+    for line in stdout.splitlines():
+        if line.startswith("# Make data base"):
+            in_db = saw_db = True
+            current = None
+            continue
+        if line.startswith("# Finished Make data base"):
+            in_db = False
+            current = None
+            continue
+        if not in_db:
+            pass
+        elif not line.strip():
+            current = None
+        elif line.startswith("\t"):
+            if current is not None:
+                current.append(line[1:])
+        elif not line.startswith("#"):
+            tm = re.match(r"^([^\s:=#][^:=]*?)(::?)(?!=)(.*)$", line)
+            if not tm:
+                current = None
+            else:
+                name = tm.group(1).strip()
+                if re.search(r"\s", name):
+                    unreadable.append(line)
+                    current = None
+                elif name in recipes:
+                    duplicates.add(name)
+                    current = None
+                else:
+                    recipes[name] = current = []
+                    prereqs[name] = tm.group(3).replace("|", " ").split()
+        # B5b backstops for names make COMPUTES. MEASURED on 3.81 and 4.3: the
+        # database always prints a `.DEFAULT:` entry, followed by
+        # "#  commands to execute" (3.81) / "#  recipe to execute" (4.3) and a
+        # TAB line only when it has a recipe; `.IGNORE:` appears only when set.
+        if in_default:
+            if not line.strip():
+                in_default = False
+            elif line.startswith("\t") or re.match(r"^#\s+(commands|recipe) to execute", line):
+                default_recipe = True
+        if line.startswith(".DEFAULT:"):
+            in_default = True
+            if line[len(".DEFAULT:"):].strip():
+                default_recipe = True
+            continue
+        if line.startswith(".IGNORE:"):
+            ignore = True
+            continue
+        if line.startswith(".PHONY:"):
+            phony.update(line[len(".PHONY:"):].split())
+            continue
+        if line.startswith(".ONESHELL:"):
+            oneshell = True
+            continue
+        if line.startswith(".SECONDEXPANSION:"):
+            secondexpansion = True
+            continue
+        m = re.match(r"^([A-Za-z_.][A-Za-z0-9_.-]*)\s*[:+?]?=\s?(.*)$", line)
+        if m and m.group(1) not in variables:
+            variables[m.group(1)] = m.group(2)
+    if not saw_db:
+        unreadable.append("(no `# Make data base` section in make's output)")
+    variables["__ONESHELL__"] = "yes" if oneshell else ""
+    variables["__SECONDEXPANSION__"] = "yes" if secondexpansion else ""
+    variables["__IGNORE__"] = "yes" if ignore else ""
+    variables["__DEFAULT_RECIPE__"] = "yes" if default_recipe else ""
+    variables["__PHONY__"] = " ".join(sorted(phony))
+    DB_RECIPES.clear()
+    DB_RECIPES.update(recipes)
+    DB_PREREQS.clear()
+    DB_PREREQS.update(prereqs)
+    DB_DUPLICATES.clear()
+    DB_DUPLICATES.update(duplicates)
+    DB_UNREADABLE[:] = unreadable
+    return variables
+
+
 def resolve_database(g: Guard, root: Path, target: str):
     """Ask make for its resolved variable database.
 
@@ -570,20 +742,7 @@ def resolve_database(g: Guard, root: Path, target: str):
         )
         return None, None
 
-    variables: dict[str, str] = {}
-    oneshell = secondexpansion = False
-    for line in proc.stdout.splitlines():
-        if line.startswith(".ONESHELL:"):
-            oneshell = True
-            continue
-        if line.startswith(".SECONDEXPANSION:"):
-            secondexpansion = True
-            continue
-        m = re.match(r"^([A-Za-z_.][A-Za-z0-9_.-]*)\s*[:+?]?=\s?(.*)$", line)
-        if m and m.group(1) not in variables:
-            variables[m.group(1)] = m.group(2)
-    variables["__ONESHELL__"] = "yes" if oneshell else ""
-    variables["__SECONDEXPANSION__"] = "yes" if secondexpansion else ""
+    variables = parse_database(proc.stdout)
     files = [f for f in variables.get("MAKEFILE_LIST", "").split() if f]
     return variables, files
 
@@ -644,6 +803,20 @@ def check_resolved(g: Guard, target: str, variables: dict) -> None:
                "make expands prerequisite lists a second time while it reads the database.")
     else:
         g.ok(f"`{target}`: `.SECONDEXPANSION:` is not in effect")
+
+    # Slice B5b: the same backstop for .IGNORE, .DEFAULT and .EXTRA_PREREQS.
+    if variables.get("__IGNORE__"):
+        g.fail(f"`.IGNORE:` is in effect while resolving `{target}`.",
+               "make ignores the exit status of the recipes it names — of every recipe, bare.")
+    if variables.get("__DEFAULT_RECIPE__"):
+        g.fail(f"`.DEFAULT` has a recipe while resolving `{target}`.",
+               "It runs for any target make finds no rule for — a recipe no gate rule shows.")
+    extra = variables.get(".EXTRA_PREREQS", "")
+    if extra.strip():
+        g.fail(f"make resolves .EXTRA_PREREQS to {extra!r} while resolving `{target}`.",
+               "It adds prerequisites no rule the gate closure reads lists.")
+    if not (variables.get("__IGNORE__") or variables.get("__DEFAULT_RECIPE__") or extra.strip()):
+        g.ok(f"`{target}`: no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`")
 
     # MAKEFLAGS. This guard invoked make as `-pn`, so `p` and `n` are ours.
     # Anything else was added by a file or by the environment.
@@ -733,7 +906,9 @@ def prerequisite_closure(root: Path, files: list[str], seeds: list[str]) -> list
             if not m:
                 continue
             names = m.group(1).split()
-            deps = m.group(2).split("#")[0].replace("|", " ").split()
+            # An inline `;` recipe is not a prerequisite list (it is refused
+            # separately); cutting it keeps its words out of the closure.
+            deps = m.group(2).split("#")[0].split(";")[0].replace("|", " ").split()
             for n in names:
                 if n.startswith(".") or "%" in n:
                     continue  # .PHONY, .SHELLFLAGS, pattern rules
@@ -875,14 +1050,27 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
 
         for n, line in enumerate(lines, 1):
             for token, why in REFUSED_TOKENS.items():
-                if token in line:
+                if _REFUSED_TOKEN_RE[token].search(line):
                     g.fail(f"{rel}:{n} names `{token}`: `{line.strip()[:120]}`", why,
                            "Refused wherever it is named — any operator, modifier or spelling — before make runs.")
 
         controlled = (*CONTROLLED_ASSIGNMENTS, *FORBIDDEN_ASSIGNMENTS)
+        in_define = False
+        logical_by_line = {}
         for n, line in mp.logical_lines(text):
+            logical_by_line[n] = line
             if line.startswith("\t"):
                 continue
+            ph = re.match(r"^\.PHONY\s*:(?!=)(.*)$", line)
+            if ph:
+                PHONY_NAMES.update(ph.group(1).split())
+            if _PATTERN_RULE_RE.match(line) and not _TARGET_SPECIFIC_RE.match(line):
+                g.fail(
+                    f"{rel}:{n} is a PATTERN rule: `{line.strip()[:120]}`",
+                    "Its recipe is reached through make's implicit-rule search, not through an explicit rule",
+                    "the gate closure reads, so its recipe lines would not be checked. A gate Makefile has no",
+                    "use for one (slice B5b).",
+                )
             m = _TARGET_SPECIFIC_RE.match(line)
             if m:
                 TARGET_SPECIFIC_NAMES.add(m.group(3))
@@ -898,6 +1086,47 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
             if d and (d.group(1) in controlled or "$" in d.group(1)):
                 g.fail(f"{rel}:{n} assigns {d.group(1)} with `define`: `{line.strip()[:120]}`",
                        f"Only `SHELL := {APPROVED_SHELL}` and `.SHELLFLAGS := {APPROVED_SHELLFLAGS}` are accepted.")
+
+            # Rule-line shape (#11 fix round 1, X-1). Lines inside a `define`
+            # body are not rules until something evals them, and eval is refused.
+            if _DEFINE_START_RE.match(line):
+                in_define = True
+                continue
+            if _DEFINE_END_RE.match(line):
+                in_define = False
+                continue
+            words = line.split()
+            if in_define or not words or words[0] in _DIRECTIVE_WORDS:
+                continue
+            rl = _RULE_LINE_RE.match(line)
+            if not rl:
+                continue
+            if "$" in rl.group(1):
+                # #11 fix round 2 (R1-1, a): a rule whose TARGET make computes
+                # attaches a recipe or prerequisites to a name the text reading
+                # cannot know — refused at the source, as for prerequisites.
+                g.fail(
+                    f"{rel}:{n} is a rule whose TARGET make computes: `{line.strip()[:120]}`",
+                    "The text reading cannot tell which target it gives a recipe or prerequisites to, so every",
+                    "gate check would be reading a different rule than make runs (#11 fix round 2).",
+                )
+                continue
+            if _TARGET_SPECIFIC_RE.match(line):
+                continue
+            names, rest = rl.group(1).split(), rl.group(3)
+            if ";" in rest:
+                g.fail(
+                    f"{rel}:{n} is a rule with an INLINE `;` recipe: `{line.strip()[:120]}`",
+                    "Its recipe is not on a TAB line, so no recipe check here would read it. A gate Makefile",
+                    "writes every recipe on its own TAB line (#11 fix round 1, X-1).",
+                )
+            if len(names) > 1:
+                MULTI_TARGET_NAMES.update(names)
+                g.fail(
+                    f"{rel}:{n} is a MULTI-TARGET rule ({', '.join(names)}): `{line.strip()[:120]}`",
+                    "Each gate rule names ONE target on its own line; a recipe on a line naming several targets",
+                    "is one the per-target recipe reading would not attribute (#11 fix round 1, X-1).",
+                )
 
         for n, line in enumerate(lines, 1):
             if line.startswith("\t"):
@@ -938,6 +1167,19 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
             for t in targets:
                 if re.match(r"^%s\s*:(?!=)" % re.escape(t), line):
                     definitions[t].append(f"{rel}:{n}")
+                    # B5c (search M-1): the closure is computed from the literal
+                    # prerequisite tokens; a `$`-token is one make computes, so
+                    # it would reach a target this guard never scans.
+                    body = logical_by_line.get(n, line)
+                    deps = re.sub(r"^[^:]*::?", "", body, count=1).split(";")[0].replace("|", " ").split()
+                    computed = [d for d in deps if "$" in d]
+                    if computed:
+                        g.fail(
+                            f"{rel}:{n} — gate closure target `{t}` has a prerequisite make COMPUTES: "
+                            f"{', '.join(computed)}",
+                            "The gate closure is read from literal prerequisites; a computed one could name a target",
+                            "whose recipe is never scanned (B5c).",
+                        )
                     # Guard against a gate target hidden inside a conditional:
                     # which recipe runs would then depend on a variable.
                     depth = 0
@@ -967,6 +1209,8 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
     undefined = []
     for t in targets:
         where = definitions[t]
+        if not where and t in MULTI_TARGET_NAMES:
+            continue  # refused, by name, as a multi-target rule
         if not where:
             if t in seeds:
                 g.fail(
@@ -974,10 +1218,16 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
                     "A required CI lane invokes it by that name.",
                 )
             else:
-                # A prerequisite with no rule of its own is an ordinary FILE
-                # dependency, not a missing lane. Named rather than silently
-                # dropped, so the transcript says what was and was not scanned.
+                # Slice B5b (R2-F2): a prerequisite with no explicit rule is one
+                # make builds through implicit-rule search, a pattern rule or
+                # `.DEFAULT` — a recipe no gate rule shows. It used to be noted
+                # as a file dependency; it is now refused.
                 undefined.append(t)
+                g.fail(
+                    f"`{t}`, a prerequisite in the gate closure, has no explicit rule in the pinned bytes.",
+                    "make would look for it through implicit rules, pattern rules or `.DEFAULT` — a recipe",
+                    "this guard does not read. Every target the gate closure reaches must have its own rule.",
+                )
         elif len(where) > 1:
             g.fail(
                 f"gate target `{t}` is defined {len(where)} times: {', '.join(where)}",
@@ -985,20 +1235,156 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
             )
         else:
             g.ok(f"gate target `{t}` is defined exactly once ({where[0]})")
-    if undefined:
-        print(f"  note  {len(undefined)} prerequisite(s) have no rule and are treated as file dependencies, "
-              f"not lanes: {', '.join(sorted(undefined))}")
+    # Every target in the closure must be declared `.PHONY` in the pinned text.
+    # GNU make skips the implicit-rule search for a phony target (manual §4.6),
+    # so with an explicit rule each, no pattern rule, builtin implicit rule or
+    # `.DEFAULT` recipe can be reached through the closure.
+    not_phony = sorted(t for t in targets if definitions[t] and t not in PHONY_NAMES)
+    if not_phony:
+        g.fail(
+            f"gate closure target(s) not declared `.PHONY` in the pinned bytes: {', '.join(not_phony)}",
+            "A target that is not phony is eligible for make's implicit-rule search, so a builtin or",
+            "pattern rule could supply a recipe this guard does not read.",
+        )
+    elif not undefined:
+        g.ok(f"every one of the {len(targets)} gate closure target(s) has one explicit rule and is declared "
+             f".PHONY, so make searches no implicit, pattern or .DEFAULT rule for any of them")
 
 
 # Every gate recipe line the text reading saw, for check_expanded_prefixes, and
-# every variable some target- or pattern-specific assignment sets.
+# every variable some target- or pattern-specific assignment sets, and every
+# name a literal `.PHONY:` line declares.
 GATE_RECIPE_LINES: list = []
 TARGET_SPECIFIC_NAMES: set = set()
+PHONY_NAMES: set = set()
 
 # A leading SIMPLE variable reference: `$(NAME)`, `${NAME}` or `$X`. A function
 # call (`$(if …)`), a substitution reference (`$(X:a=b)`) and an automatic
 # variable (`$@`) do not match, and are refused where a prefix could come from.
 _LEAD_REF_RE = re.compile(r"^\$(?:\(([^()${}:\s]+)\)|\{([^()${}:\s]+)\}|([A-Za-z0-9_]))")
+
+
+# make's `-pn` database, per target (parse_database): recipe lines,
+# prerequisites, names seen more than once, and headers this reader cannot read.
+DB_RECIPES: dict = {}
+DB_PREREQS: dict = {}
+DB_DUPLICATES: set = set()
+DB_UNREADABLE: list = []
+
+
+def _db_recipe_lines(target: str):
+    """(target, logical recipe line) for one target, continuations joined."""
+    out, buf = [], ""
+    for raw in DB_RECIPES.get(target, []):
+        buf = (buf + " " + raw.lstrip("\t")) if buf else raw
+        if buf.rstrip().endswith("\\"):
+            buf = buf.rstrip()[:-1]
+            continue
+        out.append(buf.strip())
+        buf = ""
+    if buf:
+        out.append(buf.strip())
+    return [b for b in out if b]
+
+
+def _norm(line: str) -> str:
+    """One recipe line with runs of whitespace collapsed: the text reading and
+    make's database join a `\\`-continued line with different indentation
+    (measured on 3.81: 4 lines of this Makefile differ only so; 4.3 prints them
+    identically), which is not a difference in what runs."""
+    return " ".join(line.split())
+
+
+def check_db_recipes(g: Guard, closure: list) -> None:
+    """Every closure target's recipe AS MAKE HOLDS IT — fail CLOSED (#11 fix round 2, R1-1).
+
+    For each target of the gate closure, make's `-pn` database must hold
+    exactly ONE readable entry (no entry, a second entry for the name, or a
+    header this reader cannot take as one name is refused — never treated as
+    "no recipe"), and that entry's recipe lines must EQUAL the TAB lines the
+    text reading scanned under the target's own rule line (whitespace
+    collapsed). A recipe make holds that the pinned text does not show for
+    that target — or the reverse — is refused by name. The same literal checks
+    (`-`/`+` prefix, `$(MAKE)`, swallowing suffix) then run on make's lines.
+    """
+    bad = 0
+    text_lines: dict = {}
+    for rel, lineno, target, body in GATE_RECIPE_LINES:
+        if rel != "make's database":
+            text_lines.setdefault(target, []).append(_norm(body))
+    if DB_UNREADABLE:
+        g.fail("make's database has target entr(ies) this guard cannot read as ONE name:",
+               *[ln[:120] for ln in DB_UNREADABLE[:5]],
+               "A closure target could be among them, so the database scan is refused rather than skipped.")
+        bad += 1
+    for t in closure:
+        if t not in DB_RECIPES:
+            g.fail(f"make's database has NO entry for gate closure target `{t}`.",
+                   "Its recipe as make holds it cannot be checked, so it is refused rather than read as empty.")
+            bad += 1
+            continue
+        if t in DB_DUPLICATES:
+            g.fail(f"make's database has MORE THAN ONE entry for gate closure target `{t}`.",
+                   "Which one is the recipe that runs cannot be told from here, so it is refused.")
+            bad += 1
+            continue
+        db = [_norm(b) for b in _db_recipe_lines(t)]
+        if db != text_lines.get(t, []):
+            g.fail(f"make holds a DIFFERENT recipe for gate closure target `{t}` than its pinned rule shows: "
+                   f"{len(db)} line(s) in make's database, {len(text_lines.get(t, []))} under the rule line.",
+                   *[f"make:  {x[:110]}" for x in db[:3]],
+                   *[f"text:  {x[:110]}" for x in text_lines.get(t, [])[:3]],
+                   "make attached a recipe some way the text reading does not see, or dropped one it does.")
+            bad += 1
+        for body in _db_recipe_lines(t):
+            GATE_RECIPE_LINES.append(("make's database", 0, t, body))
+            rest, prefix = body, ""
+            while rest and rest[0] in RECIPE_PREFIX_CHARS:
+                prefix += rest[0]
+                rest = rest[1:].lstrip()
+            why = []
+            if "-" in prefix or "+" in prefix:
+                why.append(f"a `{prefix}` prefix")
+            if _SUBMAKE_RE.search(rest):
+                why.append("a `$(MAKE)` sub-make")
+            if any(rest.rstrip().endswith(sfx) for sfx in SWALLOWING_SUFFIXES):
+                why.append("a `|| true`-family suffix")
+            if why:
+                g.fail(f"make's own database gives gate closure target `{t}` the recipe line `{body}`, with "
+                       f"{' and '.join(why)}.",
+                       "The text reading did not see it on the target's own rule — make attached it some other way.")
+                bad += 1
+    if not bad:
+        n = sum(len(_db_recipe_lines(t)) for t in closure)
+        g.ok(f"make's own database: each of the {len(closure)} gate closure target(s) has ONE readable entry whose "
+             f"{n} recipe line(s) equal the pinned rule's and carry no `-`/`+` prefix, sub-make or swallowing suffix")
+
+
+def check_db_closure(g: Guard, seeds: list, closure: list) -> None:
+    """The closure MAKE reports equals the closure the text reading computed (#11 fix round 2, R1-1).
+
+    From make's own prerequisite lists (DB_PREREQS), transitively from the
+    named gate targets. A target make would reach that the text closure does
+    not have — a prerequisite added some way the text reading does not
+    attribute — or one the text has that make does not, is refused by name:
+    the recipe, database and .PHONY checks all run over the text closure.
+    """
+    reached, queue = [], list(seeds)
+    while queue:
+        t = queue.pop(0)
+        if t in reached:
+            continue
+        reached.append(t)
+        queue.extend(d for d in DB_PREREQS.get(t, []) if d not in reached)
+    extra = sorted(set(reached) - set(closure))
+    missing = sorted(set(closure) - set(reached))
+    if extra or missing:
+        g.fail("the gate closure make reports from its database is not the closure the pinned text shows.",
+               *([f"make reaches, the text does not: {', '.join(extra)}"] if extra else []),
+               *([f"the text reaches, make does not: {', '.join(missing)}"] if missing else []),
+               "Every closure check here runs over the text closure, so the two must be the same set.")
+    else:
+        g.ok(f"the gate closure make reports from its database equals the text closure ({len(closure)} target(s))")
 
 
 def check_expanded_prefixes(g: Guard, variables: dict) -> None:
@@ -1016,7 +1402,11 @@ def check_expanded_prefixes(g: Guard, variables: dict) -> None:
     (the database holds only the global value) — is refused.
     """
     bad = 0
+    seen = set()
     for rel, lineno, target, body in GATE_RECIPE_LINES:
+        if (target, _norm(body)) in seen:
+            continue
+        seen.add((target, _norm(body)))
         rest, prefix, why = body, "", ""
         for _ in range(25):
             rest = rest.lstrip()
@@ -1048,8 +1438,8 @@ def check_expanded_prefixes(g: Guard, variables: dict) -> None:
                    "`make --dry-run` prints the command without it.")
             bad += 1
     if not bad:
-        g.ok(f"no gate recipe line expands to a `-` or `+` prefix ({len(GATE_RECIPE_LINES)} line(s), leading "
-             f"variable references resolved from make's database)")
+        g.ok(f"no gate recipe line expands to a `-` or `+` prefix ({len(seen)} distinct line(s) from the text and "
+             f"make's database, leading variable references resolved from the database)")
 
 
 def check_recipe(g: Guard, rel: str, target: str, recipe) -> None:
@@ -1074,6 +1464,12 @@ def check_recipe(g: Guard, rel: str, target: str, recipe) -> None:
                 "make IGNORES that line's exit status, and `make --dry-run` prints the command WITHOUT the",
                 "`-`, so no scan of the resolved recipe can see it: the command can fail, print its failure,",
                 "and the lane still exits 0.",
+            )
+        if _SUBMAKE_RE.search(body):
+            g.fail(
+                f"{rel}:{lineno} — gate target `{target}` starts a sub-make: `{prefix}{body}`",
+                "The sub-make's recipes are in no gate closure this guard reads, and GNU make runs a",
+                "`$(MAKE)` line even under -n. A gate recipe has no use for it (slice B5b).",
             )
         if "+" in prefix:
             g.fail(
@@ -1394,8 +1790,21 @@ def main() -> int:
         check_resolved(g, t, v)
         check_warnings(g, root, t)
 
-    # A `-`/`+` prefix a variable produces, from make's own database.
+    # Every closure recipe as make holds it, then the `-`/`+` prefix a
+    # variable produces — over both the text lines and make's database lines.
+    check_db_recipes(g, closure)
+    check_db_closure(g, targets, closure)
     check_expanded_prefixes(g, variables)
+
+    # B5b: make's OWN .PHONY list covers the whole closure (a backstop for the
+    # text reading of literal `.PHONY:` lines).
+    db_phony = set(variables.get("__PHONY__", "").split())
+    missing_phony = [t for t in closure if t not in db_phony]
+    if missing_phony:
+        g.fail(f"make's own database does not list {', '.join(missing_phony)} as .PHONY.",
+               "A target that is not phony is eligible for implicit-rule search.")
+    else:
+        g.ok(f"make's own .PHONY list covers all {len(closure)} gate closure target(s)")
 
     # And the bytes make was run on are STILL the pinned bytes.
     recheck_pinned_bytes(g, root, pinned_digests)

@@ -1,0 +1,37 @@
+# C22 the inline-recipe refusal removed
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: f7b69562b5fd5bf17efd6bef6f704e82b831bb9f  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 0647549c3698a0f625f1415573dfe4f30977d2ee
+
+==============================================================
+MUTATION: C22 the inline-recipe refusal removed
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C22
+  check:  fixture_scenario inline-recipe 'is a rule with an INLINE'
+--------------------------------------------------------------
+  sha256 BEFORE: 57ea87a3b17bd7ba87208573375af68f92ed992ace7507d3cdef6458b9d78bf6
+  sha256 AFTER:  6b617fa1234b12dae70c3c9a10e54cafbbd868bda90efd57a9348a5a05e344b9
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+fixture inline-recipe: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=4
+  FAIL  make holds a DIFFERENT recipe for gate closure target `ci` than its pinned rule shows: 1 line(s) in make's database, 0 under the rule line.
+make-integrity-guard: FAILED
+anchor [lenient] exit=1 make-processes=4
+  FAIL  make holds a DIFFERENT recipe for gate closure target `ci` than its pinned rule shows: 1 line(s) in make's database, 0 under the rule line.
+make-integrity-guard: FAILED
+fixture_scenario inline-recipe: control BROKEN (exit 1)
+------------------------------------
+  sha256 RESTORED: 57ea87a3b17bd7ba87208573375af68f92ed992ace7507d3cdef6458b9d78bf6
+  restore byte-identical: yes
+  RESULT: C22 the inline-recipe refusal removed -> exit 1
+
+== after restore ==
+fixture inline-recipe: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:5 is a rule with an INLINE `;` recipe: `ci: ; ./run-the-real-tests.sh`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:5 is a rule with an INLINE `;` recipe: `ci: ; ./run-the-real-tests.sh`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario inline-recipe: control HELD (exit 0)

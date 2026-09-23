@@ -1,0 +1,22 @@
+# D-db-scan-probe: the database checks, fed strings in-process
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: f7b69562b5fd5bf17efd6bef6f704e82b831bb9f  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 0647549c3698a0f625f1415573dfe4f30977d2ee
+
+ROW ok   control: consistent database: refused=False (expected False); says 'has ONE readable entry': True
+ROW ok   empty database: refused=True (expected True); says 'has NO entry for gate closure target `ci`': True
+ROW ok   empty entry, recipe expected: refused=True (expected True); says 'DIFFERENT recipe for gate closure target `ci`': True
+ROW ok   duplicate entry: refused=True (expected True); says 'MORE THAN ONE entry for gate closure target `ci`': True
+ROW ok   space-containing name: refused=True (expected True); says 'cannot read as ONE name': True
+ROW ok   a recipe line the text does not show: refused=True (expected True); says 'DIFFERENT recipe for gate closure target `ci`': True
+ROW ok   control: command output outside the database: refused=False (expected False); says 'has ONE readable entry': True
+ROW ok   no database section at all: refused=True (expected True); says 'no `# Make data base` section': True
+ROW ok   control: closures equal: refused=False (expected False); says 'equals the text closure (2 target(s))': True
+ROW ok   make widens the closure: refused=True (expected True); says 'make reaches, the text does not: extra': True
+ROW ok   make narrows the closure: refused=True (expected True); says 'the text reaches, make does not: lane': True
+ROW ok   control: resolver sees nothing special: refused=False (expected False); says 'no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`': True
+ROW ok   resolver: .IGNORE in effect: refused=True (expected True); says '`.IGNORE:` is in effect': True
+ROW ok   resolver: .DEFAULT has a recipe: refused=True (expected True); says '`.DEFAULT` has a recipe': True
+ROW ok   resolver: .SECONDEXPANSION in effect: refused=True (expected True); says '`.SECONDEXPANSION:` is in effect': True
+PROBE: all 15 rows as expected
+probe exit=0

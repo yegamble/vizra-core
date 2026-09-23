@@ -1,0 +1,14 @@
+# D-posix: the committed fixture, gate stub failing
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
+
+fixture posix: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:8 names `.POSIX`: `.POSIX:`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:8 names `.POSIX`: `.POSIX:`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario posix: control HELD (exit 0)
+fixture_scenario exit=0

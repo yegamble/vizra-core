@@ -333,7 +333,12 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// and is refused by the resolver, which is what `missing-prerequisite`
 		// keeps covered.
 		{dir: "missing-target", wantFail: true, notInvoked: true, wantText: "is not defined in any makefile make will read"},
-		{dir: "missing-prerequisite", wantFail: true, wantText: "could not be established"},
+		// Slice B5b (R2-F2): a closure prerequisite with no explicit rule is now
+		// refused before make — make would build it through implicit rules, a
+		// pattern rule or `.DEFAULT`. The resolver's own failure path keeps its
+		// red case in `resolver-cannot-resolve`.
+		{dir: "missing-prerequisite", wantFail: true, notInvoked: true, wantText: "has no explicit rule in the pinned bytes"},
+		{dir: "resolver-cannot-resolve", wantFail: true, wantText: "could not be established"},
 
 		// Sweep B5 — THE DIGEST PIN (chair ruling, tick 132, on the 2026-09-23 desk
 		// review, FINDING 4). make EVALUATES a makefile while reading it, so every
@@ -376,7 +381,7 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "resolver-computed-shell", wantFail: true, wantText: "make resolves SHELL to '/usr/bin/true'"},
 		{dir: "resolver-computed-makeflags", wantFail: true, wantText: "make resolves MAKEFLAGS to"},
 		{dir: "resolver-computed-recipeprefix", wantFail: true, wantText: "make resolves .RECIPEPREFIX to '>'"},
-		{dir: "resolver-computed-secondexpansion", wantFail: true, wantText: "`.SECONDEXPANSION:` is in effect"},
+		{dir: "resolver-computed-secondexpansion", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
 		// Found while fixing R1-F1: make applies `-`/`+` AFTER expansion, so a
 		// prefix a VARIABLE produces ignored a failing gate with the anchor green
 		// (measured on 3.81). The leading references are now resolved from make's
@@ -388,6 +393,38 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// ... and a swallowing SUFFIX a variable produces is read from make's own
 		// dry run, which prints the expanded command.
 		{dir: "suffix-from-variable", wantFail: true, wantText: "make's own dry run prints command(s) whose exit status is discarded"},
+		// Slice B5b (R2-F1): `.IGNORE` — measured on GNU Make 3.81 and 4.3 with a
+		// failing gate script, `.IGNORE:`, `.IGNORE: ci` and a computed
+		// `$(I)ORE:` each made `make ci` exit 0 — and `.DEFAULT`/`.EXTRA_PREREQS`,
+		// refused by name before make.
+		{dir: "ignore-bare", wantFail: true, notInvoked: true, wantText: "names `.IGNORE`"},
+		{dir: "ignore-per-target", wantFail: true, notInvoked: true, wantText: "names `.IGNORE`"},
+		{dir: "default-recipe", wantFail: true, notInvoked: true, wantText: "names `.DEFAULT`"},
+		{dir: "extra-prereqs", wantFail: true, notInvoked: true, wantText: "names `.EXTRA_PREREQS`"},
+		// ... and a name make COMPUTES, by the resolver after make ran.
+		// #11 fix round 2 (R1-1 a): a rule whose TARGET make computes is refused
+		// before make, so these two — and resolver-computed-secondexpansion —
+		// no longer reach the resolver. Their resolver branches keep red cases
+		// in scripts/testdata/db-scan-probe.py (TestTheDatabaseChecksFailClosed).
+		{dir: "resolver-computed-ignore", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
+		{dir: "resolver-computed-default", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
+		{dir: "resolver-computed-extra-prereqs", wantFail: true, wantText: "make resolves .EXTRA_PREREQS to 'Makefile'"},
+		// Slice B5b (R2-F2): no recipe the gate closure reaches may come from
+		// anywhere but an explicit rule the text reading scans.
+		{dir: "pattern-rule", wantFail: true, notInvoked: true, wantText: "is a PATTERN rule"},
+		{dir: "closure-not-phony", wantFail: true, notInvoked: true, wantText: "not declared `.PHONY` in the pinned bytes: ci"},
+		{dir: "submake", wantFail: true, notInvoked: true, wantText: "starts a sub-make"},
+		// #11 fix round 1 (cross-check X-1): a recipe the TAB-keyed,
+		// one-target-per-line reading would not attribute.
+		{dir: "inline-recipe", wantFail: true, notInvoked: true, wantText: "is a rule with an INLINE `;` recipe"},
+		{dir: "multi-target-rule", wantFail: true, notInvoked: true, wantText: "is a MULTI-TARGET rule (ci, other)"},
+		// ... and a rule whose target NAME make computes, beside a recipe-less
+		// `ci:`: refused before make since #11 fix round 2 (R1-1 a). In round 1
+		// only make's database saw it (raw `make ci` exits 0 over a failing stub).
+		{dir: "computed-target-recipe", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes: `$(GATE_NAME):`"},
+		// B5c (search desk review M-1, M-5).
+		{dir: "computed-prerequisite", wantFail: true, notInvoked: true, wantText: "has a prerequisite make COMPUTES: $(LANE)"},
+		{dir: "posix", wantFail: true, notInvoked: true, wantText: "names `.POSIX`"},
 		// NIT: `make -q` exit 2 is make failing, not "would remake".
 		{dir: "make-q-parse-error", wantFail: true, wantText: "failed (exit 2): make reported an ERROR"},
 	}
@@ -532,6 +569,13 @@ func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
 		"`.SECONDEXPANSION:` is not in effect",
 		"no gate recipe line expands to a `-` or `+` prefix",
 		"no expanded gate command ends in a `|| true`-family suffix",
+		// Slice B5b.
+		"has one explicit rule and is declared .PHONY",
+		"no `.IGNORE`, no `.DEFAULT` recipe, no `.EXTRA_PREREQS`",
+		"make's own .PHONY list covers all 17 gate closure target(s)",
+		// #11 fix round 1: every closure recipe as make holds it.
+		"make's own database: each of the 17 gate closure target(s) has ONE readable entry whose 62 recipe line(s) equal the pinned rule's",
+		"the gate closure make reports from its database equals the text closure (17 target(s))",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)

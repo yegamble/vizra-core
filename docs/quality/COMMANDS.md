@@ -68,12 +68,33 @@ shasum -a 256 Makefile      # paste into .github/pinned-makefiles.yml, same diff
 Before make, on the pinned text, it refuses: a `SHELL` / `.SHELLFLAGS` /
 `MAKEFLAGS` / `GNUMAKEFLAGS` / `MFLAGS` assignment in any form (global with any
 modifier, `define`, target- or pattern-specific) other than the two approved
-global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX` or `.SECONDEXPANSION`;
-a LITERAL `-`/`@-`/`+` prefix or `|| true`-family suffix on a gate recipe line;
-and a duplicate or conditional gate target — over the prerequisite closure.
+global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`,
+`.IGNORE`, `.DEFAULT` (whole word), `.EXTRA_PREREQS` or `.POSIX`; a pattern
+rule; a rule with an INLINE `;` recipe; a MULTI-TARGET rule line; a `$`-named
+prerequisite on a gate closure rule; a LITERAL `-`/`@-`/`+` prefix,
+`|| true`-family suffix or `$(MAKE)` on a gate recipe line; a duplicate or
+conditional gate target; and a gate closure target with no explicit rule or
+not declared `.PHONY`. **No gate lane may depend on a real file target**:
+every target the gate closure reaches must be an explicit, phony rule. So
+every recipe the closure reaches is scanned — GNU make skips implicit-rule
+search for phony targets (measured on 3.81 and 4.3), so the recipe is on an
+explicit rule, and with inline and multi-target forms refused it is on the
+TAB lines under that target's own rule line, which the text reading scans
+before make; a rule whose TARGET make computes is refused before make too
+(#11 fix round 2). After make, and failing CLOSED, the closure make reports
+from its own prerequisite lists must EQUAL the text closure, each closure
+target must have exactly one readable entry in make's `-pn` database, and that
+entry's recipe must EQUAL the pinned rule's TAB lines (whitespace collapsed) —
+so every recipe of every target make reaches is one the text reading scanned
+(in-process rows: `scripts/testdata/db-scan-probe.py`). The expanded-prefix
+line count differed between versions before that normalisation — 66 on GNU
+Make 3.81, 62 on 4.3, because 3.81's database joins four continued recipe
+lines of this Makefile with different indentation (#11 R1-2); both now read 62.
 After make has run on the pinned bytes, the resolver refuses what only make can
-see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` or
-declares `.SECONDEXPANSION`, a `-`/`+` prefix a leading variable expands to (a
+see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` /
+`.EXTRA_PREREQS` or declares `.SECONDEXPANSION` / `.IGNORE` / a `.DEFAULT`
+recipe, a closure target missing from make's own `.PHONY` list, a `-`/`+`
+prefix a leading variable expands to (a
 leading function or target-specific variable is refused as undeterminable), a
 `|| true` suffix in the expanded dry-run command, and a `MAKEFILE_LIST` that is
 not the pinned set. The value of any OTHER variable (`GO`, `PKGS`, …) in the
@@ -233,3 +254,54 @@ Same host (GNU Make 3.81, go1.27.1); CI could not run (billing).
 | `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
 | `./scripts/ci-required-guard.sh` | 0 | |
 | GNU Make 4.3 (`ubuntu:24.04` container): both anchors, ci-required-guard, D0–D7, C7, C10, C10b, P1, all 46 makeguard fixtures | 0 / 0 / 0 / as expected | `docs/evidence/hardening-b5/make-4.3-ubuntu24.04/` |
+
+### Slice B5b (special targets; the closure reaches only explicit, phony rules), measured on scripts/ tree `6e3ed51e…`
+
+Same host (GNU Make 3.81, go1.27.1). Not pushed at the time of measurement (the chair holds it until PR #10 merges).
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| direct unit step + `go-test-report.py` | 0 | **1230 executed, 0 failed, 0 skipped**, floor 943; `scripts` 310 |
+| `go test -race -count=1 ./scripts/` | 0 | 310 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `docs/evidence/hardening-b5/b5b/demo.sh` + `measure.sh` on 3.81 | 0 | D rows HELD; C15–C21 red, green after restore |
+| GNU Make 4.3 (`ubuntu:24.04` container): D rows, C15/C15b, `measure.sh`, both anchors, ci-required-guard, all 57 makeguard fixtures | as expected | `docs/evidence/hardening-b5/b5b/make-4.3-ubuntu24.04/`; 55 red, 2 green |
+
+### #11 fix round 1 (cross-check X-1, B5c), measured on scripts/ tree `173c57f1…`
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| direct unit step + `go-test-report.py` | 0 | **1247 executed, 0 failed, 0 skipped**, floor 943; `scripts` 327 |
+| `go test -race -count=1 ./scripts/` | 0 | 327 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD; C15–C26 red, green after restore |
+| GNU Make 4.3 container: D rows, C15/C15b, C22–C26, `measure.sh`, both anchors, the guard, all 62 makeguard fixtures | as expected | 60 red, 2 green |
+
+### #11 fix round 2 (R1-1, R1-2), measured on scripts/ tree `4be7543e…`
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| direct unit step + `go-test-report.py` | 0 | **1252 executed, 0 failed, 0 skipped**, floor 943; `scripts` 332 |
+| `go test -race -count=1 ./scripts/` | 0 | 332 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | database scan: 17 targets, 62 recipe lines equal; closure make reports = text closure; 62 distinct expanded-prefix lines on 3.81 AND 4.3 |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `python3 scripts/testdata/db-scan-probe.py` | 0 | 15 rows as expected (3.81 host and 4.3 container) |
+| `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD + probe; C15–C32 red, green after restore |
+| GNU Make 4.3 container: D rows, C15/C15b, C22–C25, C27–C32, both anchors, the guard, all 62 makeguard fixtures | as expected | 60 red, 2 green |
+
+### #11 on main (merge of #10's squash `36a72df`, with R2-1), measured on scripts/ tree `0647549c…`
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 17 ok, 8 `[no test files]`, 0 FAIL. A first run exited 2: `link: mapping output file failed: no space left on device` for `internal/httpapi` and `internal/jobs` — a host disk-exhaustion failure, NOT a pass; the re-run on the same tree passed |
+| direct unit step + `go-test-report.py` | 0 | **1328 executed, 0 failed, 0 skipped**, floor 1006, 17 packages; `scripts` 333 |
+| `go test -race -count=1 ./scripts/` | 0 | 333 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | 17 closure targets, 62 recipe lines equal, closures equal |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `python3 scripts/testdata/db-scan-probe.py` | 0 | 15 rows as expected |
+| `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD + probe; all 21 C rows red, green after restore (`b5b/on-main-36a72df/`) |

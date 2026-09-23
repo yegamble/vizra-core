@@ -1,0 +1,37 @@
+# C24 the computed-prerequisite refusal removed
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 36989c878a5a0bfba66d20f3d6f14dd5031e305b  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 4be7543ea5475ad6b8131539cd25fd7e29f7bd2a
+
+==============================================================
+MUTATION: C24 the computed-prerequisite refusal removed
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C24
+  check:  fixture_scenario computed-prerequisite 'has a prerequisite make COMPUTES'
+--------------------------------------------------------------
+  sha256 BEFORE: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
+  sha256 AFTER:  e8cfd4082cdfc96ad3e2a3734b4ad945cc5aa72ae3a137d2b6f983da755f5aa3
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+fixture computed-prerequisite: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=4
+  FAIL  the gate closure make reports from its database is not the closure the pinned text shows.
+make-integrity-guard: FAILED
+anchor [lenient] exit=1 make-processes=4
+  FAIL  the gate closure make reports from its database is not the closure the pinned text shows.
+make-integrity-guard: FAILED
+fixture_scenario computed-prerequisite: control BROKEN (exit 1)
+------------------------------------
+  sha256 RESTORED: 66fe31f6869e7d119d77b7575555782fd5381de76d0a4eed888636c07868f530
+  restore byte-identical: yes
+  RESULT: C24 the computed-prerequisite refusal removed -> exit 1
+
+== after restore ==
+fixture computed-prerequisite: raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:6 — gate closure target `ci` has a prerequisite make COMPUTES: $(LANE)
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:6 — gate closure target `ci` has a prerequisite make COMPUTES: $(LANE)
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario computed-prerequisite: control HELD (exit 0)
