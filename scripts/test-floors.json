@@ -42,11 +42,22 @@
     "internal/ownerclaim. Their floors were GENERATED with `--emit-floors` from a local",
     "measured run of the merge of PR #8's closing slice with main eeeea06 (PostgreSQL 18.6,",
     "Valkey 9.1.2, go1.27.1, darwin/arm64): measured 17 / 6 / 19 in BOTH suites, floors",
-    "14 / 4 / 16. No other floor was changed."
+    "14 / 4 / 16. No other floor was changed.",
+    "",
+    "Backend seat NEW-B (PR #8 re-review): internal/integration (floor 40, measured 165) and",
+    "internal/httpapi (floor 26, measured 56) had grown far past their floors, so the owner-claim",
+    "integration tests (owner_claim_test.go + claimtoken_cli_test.go) or setup_test.go could be",
+    "deleted with every floor green. Regenerated with `--emit-floors` from measured runs of PR #8's",
+    "head 56504c1 (+ an AGENTS.md prose edit), `go test -race -count=1 -json`, PostgreSQL 18.6 /",
+    "Valkey 9.1.2, go1.27.1, darwin/arm64: unit 1184 executed, integration 1349 executed, 0 skipped.",
+    "Raised: internal/integration 40 -> 140 (measured 165), internal/httpapi 26 -> 48 in both",
+    "suites (measured 56), and min_tests unit 943 -> 1006, integration 981 -> 1147. Nothing else was",
+    "moved. Deleting those files is scored as MUT-60 / MUT-61 in",
+    "docs/evidence/m1a-owner-claim/demonstrate.sh."
   ],
   "suites": {
     "unit": {
-      "min_tests": 943,
+      "min_tests": 1006,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 8,
@@ -58,7 +69,7 @@
         "github.com/yegamble/vizra-core/internal/doctor": 33,
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
-        "github.com/yegamble/vizra-core/internal/httpapi": 26,
+        "github.com/yegamble/vizra-core/internal/httpapi": 48,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 14,
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
@@ -69,7 +80,7 @@
       "allowed_skips": {}
     },
     "integration": {
-      "min_tests": 981,
+      "min_tests": 1147,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 8,
@@ -81,8 +92,8 @@
         "github.com/yegamble/vizra-core/internal/doctor": 33,
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
-        "github.com/yegamble/vizra-core/internal/httpapi": 26,
-        "github.com/yegamble/vizra-core/internal/integration": 40,
+        "github.com/yegamble/vizra-core/internal/httpapi": 48,
+        "github.com/yegamble/vizra-core/internal/integration": 140,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 14,
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,

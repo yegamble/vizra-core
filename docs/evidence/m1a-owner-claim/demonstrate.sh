@@ -401,6 +401,82 @@ run_case MUT-59 "let the handler decide 409-vs-403 for an empty redeem again" \
   "$HND" 'TestTheHandlerDoesNotDecideBetween409And403' "$UNI_API" \
   perl -0pi -e 's/\tcase errors\.Is\(err, credential\.ErrBusy\):/\tcase err.Error() == "no rows in result set":\n\t\treturn s.refuseToken(c)\n\n\tcase errors.Is(err, credential.ErrBusy):/' "$HND"
 
+# --- per-package floors (backend seat NEW-B): deleting a test file must be RED --
+#
+# run_floor_case <id> <description> <suite> <package> <files...>
+#
+# Deletes the named test files and judges the package with scripts/go-test-report.py
+# against its COMMITTED per-package floor. The report is given a floors file that
+# holds exactly that one package's committed floor (and uses it as min_tests too),
+# so the verdict cannot be red for any other reason; the case also REQUIRES the
+# report's own per-package-floor message, and reports HARNESS-FAIL without it —
+# a build failure is red, but it is not this control.
+run_floor_case() {
+  local id="$1" desc="$2" suite="$3" pkg="$4"; shift 4
+  if [ -n "$ONLY" ] && [ "$ONLY" != "$id" ]; then return 0; fi
+  rule "$id — $desc"
+  echo "deletes: $*"
+  echo "must turn RED: the '$suite' report's per-package floor for $pkg"
+  local tags="" ; [ "$suite" = integration ] && tags="-tags=integration"
+  local ipath="github.com/yegamble/vizra-core/${pkg#./}"; ipath="${ipath%/}"
+  local tmp; tmp="$(mktemp -d)"
+  python3 - "$suite" "$ipath" > "$tmp/floors.json" <<'PYF'
+import json, sys
+suite, pkg = sys.argv[1], sys.argv[2]
+d = json.load(open("scripts/test-floors.json"))
+f = d["suites"][suite]["min_package_tests"][pkg]
+print(json.dumps({"suites": {suite: {"min_tests": f, "min_package_tests": {pkg: f}, "allowed_skips": {}}}}))
+PYF
+  echo "committed floor: $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["suites"][sys.argv[2]]["min_tests"])' "$tmp/floors.json" "$suite")"
+  judge() {
+    local rc=0
+    go test $tags -count=1 -json "$pkg" > "$tmp/ev.json" 2>/dev/null || rc=$?
+    echo "$rc" > "$tmp/exit.txt"
+    python3 scripts/go-test-report.py --events "$tmp/ev.json" --suite "$suite" \
+      --floors "$tmp/floors.json" --go-exit-file "$tmp/exit.txt" > "$tmp/report.txt" 2>&1
+    local r=$?
+    grep -E "tests executed|test\(s\) \(floor|::error::|go-test-report: " "$tmp/report.txt" | head -8
+    return $r
+  }
+  local f; for f in "$@"; do rm -- "$f"; done
+  if [ -z "$(git status --porcelain -- "$@")" ]; then
+    echo "HARNESS-FAIL: nothing was deleted. Scoring nothing."; HARNESS=$((HARNESS+1)); rm -rf "$tmp"; return 0
+  fi
+  echo "--- RED run ---"
+  judge; local red=$?
+  echo "RED exit=$red (expected non-zero)"
+  local named=0
+  grep -q "package $ipath executed" "$tmp/report.txt" && grep -q "its recorded floor is" "$tmp/report.txt" && named=1
+  git checkout -- "$@"
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "HARNESS-FAIL: the tree is still dirty after restoring:"; git status --porcelain
+    git checkout -- .; HARNESS=$((HARNESS+1)); rm -rf "$tmp"; return 0
+  fi
+  if [ "$named" -ne 1 ]; then
+    echo "HARNESS-FAIL: the RED run did not fail on the package floor (wrong reason). Scoring nothing."
+    HARNESS=$((HARNESS+1)); rm -rf "$tmp"; return 0
+  fi
+  echo "--- GREEN run (files restored) ---"
+  judge; local green=$?
+  echo "GREEN exit=$green (expected zero)"
+  rm -rf "$tmp"
+  if [ "$red" -ne 0 ] && [ "$green" -eq 0 ]; then
+    echo "RESULT: $id PASS (red under mutation, green when restored)"; PASS=$((PASS+1))
+  else
+    echo "RESULT: $id FAIL (red=$red green=$green)"; FAIL=$((FAIL+1))
+  fi
+}
+
+# The seat's exact case: both files go together, because claimtoken_cli_test.go
+# uses owner_claim_test.go's harness and deleting one alone is a BUILD failure.
+run_floor_case MUT-60 "delete the owner-claim integration tests (owner_claim_test.go + claimtoken_cli_test.go)" \
+  integration ./internal/integration/ \
+  internal/integration/owner_claim_test.go internal/integration/claimtoken_cli_test.go
+
+run_floor_case MUT-61 "delete the setup handler's unit tests (setup_test.go)" \
+  unit ./internal/httpapi/ \
+  internal/httpapi/setup_test.go
+
 rule "REVIEW-ONLY PROPERTIES (no mutation here turns a test red)"
 cat <<'NOTE'
 Stated rather than implied, because a mutation matrix that quietly omits these

@@ -197,3 +197,22 @@ server's own pool's isolation default (it used to reset only the test's pool and
 relied, unchecked, on the server's pool not having connected before the
 `ALTER DATABASE` — true today, but nothing held it true), and asserts zero `refused` rows and zero failure-budget charges from the
 losers.
+
+### Council re-review of `56504c1` (backend NEW-B, security F-2)
+
+- **NEW-B.** `internal/integration` (floor 40, measured 165) and `internal/httpapi`
+  (floor 26, measured 56) had outgrown their per-package floors, so this PR's own
+  integration tests, or the setup handler's unit tests, could be deleted with every
+  floor green. The floors were regenerated with `--emit-floors` from measured runs
+  (integration 140, httpapi 48 in both suites; whole-suite `min_tests` unit 1006,
+  integration 1147); the measurement is recorded in `scripts/test-floors.json`'s
+  `_why`. Two harness cases score it, with their own runner (`run_floor_case`):
+  **MUT-60** deletes `owner_claim_test.go` together with `claimtoken_cli_test.go`
+  (the second uses the first's harness, so deleting one alone is a BUILD failure,
+  not this control), and **MUT-61** deletes `internal/httpapi/setup_test.go`. Each
+  judges the package with `scripts/go-test-report.py` against its COMMITTED floor,
+  and is scored only if the report names that package's floor as the reason.
+- **F-2.** The AGENTS.md row on the failure limiter now also states the per-route
+  hard ceiling (claim 600, status 3000 per 15 minutes) as an accepted residual that
+  CAN answer a valid token 429 until the window rolls, pending M1-B's concurrency
+  bound — which `allowSetupRequest`'s comment already said AGENTS.md recorded.
