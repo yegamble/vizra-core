@@ -187,10 +187,16 @@ func TestARequestCancelledMidCommandDoesNotFlipTheLimiterToDegraded(t *testing.T
 		}
 	}()
 	t.Cleanup(func() {
-		_ = ln.Close()
-		close(accepted)
-		for conn := range accepted {
-			_ = conn.Close()
+		_ = ln.Close() // ends the accept loop
+		// Drain without closing the channel, so a late accept can never send on
+		// a closed channel.
+		for {
+			select {
+			case conn := <-accepted:
+				_ = conn.Close()
+			default:
+				return
+			}
 		}
 	})
 
