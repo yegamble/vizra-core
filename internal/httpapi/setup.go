@@ -463,13 +463,13 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 			// enforces, so reaching here means the two drifted — which is a 400
 			// for the caller and a defect for us.
 			s.deps.Logger.Error("http: a CHECK constraint refused a request the validator accepted",
-				"constraint", pgErr.ConstraintName, "request_id", requestIDOf(c))
+				"constraint", obs.Redact(pgErr.ConstraintName), "request_id", obs.Redact(requestIDOf(c)))
 			return newCodedError(http.StatusBadRequest, "bad_request",
 				"one of the submitted values is not acceptable")
 		case pgErr.Code == "40001":
 			// Unreachable: the claim transaction pins READ COMMITTED explicitly.
 			s.deps.Logger.Error("http: serialization failure on a READ COMMITTED claim",
-				"request_id", requestIDOf(c))
+				"request_id", obs.Redact(requestIDOf(c)))
 		}
 	}
 
@@ -491,9 +491,9 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 // line (AGENTS.md) while the operator still gets something to act on.
 func (s *Server) unavailable(c *echo.Context, where string, cause error) error {
 	s.deps.Logger.Error("http: the claim endpoint could not reach the database",
-		"where", where,
+		"where", obs.Redact(where),
 		"error", obs.Redact(cause.Error()),
-		"request_id", requestIDOf(c))
+		"request_id", obs.Redact(requestIDOf(c)))
 	return newCodedError(http.StatusServiceUnavailable, "unavailable",
 		"the instance state could not be read")
 }
