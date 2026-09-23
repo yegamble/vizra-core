@@ -231,8 +231,16 @@ Valkey: after a 600-request burst, one request every <=15 minutes held
 claim-owner closed indefinitely, and the operator's own retries extended the
 lockout. Every other bucket had the same fault. The in-process fallback was
 already a true fixed window, so the semantics depended on cache health. The fix
-is `INCR` + `EXPIRE key window NX` in one MULTI/EXEC: the TTL is set only when
-the key has none, and the server applies both commands or neither.
+is `INCR` + `EXPIRE key window NX` in one MULTI/EXEC, and the TTL is set only
+when the key has none. What holds, at exactly this strength (verifier R5-N1):
+the two commands are not interleaved with other clients, a crash applies
+neither, and a queue-time error discards both. A runtime error is NOT rolled
+back, because Redis and Valkey have none. But the only realistic one, `INCR` on a
+non-integer value, still leaves `EXPIRE NX` to set the TTL, and a counter found
+without a TTL is given one on its next call, so no path leaves a permanent
+lockout. An earlier version of this paragraph, the `ratelimit.go` comment and
+AGENTS.md said "the server applies both or neither", which was stronger than
+Redis guarantees.
 
 The four integration tests were run red against the unfixed code and green with
 the fix, on Valkey 9.1.2 AND Redis 7.2.16 (`09-limiter-red-green.txt`).
