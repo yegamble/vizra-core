@@ -2,6 +2,10 @@ package ownerclaim
 
 import (
 	"errors"
+	"go/ast"
+	"go/build"
+	"go/parser"
+	"go/token"
 	"os"
 	"strings"
 	"testing"
@@ -219,6 +223,62 @@ func TestIsServerUnavailableSeparatesOutagesFromViolations(t *testing.T) {
 	for _, code := range []string{"23505", "23514", "23503", "40001", "42501", "57014", "22001", ""} {
 		if IsServerUnavailable(code) {
 			t.Errorf("%s is not an outage; classifying it as one would turn a real answer into a 503", code)
+		}
+	}
+}
+
+// TestTheClaimSeamCannotBeSetFromAProductionBuild (closing slice).
+//
+// afterClaimedCheck lets the integration suite pause a claimant between its
+// claimed check and its token examination. It must not be reachable from a
+// production binary, and this pins BOTH halves of that:
+//
+//  1. the setter's file is excluded from a build without `-tags=integration`
+//     (it is in IgnoredGoFiles, not GoFiles) — and it EXISTS, so this cannot
+//     pass vacuously after a rename;
+//  2. no file in the default build stores into the seam.
+func TestTheClaimSeamCannotBeSetFromAProductionBuild(t *testing.T) {
+	ctx := build.Default
+	ctx.BuildTags = nil // exactly what `go build` without tags sees
+	pkg, err := ctx.ImportDir(".", 0)
+	if err != nil {
+		t.Fatalf("reading the package as a production build sees it: %v", err)
+	}
+
+	const setter = "SetAfterClaimedCheckHookForTest"
+	declares := func(file string) bool {
+		f, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", file, err)
+		}
+		for _, d := range f.Decls {
+			if fn, ok := d.(*ast.FuncDecl); ok && fn.Name.Name == setter {
+				return true
+			}
+		}
+		return false
+	}
+
+	found := false
+	for _, f := range pkg.IgnoredGoFiles {
+		if declares(f) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("%s is not declared in any file a production build EXCLUDES; either it moved "+
+			"into the default build or it was renamed and this test is no longer checking it", setter)
+	}
+	for _, f := range pkg.GoFiles {
+		if declares(f) {
+			t.Fatalf("%s is declared in %s, which a production build compiles", setter, f)
+		}
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(src), "afterClaimedCheck.Store(") {
+			t.Fatalf("%s stores into the claim test seam, and a production build compiles it", f)
 		}
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v5"
@@ -417,6 +416,11 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 		return newCodedError(http.StatusConflict, "conflict", claimedMessage)
 
 	case errors.Is(err, ownerclaim.ErrTokenNotAccepted):
+		// Claim returns this only from ownerclaim.classifyRefusal, AFTER a fresh
+		// read found the instance still unclaimed. The 409-vs-403 decision is
+		// made there and nowhere else — this layer used to carry a second copy
+		// of it for the redeem's empty result, while the read phase's own
+		// refusals were never classified at all.
 		return s.refuseToken(c)
 
 	case errors.Is(err, credential.ErrBusy):
@@ -430,34 +434,6 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 		// tells the operator nothing on the one endpoint they cannot skip.
 		return s.unavailable(c, "claim", err)
 
-	case errors.Is(err, pgx.ErrNoRows):
-		// The redeem matched nothing: a concurrent claimer won, or the token was
-		// already terminal. Re-read the claimed state to answer the right one.
-		//
-		// The two failure modes of that re-read are NOT the same as "the token
-		// was wrong", and must not be laundered into it. ErrUnavailable's own doc
-		// says so three files away; letting a dead pool fall through to 403 would
-		// contradict it AND charge the caller's failure budget for a failure that
-		// was the server's.
-		pool, perr := s.poolFor(c)
-		if perr != nil {
-			return s.unavailable(c, "re-reading the claimed state", perr)
-		}
-		// The CLAIMED state (any user), not "a live owner exists". The redeem's
-		// own WHERE NOT EXISTS (SELECT 1 FROM users) makes it return no row
-		// whenever ANY user exists, and "claimed" is defined as exactly that, so
-		// OQ-4's answer is 409. Keying on a live OWNER answered a member-only or
-		// tombstoned-owner instance with 403 — charging the failure budget and
-		// writing a `refused` audit row on an instance that is claimed.
-		claimed, cerr := ownerclaim.Claimed(c.Request().Context(), sqlcgen.New(pool))
-		if cerr != nil {
-			return s.unavailable(c, "re-reading the claimed state", cerr)
-		}
-		if claimed {
-			s.claimed.set(true, s.deps.Now())
-			return newCodedError(http.StatusConflict, "conflict", claimedMessage)
-		}
-		return s.refuseToken(c)
 	}
 
 	var ve *ownerclaim.ValidationError

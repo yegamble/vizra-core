@@ -8,6 +8,8 @@
 | `04-make-ci.txt` | `make ci` (every `ci-required` floor lane that runs without Docker) |
 | `05-mut53-measurement.txt` | the measurement behind MUT-53's review-only status: the gate deleted, the whole unit and integration suites run, both exit 0. This is attempt 2 and says so: attempt 1's unit run panicked on the 10-minute default timeout in `internal/fixtures` (which does not import `internal/ownerclaim`) under host load, with integration exit 0 |
 | `06-unit.txt` | `go test -race -count=1 ./...` without make — what `build-test` runs directly |
+| `07-race-stress.txt` | closing slice: `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation` repeated with `-count`, on Valkey 9.1.2 and Redis 7.2.16, with and without CPU contention, plus the baseline at `655f46a` |
+| `08-shuffle-seeds.txt` | closing slice: `make test-integration-shuffle` re-run with fixed seeds, including CI's failing `1790134723139270269` |
 | `demonstrate.sh` | the harness that produced `02-mutations.txt`, re-runnable by a verifier |
 
 Every transcript was produced on the tested tree recorded in its own `src:` header line. The pushed
@@ -138,3 +140,60 @@ redeem). Two are Go-side redundancy in front of a scored database guard: MUT-36
 with MUT-54 scoring the pair). One moved: MUT-14's decision now lives in `Mint`
 and is scored as MUT-14b. The `consumed_at`/`superseded_at`/expiry predicates are
 no longer review-only — MUT-1b, MUT-1c and MUT-6 score them by direct query.
+
+### Closing slice (a fresh builder, on top of `655f46a`)
+
+`655f46a` was **red** in CI: run 35814919455, cache-matrix valkey leg,
+`make test-integration-shuffle` seed `1790134723139270269`,
+`TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable`
+— "claimant 22 got an unexpected 403 … that claim token was not accepted", 30
+declined where 31 were wanted.
+
+**The defect was a class, not a line.** `Claim`'s read phase checked the claimed
+state, then examined the token (shape, row, digest, liveness) and answered any
+refusal directly. A winner that committed between a loser's claimed check and
+its token read left the loser looking at a CONSUMED token, so the loser got 403,
+a permanent `refused` audit row and a failure-budget charge on an instance that
+was claimed — against OQ-4. The same shape held for every read-phase refusal
+branch, while the redeem's empty result was classified by a second copy of the
+logic in the HTTP layer.
+
+**The fix.** `ownerclaim.classifyRefusal` is now the ONE place a token refusal
+becomes an answer: a fresh claimed read → 409 (no row, no charge, claimed bit
+set), a failed read → 503 (no charge), still unclaimed → the uniform 403 with its
+audit and budget semantics unchanged. `examineToken` returns a verdict and never
+`ErrTokenNotAccepted` itself, so the read phase has a single refusal exit; the
+redeem's empty result calls the same function after releasing its transaction;
+the handler's own re-read branch is deleted.
+
+**How it is proven, deterministically.** A test seam (`afterClaimedCheck`, nil in
+production; its setter is compiled only under `-tags=integration`, which
+`TestTheClaimSeamCannotBeSetFromAProductionBuild` pins) pauses a claimant between
+its claimed check and its token examination. For each branch — consumed,
+digest mismatch, malformed, never minted — the instance becomes claimed while
+it is paused, and on release it must answer 409 with no `refused` row, no
+failure-budget charge (a recording limiter counts charges) and no derivation.
+The same seam drives the controls (every branch on an instance that stays
+unclaimed is still exactly one 403, one row, one charge) and the outage case (the
+classification's read blocked on a table lock and cancelled → 503, nothing
+charged).
+
+**Mutations.** New: MUT-56 (bypass the classification on the read phase — the
+defect itself), MUT-57 (classification answers 409 whatever the state), MUT-58
+(the seam's setter compiled into production), MUT-59 (the handler decides
+409-vs-403 again). Retargeted, because the code they mutated moved into
+`classifyRefusal`: MUT-43 (a failed re-read laundered into a token refusal) and
+MUT-52 (the redeem's empty result refused regardless). Patterns updated for code
+that moved but did not change meaning: MUT-13 and MUT-31.
+
+**The review-only block is unchanged in membership** — MUT-4, MUT-4b, MUT-53,
+MUT-36, MUT-14 — re-examined against this change: none became observable.
+MUT-53 (deleting only the in-transaction gate) is still indistinguishable from
+outside, because the redeem's users guard then yields an empty result that the
+same classification answers 409; its note now names `classifyRefusal`.
+
+**The race test was tightened, not loosened.** It now resets and CHECKS the
+server's own pool's isolation default (it used to reset only the test's pool and
+relied, unchecked, on the server's pool not having connected before the
+`ALTER DATABASE` — true today, but nothing held it true), and asserts zero `refused` rows and zero failure-budget charges from the
+losers.

@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,9 +83,15 @@ var (
 	// malformed, already consumed, superseded by a re-mint, expired, and never
 	// minted. The server genuinely cannot tell them apart from a digest
 	// comparison, and separate messages would be both a lie and an oracle.
+	//
+	// Claim returns it ONLY from classifyRefusal, and only after a fresh read
+	// found the instance still unclaimed.
 	ErrTokenNotAccepted = errors.New("ownerclaim: token not accepted")
-	// ErrAlreadyClaimed means an owner exists. Checked strictly before the token
-	// is examined, so a claimed instance is never a token oracle.
+	// ErrAlreadyClaimed means the instance has a user. Checked strictly before the
+	// token is examined, so a claimed instance is never a token oracle — and
+	// every token refusal is re-classified against a fresh claimed read, so an
+	// instance that BECAME claimed while the token was being examined answers
+	// this too.
 	ErrAlreadyClaimed = errors.New("ownerclaim: instance already claimed")
 	// ErrHasUsers is the CLI's refusal: minting an owner-creating credential on a
 	// running claimed instance would be a standing escalation path for anyone
@@ -400,11 +407,7 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 	if claimed {
 		return Result{}, ErrAlreadyClaimed
 	}
-
-	if err := in.Validate(); err != nil {
-		return Result{}, err
-	}
-	normalized := Normalize(in.Token)
+	fireAfterClaimedCheck()
 
 	// ---- READ PHASE: no transaction, and no connection held across the hash --
 	//
@@ -421,31 +424,23 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 	// users_one_owner is the final arbiter. A stale read can only send us into a
 	// transaction that then refuses.
 	//
+	// What a stale read must NOT do is decide a REFUSAL. The claimed check above
+	// is a snapshot: a concurrent winner can commit between it and the token read
+	// below, and the loser then sees a CONSUMED token. Answering that as "token
+	// not accepted" is a 403 on an instance that is claimed — against OQ-4, with
+	// a `refused` audit row and a failure-budget charge for the server's own race.
+	// CI measured exactly that (run 35814919455, valkey leg, seed
+	// 1790134723139270269: "claimant 22 got an unexpected 403"). So the read phase
+	// has ONE refusal exit, and it goes through classifyRefusal.
+	//
 	// M1-B's sign-in is the real multi-caller of this hasher and is instructed to
 	// import it; this is the call shape it should copy.
-	row, err := q.GetOwnerClaimToken(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		// No token was ever minted. That is the fifth indistinguishable cause.
-		return Result{}, ErrTokenNotAccepted
-	}
+	row, accepted, err := examineToken(ctx, q, in)
 	if err != nil {
-		return Result{}, unavailable("reading the token", err)
+		return Result{}, err
 	}
-	if subtle.ConstantTimeCompare(Digest(normalized), row.TokenSha256) != 1 {
-		return Result{}, ErrTokenNotAccepted
-	}
-
-	// LIVENESS PRE-CHECK. The redeem CTE's guard is the enforcement and stays;
-	// this is about the cost incurred BEFORE it. Without this, a token that is
-	// correct but consumed, superseded or expired — one an attacker may already
-	// hold, from a log under the stderr opt-in or after an operator re-mint —
-	// buys a full derivation before the CTE refuses it. The `live` column is
-	// already selected and is computed by the DATABASE clock.
-	//
-	// It returns the same ErrTokenNotAccepted, so nothing observable changes: the
-	// five causes stay indistinguishable in status, code and message.
-	if row.Live == nil || !*row.Live {
-		return Result{}, ErrTokenNotAccepted
+	if !accepted {
+		return Result{}, classifyRefusal(ctx, q)
 	}
 
 	// Only now is the password hashed, and no connection is checked out while it
@@ -495,7 +490,13 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Result{}, err // the caller re-reads the claimed state to pick 409 or 403
+			// The redeem matched nothing: a concurrent claimer won, a user
+			// appeared, or the token went terminal (expired, superseded) after the
+			// liveness pre-check. The SAME classification as the read phase decides
+			// which. The transaction is released first, so the re-read never holds
+			// one pooled connection while waiting for a second.
+			_ = tx.Rollback(ctx)
+			return Result{}, classifyRefusal(ctx, q)
 		}
 		// unavailable() passes a CONSTRAINT PgError through untouched for the
 		// mapper to key on, and wraps connection failures and server-signalled
@@ -528,6 +529,99 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		Role:            string(created.Role),
 		TokenGeneration: created.TokenGeneration,
 	}, nil
+}
+
+// examineToken is EVERY examination of the presented token that the read phase
+// performs: its shape (inside Validate), the row's existence, the digest
+// compare and the liveness pre-check. It answers in exactly two ways:
+//
+//   - an error it must not decide on the token's behalf — a ValidationError on
+//     another field, or an outage reading the row;
+//   - a verdict. `accepted == false` is NOT an answer for the caller. Claim
+//     sends it to classifyRefusal, because the instance may have become claimed
+//     since the claimed check, and then the answer is 409, not 403.
+//
+// It never returns ErrTokenNotAccepted itself. That is the point of its shape:
+// a refusal cannot leave the read phase without being classified.
+func examineToken(ctx context.Context, q *sqlcgen.Queries, in Input) (sqlcgen.GetOwnerClaimTokenRow, bool, error) {
+	var none sqlcgen.GetOwnerClaimTokenRow
+	if err := in.Validate(); err != nil {
+		if errors.Is(err, ErrTokenNotAccepted) {
+			return none, false, nil // malformed: a token refusal like any other
+		}
+		return none, false, err
+	}
+	row, err := q.GetOwnerClaimToken(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// No token was ever minted. That is the fifth indistinguishable cause.
+		return none, false, nil
+	}
+	if err != nil {
+		return none, false, unavailable("reading the token", err)
+	}
+	if subtle.ConstantTimeCompare(Digest(Normalize(in.Token)), row.TokenSha256) != 1 {
+		return none, false, nil
+	}
+	// LIVENESS PRE-CHECK. The redeem CTE's guard is the enforcement and stays;
+	// this is about the cost incurred BEFORE it. Without this, a token that is
+	// correct but consumed, superseded or expired — one an attacker may already
+	// hold, from a log under the stderr opt-in or after an operator re-mint —
+	// buys a full derivation before the CTE refuses it. The `live` column is
+	// already selected and is computed by the DATABASE clock.
+	//
+	// It is refused through the same classification, so nothing observable
+	// changes: the five causes stay indistinguishable in status, code and message.
+	if row.Live == nil || !*row.Live {
+		return none, false, nil
+	}
+	return row, true, nil
+}
+
+// classifyRefusal is THE one place a token refusal becomes an answer. Every
+// read-phase refusal (malformed, never minted, wrong digest, not live) and the
+// redeem's empty result go through it; nothing else in this package or in the
+// HTTP layer decides between 409 and 403.
+//
+// It re-reads the claimed state FRESH, because the claimed check that preceded
+// the token examination is a snapshot a concurrent winner can invalidate:
+//
+//   - claimed               → ErrAlreadyClaimed (409; no audit row, no budget)
+//   - the read failed        → ErrUnavailable (503; never charged to the caller)
+//   - still unclaimed        → ErrTokenNotAccepted (the uniform 403, audited
+//     and charged to the failure budget exactly as before)
+//
+// EVERY lookup failure is ErrUnavailable here, including a *pgconn.PgError the
+// server answered with: the question was "is this instance claimed", and a
+// failure to answer it is the server's, not a wrong token. Laundering it into
+// 403 would charge the caller's failure budget for an outage.
+//
+// The bit only goes false→true (EXISTS(users), and no path deletes the last
+// user), so a claimed answer here can never be wrong later.
+func classifyRefusal(ctx context.Context, q *sqlcgen.Queries) error {
+	claimed, err := Claimed(ctx, q)
+	if err != nil {
+		return fmt.Errorf("%w: re-reading the claimed state: %v", ErrUnavailable, err)
+	}
+	if claimed {
+		return ErrAlreadyClaimed
+	}
+	return ErrTokenNotAccepted
+}
+
+// afterClaimedCheck is a TEST SEAM and nothing else. It runs in Claim after the
+// read-phase claimed check and before any examination of the token, which is
+// exactly the window a concurrent winner can commit into.
+//
+// It is nil in every build a production binary is made from: the only code that
+// can set it is SetAfterClaimedCheckHookForTest, in seam_integration.go, which
+// is compiled only under `-tags=integration`.
+// TestTheClaimSeamCannotBeSetFromAProductionBuild asserts both halves.
+var afterClaimedCheck atomic.Pointer[func()]
+
+func fireAfterClaimedCheck() {
+	if h := afterClaimedCheck.Load(); h != nil {
+		(*h)()
+	}
 }
 
 func nonEmpty(s string) *string {

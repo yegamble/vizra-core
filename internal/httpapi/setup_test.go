@@ -177,7 +177,13 @@ func TestClaimErrorMapping(t *testing.T) {
 			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
 		{"too many connections (53300)", &pgconn.PgError{Code: "53300"},
 			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
-		{"the claimed re-read cannot reach the database", pgx.ErrNoRows,
+		// The claimed re-read that classifies a token refusal now lives in
+		// ownerclaim.classifyRefusal, and a failure there arrives here as
+		// ErrUnavailable — this is the shape it produces. It must stay 503: an
+		// outage laundered into "token not accepted" would charge the caller's
+		// failure budget for the server's failure.
+		{"the claimed re-read cannot reach the database", fmt.Errorf(
+			"%w: re-reading the claimed state: %v", ownerclaim.ErrUnavailable, errors.New("closed pool")),
 			http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"},
 	}
 	for _, tc := range cases {
@@ -192,6 +198,24 @@ func TestClaimErrorMapping(t *testing.T) {
 					tc.err, message, tc.wantMessage)
 			}
 		})
+	}
+}
+
+// TestTheHandlerDoesNotDecideBetween409And403 (closing slice).
+//
+// The 409-vs-403 decision for a token refusal is made in exactly ONE place,
+// ownerclaim.classifyRefusal. This layer used to carry a second copy for the
+// redeem's empty result (a pgx.ErrNoRows branch that re-read the claimed state
+// itself), while the read phase's refusals went unclassified — two copies, and
+// the one that mattered was missing. ownerclaim.Claim never returns a bare
+// pgx.ErrNoRows any more; if one ever reaches the mapper it is a defect and
+// must surface as one, not be quietly turned into a token refusal (which audits
+// and charges the budget) or into "claimed".
+func TestTheHandlerDoesNotDecideBetween409And403(t *testing.T) {
+	status, code, _ := mapOnly(t, pgx.ErrNoRows)
+	if status == http.StatusForbidden || status == http.StatusConflict {
+		t.Fatalf("a bare pgx.ErrNoRows mapped to %d/%s: the handler is deciding 409-vs-403 again; "+
+			"that decision belongs to ownerclaim.classifyRefusal alone", status, code)
 	}
 }
 

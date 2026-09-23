@@ -49,6 +49,42 @@ type claimEnv struct {
 	srv     *httpapi.Server
 	hasher  *countingHasher
 	logs    *safeBuffer
+	// limiter records every key the server spends budget against, so a test can
+	// assert that a refusal did — or did not — charge the failure budget.
+	limiter *recordingLimiter
+}
+
+// recordingLimiter wraps the real limiter and records the keys it is asked
+// about. It changes no decision: every call is delegated.
+type recordingLimiter struct {
+	inner cache.Limiter
+	mu    sync.Mutex
+	keys  []string
+}
+
+func (l *recordingLimiter) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, int) {
+	l.mu.Lock()
+	l.keys = append(l.keys, key)
+	l.mu.Unlock()
+	return l.inner.Allow(ctx, key, limit, window)
+}
+
+func (l *recordingLimiter) Degraded() bool { return l.inner.Degraded() }
+
+// failureCharges counts charges to the GLOBAL failure budget. Every token
+// refusal charges it exactly once (the per-origin bucket is charged too when
+// the client has an attributable prefix), and nothing else ever touches it —
+// the hard ceilings and the transition marker use their own keys.
+func (l *recordingLimiter) failureCharges() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := 0
+	for _, k := range l.keys {
+		if strings.HasSuffix(k, ":rl:setup.claim:all") {
+			n++
+		}
+	}
+	return n
 }
 
 // countingHasher wraps the real hasher so a test can assert how many argon2
@@ -89,12 +125,13 @@ func newClaimEnv(t *testing.T) *claimEnv {
 	logs := &safeBuffer{}
 	hasher := &countingHasher{inner: credential.New()}
 	srvPools := poolsOf(t, resolver)
+	limiter := &recordingLimiter{inner: cache.NewFallbackLimiter(cacheClient)}
 	srv := httpapi.New(httpapi.Deps{
 		Config:                cfg,
 		Resolver:              resolver,
 		Pools:                 srvPools,
 		Cache:                 cacheClient,
-		Limiter:               cache.NewFallbackLimiter(cacheClient),
+		Limiter:               limiter,
 		EmbeddedSchemaVersion: mustEmbedded(t),
 		Hasher:                hasher,
 		// A PLAIN handler, deliberately: the redacting handler would hide a
@@ -103,7 +140,7 @@ func newClaimEnv(t *testing.T) *claimEnv {
 		Now:    time.Now,
 	})
 	return &claimEnv{cfg: cfg, resolver: resolver, pool: pool, srvPool: srvPools.Default(),
-		srv: srv, hasher: hasher, logs: logs}
+		srv: srv, hasher: hasher, logs: logs, limiter: limiter}
 }
 
 // mint puts a live token in the database and returns it.
@@ -350,10 +387,24 @@ func TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation(t *
 				_, _ = e.pool.Exec(context.Background(),
 					fmt.Sprintf("ALTER DATABASE %s RESET default_transaction_isolation", dbName))
 			})
-			// New connections must pick up the new default.
+			// New connections must pick up the new default — on BOTH pools. The
+			// server's own pool is the one the claimants use; resetting only the
+			// test's pool relied, unchecked, on the server's pool not having
+			// connected before the ALTER. True today; now it is asserted.
 			e.pool.Reset()
+			e.srvPool.Reset()
+			var got string
+			if err := e.srvPool.QueryRow(t.Context(), "SHOW default_transaction_isolation").Scan(&got); err != nil {
+				t.Fatalf("reading the server pool's isolation default: %v", err)
+			}
+			if got != iso {
+				t.Fatalf("the server's pool runs under %q, want %q; this sub-test would not be testing "+
+					"what its name says", got, iso)
+			}
 
 			token, _ := e.mint(t)
+			refusedBefore := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
+			chargesBefore := e.limiter.failureCharges()
 
 			const n = 32
 			var wg sync.WaitGroup
@@ -412,6 +463,15 @@ func TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation(t *
 			}
 			if got := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.succeeded'`); got != 1 {
 				t.Fatalf("succeeded audit rows = %d, want exactly 1", got)
+			}
+			// A loser is declined by the server's race, not refused for its token:
+			// no `refused` row and no failure-budget charge, whichever gate
+			// declined it (read phase, in-transaction gate, or an empty redeem).
+			if got := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`) - refusedBefore; got != 0 {
+				t.Fatalf("%d `refused` audit rows were written by losers of the race, want 0", got)
+			}
+			if got := e.limiter.failureCharges() - chargesBefore; got != 0 {
+				t.Fatalf("losers of the race charged the failure budget %d time(s), want 0", got)
 			}
 		})
 	}
@@ -2667,5 +2727,320 @@ func TestAClaimRefusesWhenAUserAppearsDuringTheHash(t *testing.T) {
 	}
 	if got := e.count(t, `SELECT count(*) FROM audit_events`) - auditBefore; got != 0 {
 		t.Fatalf("a refused claim on a now-claimed instance wrote %d audit rows, want 0", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Closing slice — a refusal decided in the read phase is classified against a
+// FRESH claimed state (CI run 35814919455, valkey leg, seed 1790134723139270269)
+// ---------------------------------------------------------------------------
+
+// pauseFirstClaimantAfterItsClaimedCheck installs ownerclaim's test seam so the
+// FIRST claimant to pass Claim's read-phase claimed check stops there — before
+// any examination of its token — until release is called. Every later claimant
+// passes straight through. This is the window the race test hit once in CI and
+// never locally: it is now opened on purpose.
+func pauseFirstClaimantAfterItsClaimedCheck(t *testing.T) (paused <-chan struct{}, release func()) {
+	t.Helper()
+	p := make(chan struct{})
+	r := make(chan struct{})
+	var first sync.Once
+	restore := ownerclaim.SetAfterClaimedCheckHookForTest(func() {
+		isFirst := false
+		first.Do(func() { isFirst = true })
+		if !isFirst {
+			return
+		}
+		close(p)
+		select {
+		case <-r:
+		case <-time.After(60 * time.Second): // never hang the suite
+		}
+	})
+	var once sync.Once
+	rel := func() { once.Do(func() { close(r) }) }
+	t.Cleanup(func() { rel(); restore() })
+	return p, rel
+}
+
+func waitPaused(t *testing.T, paused <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-paused:
+	case <-time.After(60 * time.Second):
+		t.Fatal("the claimant never reached the seam after its claimed check; the window this " +
+			"test exists for was never opened, so it must not pass")
+	}
+}
+
+type claimOutcome struct {
+	code int
+	body map[string]any
+}
+
+// postAsync sends one claim from a goroutine and returns its outcome channel.
+func (e *claimEnv) postAsync(t *testing.T, body any, mutate func(*http.Request)) <-chan claimOutcome {
+	out := make(chan claimOutcome, 1)
+	go func() {
+		code, b := e.post(t, body, mutate)
+		out <- claimOutcome{code, b}
+	}()
+	return out
+}
+
+func await(t *testing.T, ch <-chan claimOutcome) claimOutcome {
+	t.Helper()
+	select {
+	case o := <-ch:
+		return o
+	case <-time.After(90 * time.Second):
+		t.Fatal("the paused claimant never answered")
+		return claimOutcome{}
+	}
+}
+
+// readPhaseBranch is one way the read phase can refuse a token. `present` is
+// what the paused claimant sends, given the live token (empty when none was
+// minted).
+type readPhaseBranch struct {
+	name    string
+	mint    bool
+	present func(live string) string
+}
+
+func readPhaseBranches() []readPhaseBranch {
+	return []readPhaseBranch{
+		// The CI failure exactly: the loser holds the SAME token as the winner,
+		// and by the time it reads the row the winner has consumed it.
+		{"not live (consumed by the winner)", true, func(live string) string { return live }},
+		{"digest mismatch", true, func(string) string { return strings.Repeat("b", 64) }},
+		{"malformed shape", true, func(string) string { return "x" }},
+		{"no token row (never minted)", false, func(string) string { return strings.Repeat("c", 64) }},
+	}
+}
+
+// TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409 (closing slice).
+//
+// For EACH read-phase refusal branch: claimant A passes the claimed check while
+// the instance is unclaimed and is paused there. The instance then becomes
+// claimed — through the endpoint where a token exists, out of band where none
+// was ever minted — and A is released. A must answer OQ-4's 409, write no
+// audit row, charge no failure budget, cost no derivation, and leave the
+// monotonic claimed bit set.
+//
+// Before the fix every sub-test answered 403 `forbidden`, wrote a `refused`
+// row and charged the budget: the read phase refused on a stale snapshot.
+func TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409(t *testing.T) {
+	for _, br := range readPhaseBranches() {
+		t.Run(br.name, func(t *testing.T) {
+			e := newClaimEnv(t)
+			live := ""
+			if br.mint {
+				live, _ = e.mint(t)
+			}
+			paused, release := pauseFirstClaimantAfterItsClaimedCheck(t)
+
+			refusedBefore := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
+			chargesBefore := e.limiter.failureCharges()
+
+			a := validBody(br.present(live))
+			a.Username, a.Email = "loser", "loser@example.org"
+			outcome := e.postAsync(t, a, nil)
+			waitPaused(t, paused)
+
+			// The instance becomes claimed while A is paused.
+			derivationsBefore := e.hasher.Derivations()
+			if br.mint {
+				if code, body := e.post(t, validBody(live), nil); code != http.StatusCreated {
+					t.Fatalf("the winner's claim answered %d, want 201. body=%v", code, body)
+				}
+			} else {
+				insertOwner(t, e.pool, "oob", "oob@example.org")
+			}
+			winnerDerivations := e.hasher.Derivations() - derivationsBefore
+
+			release()
+			got := await(t, outcome)
+
+			if got.code != http.StatusConflict || bodyCode(got.body) != "conflict" {
+				t.Fatalf("A answered %d %v, want 409 conflict: the instance is claimed, and a refusal "+
+					"decided on the read phase's stale snapshot must be classified against a fresh one "+
+					"(OQ-4)", got.code, got.body)
+			}
+			if n := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`) - refusedBefore; n != 0 {
+				t.Fatalf("A wrote %d `refused` audit row(s); a claimed instance writes none", n)
+			}
+			if n := e.limiter.failureCharges() - chargesBefore; n != 0 {
+				t.Fatalf("A charged the failure budget %d time(s); the server's race is not the caller's failure", n)
+			}
+			if d := e.hasher.Derivations() - derivationsBefore - winnerDerivations; d != 0 {
+				t.Fatalf("A cost %d derivation(s), want 0", d)
+			}
+			if n := e.count(t, `SELECT count(*) FROM users`); n != 1 {
+				t.Fatalf("users = %d, want exactly 1", n)
+			}
+
+			// The monotonic claimed bit is set: the status read answers claimed
+			// without touching the pool. (Where the winner came through the
+			// endpoint its 201 set it too; the out-of-band branch is the one that
+			// proves A's own 409 did.)
+			acquires := e.srvPool.Stat().AcquireCount()
+			if code, body := e.getStatus(t); code != http.StatusOK || body["claimed"] != true {
+				t.Fatalf("claim-status after A = %d %v, want 200 claimed:true", code, body)
+			}
+			if n := e.srvPool.Stat().AcquireCount() - acquires; n != 0 {
+				t.Fatalf("claim-status acquired %d pooled connection(s) after A's 409; the claimed bit "+
+					"was not set", n)
+			}
+		})
+	}
+}
+
+// TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403 (closing slice).
+//
+// The other half of the classification, through the same seam: when NOTHING
+// claims the instance while A is paused, every branch is still the uniform 403
+// with exactly one `refused` row and one failure-budget charge. This is what
+// stops "classify" decaying into "always 409", and what proves the charge
+// counter used above is not vacuous.
+func TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403(t *testing.T) {
+	type unclaimedBranch struct {
+		name    string
+		mint    bool
+		present func(live string) string
+		// during runs while A is paused; the instance stays unclaimed.
+		during func(t *testing.T, e *claimEnv)
+	}
+	same := func(live string) string { return live }
+	branches := []unclaimedBranch{
+		{"digest mismatch", true, func(string) string { return strings.Repeat("b", 64) }, nil},
+		{"malformed shape", true, func(string) string { return "x" }, nil},
+		{"no token row (never minted)", false, func(string) string { return strings.Repeat("c", 64) }, nil},
+		{"not live (expired while paused)", true, same, func(t *testing.T, e *claimEnv) {
+			if _, err := e.pool.Exec(t.Context(),
+				`UPDATE owner_claim_tokens SET minted_at = now() - interval '4h', expires_at = now() - interval '3h'`); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		// A re-mint overwrites the digest in place, so A's token then fails the
+		// digest compare: superseded is indistinguishable from mistyped, by design.
+		{"superseded while paused", true, same, func(t *testing.T, e *claimEnv) { e.mint(t) }},
+	}
+	for _, br := range branches {
+		t.Run(br.name, func(t *testing.T) {
+			e := newClaimEnv(t)
+			live := ""
+			if br.mint {
+				live, _ = e.mint(t)
+			}
+			paused, release := pauseFirstClaimantAfterItsClaimedCheck(t)
+			refusedBefore := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
+			chargesBefore := e.limiter.failureCharges()
+
+			outcome := e.postAsync(t, validBody(br.present(live)), nil)
+			waitPaused(t, paused)
+			if br.during != nil {
+				br.during(t, e)
+			}
+			release()
+			got := await(t, outcome)
+
+			if got.code != http.StatusForbidden || bodyCode(got.body) != "forbidden" || msgOf(got.body) != "that claim token was not accepted" {
+				t.Fatalf("A answered %d %v, want the uniform 403 forbidden", got.code, got.body)
+			}
+			if n := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`) - refusedBefore; n != 1 {
+				t.Fatalf("`refused` rows written = %d, want exactly 1", n)
+			}
+			if n := e.limiter.failureCharges() - chargesBefore; n != 1 {
+				t.Fatalf("failure-budget charges = %d, want exactly 1", n)
+			}
+			if n := e.count(t, `SELECT count(*) FROM users`); n != 0 {
+				t.Fatalf("users = %d, want 0", n)
+			}
+		})
+	}
+}
+
+// TestAFailedClassificationReadAnswers503AndChargesNothing (closing slice).
+//
+// The classification's own read can fail. That is the server's failure and
+// answers 503 — never "token not accepted", never an audit row, never a budget
+// charge. Forced deterministically: while A is paused, another session takes
+// ACCESS EXCLUSIVE on `users`; A's token read (a different table) proceeds and
+// refuses, its classification blocks on `users`, and the test cancels A's
+// request once pg_stat_activity shows it waiting there.
+func TestAFailedClassificationReadAnswers503AndChargesNothing(t *testing.T) {
+	e := newClaimEnv(t)
+	e.mint(t)
+	paused, release := pauseFirstClaimantAfterItsClaimedCheck(t)
+	refusedBefore := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
+	chargesBefore := e.limiter.failureCharges()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	outcome := e.postAsync(t, validBody(strings.Repeat("d", 64)), func(r *http.Request) {
+		*r = *r.WithContext(ctx)
+	})
+	waitPaused(t, paused)
+
+	locker, err := e.pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = locker.Rollback(context.Background()) }()
+	if _, err := locker.Exec(t.Context(), `LOCK TABLE users IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatalf("locking users: %v", err)
+	}
+	release()
+	waitForLockWaiters(t, e.pool, 1) // A's classification is now blocked on `users`
+	cancel()
+	got := await(t, outcome)
+	if err := locker.Rollback(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if got.code != http.StatusServiceUnavailable || bodyCode(got.body) != "unavailable" {
+		t.Fatalf("a classification read that could not complete answered %d %v, want 503 unavailable",
+			got.code, got.body)
+	}
+	if n := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`) - refusedBefore; n != 0 {
+		t.Fatalf("an outage wrote %d `refused` row(s)", n)
+	}
+	if n := e.limiter.failureCharges() - chargesBefore; n != 0 {
+		t.Fatalf("an outage charged the caller's failure budget %d time(s)", n)
+	}
+}
+
+// TestATokenSupersededDuringTheHashIsTheUniform403 (closing slice).
+//
+// The post-redeem path goes through the SAME classification. Here the token is
+// superseded while A hashes (after the liveness pre-check), so the redeem finds
+// no row on an instance that is still unclaimed: the answer is the uniform 403,
+// with its audit row and budget charge — the "went terminal in that window"
+// case AGENTS.md names. (The claimed half of this path is the loser in
+// TestTheClaimTransactionPinsReadCommitted.)
+func TestATokenSupersededDuringTheHashIsTheUniform403(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+	e.hasher.before = func() {
+		if _, _, err := ownerclaim.Mint(context.Background(), e.pool, e.cfg.OwnerClaimTTL, false, false); err != nil {
+			t.Errorf("superseding mid-hash: %v", err)
+		}
+	}
+	refusedBefore := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`)
+	chargesBefore := e.limiter.failureCharges()
+
+	code, body := e.post(t, validBody(token), nil)
+	if code != http.StatusForbidden || bodyCode(body) != "forbidden" {
+		t.Fatalf("a token superseded mid-hash answered %d %v, want the uniform 403", code, body)
+	}
+	if n := e.count(t, `SELECT count(*) FROM audit_events WHERE action='setup.owner_claim.refused'`) - refusedBefore; n != 1 {
+		t.Fatalf("`refused` rows = %d, want exactly 1", n)
+	}
+	if n := e.limiter.failureCharges() - chargesBefore; n != 1 {
+		t.Fatalf("failure-budget charges = %d, want exactly 1", n)
+	}
+	if n := e.count(t, `SELECT count(*) FROM users`); n != 0 {
+		t.Fatalf("users = %d, want 0", n)
 	}
 }

@@ -191,7 +191,7 @@ run_case MUT-24 "let the proxy's own prefix be written as if it were the client"
 # --- the request posture and hashing order -----------------------------------
 run_case MUT-13 "hash the password BEFORE comparing the claim token" \
   "$SVC" 'TestNoPasswordHashingOccursWithoutAValidToken' "$INT" \
-  perl -0pi -e 's/\trow, err := q\.GetOwnerClaimToken\(ctx\)/\tif _, herr := hasher.Hash(ctx, in.Password); herr != nil {\n\t\treturn Result{}, herr\n\t}\n\trow, err := q.GetOwnerClaimToken(ctx)/' "$SVC"
+  perl -0pi -e 's/\trow, accepted, err := examineToken\(ctx, q, in\)/\tif _, herr := hasher.Hash(ctx, in.Password); herr != nil {\n\t\treturn Result{}, herr\n\t}\n\trow, accepted, err := examineToken(ctx, q, in)/' "$SVC"
 
 run_case MUT-18 "accept any content type (drop the JSON media-type check)" \
   "$HND" 'TestClaimRefusesANonJSONContentType' "$INT" \
@@ -249,7 +249,7 @@ run_case MUT-29 "hash inside the claim transaction again" \
 
 run_case MUT-31 "remove the liveness pre-check before hashing" \
   "$SVC" 'TestACorrectButDeadTokenCostsNoDerivation' "$INT" \
-  perl -0pi -e 's/\tif row\.Live == nil \|\| !\*row\.Live \{\n\t\treturn Result\{\}, ErrTokenNotAccepted\n\t\}\n//' "$SVC"
+  perl -0pi -e 's/\tif row\.Live == nil \|\| !\*row\.Live \{\n\t\treturn none, false, nil\n\t\}\n//' "$SVC"
 
 run_case MUT-14b "move the liveness decision back outside the advisory lock" \
   "$SVC" 'TestConcurrentBootsMintExactlyOneToken' "$INT" \
@@ -309,9 +309,11 @@ run_case MUT-42 "declare no 429 on getSetupClaimStatus" \
   api/openapi.yaml 'TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs' "$UNI_API" \
   perl -0pi -e 's/        "429":\n          description: \|\n            Too many requests to this route\. It carries its own hard ceiling,\n            separate from the claim endpoint.s, so a flood here can never spend\n            the budget a claim needs\.\n          content:\n            application\/json:\n              schema:\n                \$ref: "#\/components\/schemas\/Error"\n//' api/openapi.yaml
 
+# Retargeted in the closing slice: the claimed re-read moved out of the handler
+# into ownerclaim.classifyRefusal, the one place a token refusal is decided.
 run_case MUT-43 "launder a failed claimed re-read into a token refusal" \
-  "$HND" 'TestClaimErrorMapping' "$UNI_API" \
-  perl -0pi -e 's/\t\tpool, perr := s\.poolFor\(c\)\n\t\tif perr != nil \{\n\t\t\treturn s\.unavailable\(c, "re-reading the claimed state", perr\)\n\t\t\}/\t\tpool, perr := s.poolFor(c)\n\t\tif perr != nil {\n\t\t\treturn s.refuseToken(c)\n\t\t}/' "$HND"
+  "$SVC" 'TestAFailedClassificationReadAnswers503AndChargesNothing' "$INT" \
+  perl -0pi -e 's/\t\treturn fmt\.Errorf\("%w: re-reading the claimed state: %v", ErrUnavailable, err\)/\t\treturn ErrTokenNotAccepted/' "$SVC"
 
 run_case MUT-44 "drop the cause from the 503 log line" \
   "$HND" 'TestADatabaseOutageIsDiagnosableFromTheLog' "$INT" \
@@ -357,9 +359,11 @@ run_case MUT-51 "examine the token before the claimed state again (library)" \
   "$SVC" 'TestClaimReadsTheClaimedStateBeforeExaminingTheToken' "$INT" \
   perl -0pi -e 's/(\tq := sqlcgen\.New\(pool\)\n)/$1\tif err := in.Validate(); err != nil {\n\t\treturn Result{}, err\n\t}\n/' "$SVC"
 
+# Retargeted in the closing slice: the redeem's empty result is classified by
+# the same ownerclaim.classifyRefusal as the read phase; the handler's copy is gone.
 run_case MUT-52 "answer the redeem's no-row case with a token refusal regardless" \
-  "$HND" 'TestTheClaimTransactionPinsReadCommitted' "$INT" \
-  perl -0pi -e 's/\t\tif claimed \{\n\t\t\ts\.claimed\.set\(true, s\.deps\.Now\(\)\)\n\t\t\treturn newCodedError\(http\.StatusConflict, "conflict", claimedMessage\)\n\t\t\}\n\t\treturn s\.refuseToken\(c\)/\t\t_ = claimed\n\t\treturn s.refuseToken(c)/' "$HND"
+  "$SVC" 'TestTheClaimTransactionPinsReadCommitted' "$INT" \
+  perl -0pi -e 's/\t\t\t_ = tx\.Rollback\(ctx\)\n\t\t\treturn Result\{\}, classifyRefusal\(ctx, q\)/\t\t\treturn Result{}, ErrTokenNotAccepted/' "$SVC"
 
 # Both defences against "a user appears during the hash" removed at once. Neither
 # alone is observable through the handler (see MUT-53 in the review-only block),
@@ -377,6 +381,26 @@ run_case MUT-55 "read the raw public origin from the process env under --env aga
   "$DOC" 'TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig' ./cmd/vizra/ \
   perl -0pi -e 's/\t\t\tl, err := source\(\)\n\t\t\tif err != nil \{\n\t\t\t\treturn "" \/\/ unreachable in practice: loadConfig already failed on it\n\t\t\t\}\n\t\t\tv, _ := l\("VIZRA_PUBLIC_ORIGIN"\)/\t\t\tv, _ := os.LookupEnv("VIZRA_PUBLIC_ORIGIN")/' "$DOC"
 
+# --- closing slice: every read-phase refusal is classified against a FRESH ----
+# --- claimed state (CI run 35814919455, valkey leg, seed 1790134723139270269) --
+
+run_case MUT-56 "bypass the classification on the read phase (refuse on the stale snapshot)" \
+  "$SVC" 'TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409' "$INT" \
+  perl -0pi -e 's/\tif !accepted \{\n\t\treturn Result\{\}, classifyRefusal\(ctx, q\)\n\t\}/\tif !accepted {\n\t\treturn Result{}, ErrTokenNotAccepted\n\t}/' "$SVC"
+
+run_case MUT-57 "let the classification answer 409 whatever the claimed state" \
+  "$SVC" 'TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403|TestATokenSupersededDuringTheHashIsTheUniform403' "$INT" \
+  perl -0pi -e 's/\tif claimed \{\n\t\treturn ErrAlreadyClaimed\n\t\}\n\treturn ErrTokenNotAccepted\n/\t_ = claimed\n\treturn ErrAlreadyClaimed\n/' "$SVC"
+
+SEAM=internal/ownerclaim/seam_integration.go
+run_case MUT-58 "compile the claim test seam's setter into production builds" \
+  "$SEAM" 'TestTheClaimSeamCannotBeSetFromAProductionBuild' ./internal/ownerclaim/ \
+  perl -0pi -e 's{^//go:build integration\n\n}{}' "$SEAM"
+
+run_case MUT-59 "let the handler decide 409-vs-403 for an empty redeem again" \
+  "$HND" 'TestTheHandlerDoesNotDecideBetween409And403' "$UNI_API" \
+  perl -0pi -e 's/\tcase errors\.Is\(err, credential\.ErrBusy\):/\tcase err.Error() == "no rows in result set":\n\t\treturn s.refuseToken(c)\n\n\tcase errors.Is(err, credential.ErrBusy):/' "$HND"
+
 rule "REVIEW-ONLY PROPERTIES (no mutation here turns a test red)"
 cat <<'NOTE'
 Stated rather than implied, because a mutation matrix that quietly omits these
@@ -393,9 +417,10 @@ would overclaim:
          the code calls THE authoritative gate. MEASURED: nothing reddens, and
          the reason is structural. Since the redeem statement gained
          `AND NOT EXISTS (SELECT 1 FROM users)` (FU-2), a user present when the
-         redeem runs makes it return no row, and the 409-vs-403 re-read — which
-         keys on the CLAIMED state, as OQ-4 defines it — answers 409 exactly as
-         the gate would, with no audit row and no budget charged. The two paths
+         redeem runs makes it return no row, and ownerclaim.classifyRefusal —
+         the ONE classification every token refusal goes through since the
+         closing slice, keyed on the CLAIMED state as OQ-4 defines it — answers
+         409 exactly as the gate would, with no audit row and no budget charged. The two paths
          are indistinguishable from outside. Before FU-2 they were not: the
          verifier measured HTTP 201 and an owner created with this gate deleted.
          The statement guard is scored on its own by MUT-46 (a direct-query test
