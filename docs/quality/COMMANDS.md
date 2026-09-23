@@ -293,3 +293,15 @@ Same host (GNU Make 3.81, go1.27.1). Not pushed at the time of measurement (the 
 | `python3 scripts/testdata/db-scan-probe.py` | 0 | 15 rows as expected (3.81 host and 4.3 container) |
 | `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD + probe; C15–C32 red, green after restore |
 | GNU Make 4.3 container: D rows, C15/C15b, C22–C25, C27–C32, both anchors, the guard, all 62 makeguard fixtures | as expected | 60 red, 2 green |
+
+### #11 on main (merge of #10's squash `36a72df`, with R2-1), measured on scripts/ tree `0647549c…`
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 17 ok, 8 `[no test files]`, 0 FAIL. A first run exited 2: `link: mapping output file failed: no space left on device` for `internal/httpapi` and `internal/jobs` — a host disk-exhaustion failure, NOT a pass; the re-run on the same tree passed |
+| direct unit step + `go-test-report.py` | 0 | **1328 executed, 0 failed, 0 skipped**, floor 1006, 17 packages; `scripts` 333 |
+| `go test -race -count=1 ./scripts/` | 0 | 333 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | 17 closure targets, 62 recipe lines equal, closures equal |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| `python3 scripts/testdata/db-scan-probe.py` | 0 | 15 rows as expected |
+| `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD + probe; all 21 C rows red, green after restore (`b5b/on-main-36a72df/`) |

@@ -1,0 +1,25 @@
+# C31 a recipe differing from the pinned rule no longer refused
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: f7b69562b5fd5bf17efd6bef6f704e82b831bb9f  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 0647549c3698a0f625f1415573dfe4f30977d2ee
+
+==============================================================
+MUTATION: C31 a recipe differing from the pinned rule no longer refused
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5b/mutations.py C31
+  check:  python3 scripts/testdata/db-scan-probe.py | grep -E '^ROW BAD|^PROBE'; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 57ea87a3b17bd7ba87208573375af68f92ed992ace7507d3cdef6458b9d78bf6
+  sha256 AFTER:  f9cfbff8f55b55ef70f0e61af0c71ea2c7ae233478a1aa2dc1896f2d239a386b
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+ROW BAD  empty entry, recipe expected: refused=False (expected True); says 'DIFFERENT recipe for gate closure target `ci`': False
+ROW BAD  a recipe line the text does not show: refused=False (expected True); says 'DIFFERENT recipe for gate closure target `ci`': False
+PROBE: FAILED — 2 of 15 rows did not behave as expected
+------------------------------------
+  sha256 RESTORED: 57ea87a3b17bd7ba87208573375af68f92ed992ace7507d3cdef6458b9d78bf6
+  restore byte-identical: yes
+  RESULT: C31 a recipe differing from the pinned rule no longer refused -> exit 1
+
+== after restore ==
+PROBE: all 15 rows as expected

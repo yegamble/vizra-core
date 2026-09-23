@@ -1,0 +1,14 @@
+# D-ignore-bare: the committed fixture, gate stub failing
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: f7b69562b5fd5bf17efd6bef6f704e82b831bb9f  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 0647549c3698a0f625f1415573dfe4f30977d2ee
+
+fixture ignore-bare: raw `make ci` on these bytes (no anchor): exit 0
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:8 names `.IGNORE`: `.IGNORE:`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:8 names `.IGNORE`: `.IGNORE:`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario ignore-bare: control HELD (exit 0)
+fixture_scenario exit=0
