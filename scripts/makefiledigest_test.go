@@ -997,3 +997,36 @@ func TestTheDatabaseChecksFailClosed(t *testing.T) {
 	}
 	t.Logf("%s", out)
 }
+
+// #11 R2-1: every Python program in this package must compile with warnings
+// as errors. An invalid escape in a non-raw string (a backslash before a
+// backtick, in a docstring) is a
+// SyntaxWarning on Python 3.12 — printed on every anchor run — and a hard
+// compile failure under `-W error`; a future Python makes it an error outright.
+func TestEveryPythonScriptCompilesWithWarningsAsErrors(t *testing.T) {
+	root := repoRoot(t)
+	var files []string
+	for _, pattern := range []string{"scripts/*.py", "scripts/testdata/*.py"} {
+		m, err := filepath.Glob(filepath.Join(root, pattern))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, m...)
+	}
+	if len(files) < 7 {
+		t.Fatalf("found only %d Python file(s) under scripts/; the glob no longer sees them", len(files))
+	}
+	const prog = "import sys\nwith open(sys.argv[1]) as fh:\n    src = fh.read()\ncompile(src, sys.argv[1], 'exec')\n"
+	ok := 0
+	for _, f := range files {
+		cmd := exec.Command("python3", "-W", "error", "-c", prog, f)
+		cmd.Env = append(guardEnv(), "PYTHONDONTWRITEBYTECODE=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			rel, _ := filepath.Rel(root, f)
+			t.Errorf("%s does not compile with warnings as errors: %v\n%s", rel, err, out)
+			continue
+		}
+		ok++
+	}
+	t.Logf("%d of %d Python file(s) compile with -W error", ok, len(files))
+}

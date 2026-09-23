@@ -136,7 +136,7 @@ not discarded:
     closure is one the text reading scanned. Tested in-process by
     scripts/testdata/db-scan-probe.py. NOTE (#11 R1-2): before fix round 2 the
     expanded-prefix count on this Makefile read 66 lines on GNU Make 3.81 and
-    62 on 4.3 — 3.81's database joins four `\`-continued recipe lines with
+    62 on 4.3 — 3.81's database joins four `\\`-continued recipe lines with
     different indentation; lines are now compared with whitespace collapsed, and
     both versions report 62;
   * a gate target recipe line carrying a LITERAL `-` / `@-` / `+` prefix, a
