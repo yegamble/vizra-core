@@ -172,3 +172,21 @@ CI `ubuntu-24.04` is.**
 The red/green transcripts for every control are in
 `docs/evidence/hardening-b1/`, produced by `mutate.sh`, which aborts unless the
 mutation's digest moved and the restore is byte-identical.
+
+### Sweep B5 (the Makefile digest pin), measured on tree `36c3f7c`
+
+Same host, GNU Make 3.81; GNU Make 4.3 in an `ubuntu:24.04` container for the
+anchor, both modes, and check 11 (`docs/evidence/hardening-b5/make-4.3-ubuntu24.04/`).
+CI could not run (GitHub Actions refused jobs for billing), so nothing here is
+CI-corroborated.
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | `passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)` |
+| `./scripts/ci-required-guard.sh` | 0 | check 11: `pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree` |
+| direct unit step + `go-test-report.py` | 0 | **1149 executed, 0 skipped**, floor 943; `scripts` 229 (floor 161) |
+| `go test -race -count=1 ./scripts/` | 0 | 229 pass, 0 fail, 0 skip |
+
+Red/green transcripts: `docs/evidence/hardening-b5/` (`demo.sh`, over the B1
+`mutate.sh`).
