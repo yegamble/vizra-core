@@ -34,7 +34,7 @@ jobs:
         run: |
           set -uo pipefail
           rc=0
-          go test -race -count=1 -json ./... > unit-events.json || rc=$?
+          go test -race -count=1 -timeout 8m -json ./... > unit-events.json || rc=$?
           echo "$rc" > unit-exit.txt
           echo "go test (unit) exited $rc"
           python3 scripts/go-test-report.py \
@@ -49,7 +49,7 @@ jobs:
             exit 1
           fi
           rc=0
-          go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+          go test -race -count=1 -timeout 8m -tags=integration -json ./... > int-events.json || rc=$?
           echo "$rc" > int-exit.txt
           echo "go test (integration) exited $rc"
           python3 scripts/go-test-report.py \

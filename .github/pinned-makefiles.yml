@@ -44,4 +44,4 @@
 # `  <repository-relative path>: <64 lowercase hex>` line per file. No quotes,
 # no tabs, no flow style — both readers refuse anything else.
 makefiles:
-  Makefile: ad681247536d61376d6789dfe6a1d654bd3cc1b65e437a7f32f094efd1199ba1
+  Makefile: 7c2a2ea72fa5867d442d5e1b8bdf8763a567d113fd5766e13d5b74884782ba78

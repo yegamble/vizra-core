@@ -88,9 +88,10 @@ Everything else — `include` and every other directive, conditionals, `define`,
 `export`, `override`, target- and pattern-specific assignments, `+=` / `!=`,
 special targets other than `.PHONY`, functions and substitution references,
 inline `;` recipes, multi-target, double-colon and pattern rules, and every
-character above — is outside the grammar. The real Makefile fits it unchanged
-(56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe lines; the
-anchor's ok line prints the counts). Because `include` is refused, the pinned
+character above — is outside the grammar. The real Makefile fits it (64
+blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe lines since the
+test-stability slice added its `-timeout` comment; the anchor's ok line prints
+the counts). Because `include` is refused, the pinned
 read set is the root `Makefile` alone; the include reading and the post-make
 checks below remain as defence in depth.
 
@@ -195,7 +196,7 @@ results — because `go test ./...` exits 0 having run nothing, and a non-verbos
 `go test` prints nothing at all for a skipped test.
 
 ```
-rc=0; go test -race -count=1 -json ./... > unit-events.json || rc=$?
+rc=0; go test -race -count=1 -timeout 8m -json ./... > unit-events.json || rc=$?
 echo "$rc" > unit-exit.txt
 python3 scripts/go-test-report.py --events unit-events.json --suite unit \
   --floors scripts/test-floors.json --go-exit-file unit-exit.txt
@@ -203,7 +204,7 @@ python3 scripts/go-test-report.py --events unit-events.json --suite unit \
 
 ```
 export VIZRA_TEST_DATABASE_URL='postgres://…' VIZRA_TEST_CACHE_URL='redis://…'
-rc=0; go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+rc=0; go test -race -count=1 -timeout 8m -tags=integration -json ./... > int-events.json || rc=$?
 echo "$rc" > int-exit.txt
 python3 scripts/go-test-report.py --events int-events.json --suite integration \
   --floors scripts/test-floors.json --go-exit-file int-exit.txt

@@ -149,14 +149,22 @@ load-corpus: ## Generate the DECLARED load corpus (VZ-OPS-007). Not committed, n
 	   -seed  "$${LOAD_CORPUS_SEED:-1}" \
 	   -mix   "$${LOAD_CORPUS_MIX:-12,8,4}"
 
+# -timeout 8m on every go test here and in the pinned direct steps (sentinel
+# S-0016). Sized from measurement, not raised to hide a hang: the slowest
+# package took at most 140s in CI (4 runs, before this change) and 186s on a
+# shared 8-core host running two suites at once (after it), so 8m is 3.4x and
+# 2.6x those. It is BELOW go's 10m default so that a hang in the LAST test step
+# of build-test (20m job) or cache-matrix-leg (15m job) still prints go's
+# goroutine dump before the job is killed. docs/quality/COMMANDS.md has the
+# table.
 .PHONY: test
 test: ## Unit tests
-	@$(GO) test -count=1 $(PKGS)
+	@$(GO) test -count=1 -timeout 8m $(PKGS)
 
 .PHONY: test-race
 test-race: ## Unit tests with the race detector
 	@echo "==> test-race"
-	@$(GO) test -race -count=1 $(PKGS)
+	@$(GO) test -race -count=1 -timeout 8m $(PKGS)
 
 .PHONY: test-integration
 test-integration: ## Tests needing PostgreSQL and a RESP server (VIZRA_TEST_DATABASE_URL, VIZRA_TEST_CACHE_URL)
@@ -164,7 +172,7 @@ test-integration: ## Tests needing PostgreSQL and a RESP server (VIZRA_TEST_DATA
 	@if [ -z "$${VIZRA_TEST_DATABASE_URL:-}" ]; then \
 	   echo "  FAIL  VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."; \
 	   exit 1; fi
-	@$(GO) test -race -count=1 -tags=integration ./...
+	@$(GO) test -race -count=1 -timeout 8m -tags=integration ./...
 
 .PHONY: test-integration-shuffle
 test-integration-shuffle: ## The same suite in a RANDOM order, so order dependence cannot hide
@@ -179,7 +187,7 @@ test-integration-shuffle: ## The same suite in a RANDOM order, so order dependen
 	@if [ -z "$${VIZRA_TEST_DATABASE_URL:-}" ]; then \
 	   echo "  FAIL  VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."; \
 	   exit 1; fi
-	@$(GO) test -race -count=1 -shuffle=on -tags=integration ./...
+	@$(GO) test -race -count=1 -timeout 8m -shuffle=on -tags=integration ./...
 
 .PHONY: govulncheck
 govulncheck: ## Known vulnerabilities in the dependency set
