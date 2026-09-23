@@ -1,0 +1,28 @@
+
+== BASELINE item 2: a REQUIRED but non-FLOOR lane is never checked ==
+/tmp/vzb1-extra
+/tmp/vzb1-extra/workflows
+ci-required-guard EXIT=0
+every line mentioning extra-lane:
+      ok    required check 'extra-lane' resolves to a job
+
+== BASELINE item 3: the direct lane exits 0 with ZERO tests run ==
+  *_test.go files: 23
+  go test -race -count=1 ./...   EXIT=0
+  packages reporting [no test files]: 22
+  lines NOT '[no test files]' or 'ok':
+  restored; git status --porcelain: [?? docs/evidence/hardening-b1/]
+
+== BASELINE item 7: --fail-on '' exits 0 over a CRITICAL ==
+  --fail-on ''   EXIT=0
+      CRITICAL: 1
+      TOTAL: 3
+    
+    A valid scan of vizra-core:scan found nothing at or above [].
+  --fail-on ','  EXIT=0
+
+== BASELINE item 5: append-only has no provenance step ==
+   append-only        checkout=True  provenance=False
+   build-test         checkout=True  provenance=True
+   cache-matrix-leg   checkout=True  provenance=True
+   cache-matrix       checkout=False provenance=False

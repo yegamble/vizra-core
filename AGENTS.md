@@ -35,62 +35,149 @@ guard needs.
 `SHELL := /usr/bin/true`, or `MAKEFLAGS += -i` — makes every recipe in this
 repository exit 0 without running (measured on GNU Make 3.81 and 4.3). No check
 written inside a Makefile can prevent it, because the neutering disarms that
-check too. Two out-of-make controls close it:
+check too. And ONE WORD on a workflow line — `make -i ci` — did the same with
+both of the original controls exiting 0 (PR#6 VERIFY, FINDING 1).
 
-1. **`scripts/make-integrity-guard.sh`** runs as its own workflow step, BEFORE
-   any `make` line, in every required lane that invokes make. It refuses a
-   `SHELL` / `.SHELLFLAGS` / `MAKEFLAGS` / `GNUMAKEFLAGS` / `.ONESHELL`
-   override, a `-`/`@-` prefix or `|| true` suffix on a gate recipe, and a
-   duplicate gate target — in the Makefile **and everything it includes**, with
-   the include list taken from make's own `MAKEFILE_LIST`.
-2. **`build-test` runs `go test -race -count=1 ./...` directly**, with no make,
-   so whatever `make ci` did, a real failing **unit** test still fails a
-   required lane. It carries no `-tags=integration`, so it is the UNIT suite
-   only — see the residual list below.
+Sweep B1 answered that by PARSING each make step's `run:` as shell and refusing
+a blacklist of flags, overrides and `env:` names. A verifier then found
+**thirteen** spellings that left both guards green (PR#9 VERIFY, § 3b):
+`make -j -i ci` and `make -l -i ci` (the `-i` eaten as an optional argument),
+`export MAKEFLAGS=-i` on the line above, a `$GITHUB_ENV` or `$GITHUB_PATH` write
+by an earlier step, `M=make; $M -i ci`, `${MAKE:-make}`, a shell function named
+`make`, a PATH shadow, backticks, a step-level `if:`, `working-directory:`, and
+`shell: bash -c '{0} || true'`. **A blacklist over arbitrary shell cannot be
+exhaustive** — the shell has unbounded ways to name a command.
 
-`ci-required-guard.py` asserts both are present and armed.
+So the control was INVERTED. It is now DEFAULT-DENY on the SHAPE of the two
+kinds of step that carry the gate, and it does not read their shell at all:
 
-#### What these two controls do NOT give you
+1. **The anchor — `./scripts/make-integrity-guard.sh --workflow`, pinned
+   byte-for-byte** in `.github/pinned-steps.yml` — runs as its own step
+   IMMEDIATELY before every make step. It refuses a `SHELL` / `.SHELLFLAGS` /
+   `MAKEFLAGS` / `GNUMAKEFLAGS` / `.ONESHELL` override, a `-`/`@-` prefix or
+   `|| true` suffix on a gate recipe, and a duplicate gate target — in the
+   Makefile **and everything it includes**. And it checks its OWN process, in a
+   STRICT mode selected by the pinned `--workflow` argument, **never by the
+   environment**:
+   - MAKEFLAGS / GNUMAKEFLAGS / MFLAGS are **unset** — not empty, not "free of
+     flags it recognises";
+   - MAKELEVEL / MAKE_RESTARTS / MAKEOVERRIDES / MAKECMDGOALS are **absent** —
+     the anchor is not a make recipe, so if any is present something planted it;
+   - every variable the makefiles take FROM the environment is **absent** —
+     today `GO`, `SQLC`, `GOFLAGS`, `RELEASE`, `COMMIT`, `BUILT_AT` (all `?=`),
+     derived from every file make read, because `GO=true make test-race`
+     turns a failing test into exit 0;
+   - MAKEFILES, BASH_ENV and ENV are unset, and `SHELL` is a real shell;
+   - `make` resolves to a FILE (not a function or alias) whose real name is
+     `make`, in a system directory. It does not inspect that file's contents.
 
-This list is meant to be exhaustive. If you find something that belongs on it
-and is not here, that is a defect in this section, not a detail.
+   Adjacency is what makes those runtime checks mean anything. A `$GITHUB_ENV`
+   or `$GITHUB_PATH` write applies to LATER steps, so a write made by any
+   EARLIER step lands in the anchor's process exactly as it lands in make's,
+   and is refused there. The step immediately before make cannot be the writer,
+   because it must BE the pinned anchor literal.
 
-- **The guard never reads the workflow's own `make` invocation.** It checks the
-  Makefile, its includes, and its OWN environment — it cannot see the argv or
-  the step-level `env:` of a different workflow step, and `ci-required-guard.py`
-  checks a make step's presence, position, `if:` and `continue-on-error` but
-  never the TEXT of its `run:`. So **one word on a workflow line** still
-  no-ops every make-driven lane with both guards exiting 0. Four spellings,
-  all measured green at `f56dc03`: `run: make -i ci`,
-  `run: make SHELL=/usr/bin/true ci`, `run: make MAKEFLAGS=-i ci`, and a
-  step-level `env: MAKEFLAGS: -i` on an otherwise ordinary make step.
-  Blast radius: everything make-driven goes silent — `fmt-check`, `vet`,
-  `lint-imports`, `migrate-lint`, `config-template-check`, `openapi-verify`,
-  `sqlc-verify`, `ci-guard`, `fixtures-verify`, `tidy-check`, `build`, and
-  **both integration lanes, including both `cache-matrix` legs**. Only the unit
-  suite survives, through control 2. Closing it — the guard refusing
-  flag/variable overrides on a make step's `run:` and a `MAKEFLAGS`-family
-  step-level `env:` — is queued for **core hardening sweep B**; it is
-  deliberately not implemented here.
-- **Control 2 covers the UNIT suite only.** Every integration invocation in this
-  repository goes through make (`make test-integration`,
-  `make test-integration-shuffle`, in `build-test` and in both `cache-matrix`
-  legs). Under the evasion above, a failing INTEGRATION test — the migrator
-  against real PostgreSQL 18, the permanent Valkey/Redis-7.2 matrix that
-  ADR-001 Q-004 exists for — is silent, not red.
-- **Control 2 does not fail when zero tests run.** `go test ./...` with every
-  `*_test.go` moved aside exits 0, reporting `[no test files]` per package
-  (measured at `f56dc03`). It is a control against make being neutered, not
-  against the suite being EMPTIED. Queued for sweep B.
-- **`append-only` is a required floor lane with no provenance step.** It checks
-  out with `fetch-depth: 0`, computes a merge base and echoes that SHA, without
-  saying which tree it is standing in — the shape meta-PR3 FINDING 5 is about.
-  `provenance.sh` runs in every required workflow FILE, which is not the same as
-  every required JOB. Queued.
-- The guard, the workflows and `ci-required-guard.py` are all checked out from
-  the pull request under test and can be edited in it — every such edit is
-  visible in the diff, and CODEOWNERS is **advisory only** until the owner's
-  ruleset exists (it currently returns 403 on their plan).
+   Without `--workflow` — only `make ci-guard`, for local parity, which is not a
+   control — make itself exports MAKEFLAGS to the recipe, so every word must be
+   one GNU make was **measured** to export (3.81 and 4.3: `-jN`,
+   `--jobserver-*`, `s`, `w`, `--no-print-directory`). That is an allowlist; no
+   floor lane can select this mode, because its invocation is not the pin.
+2. **`ci-required-guard.py` check 8b pins the make step's SHAPE.** A step whose
+   `run:` mentions `make` at all — the wide, fail-closed classifier decides
+   that, a token in a comment included — must be **byte-equal** to a literal in
+   `.github/pinned-steps.yml`, may carry no key but `name`/`run`/`id`, and must
+   be immediately preceded by a step that is **byte-equal to the pinned anchor**
+   (also `name`/`run`/`id` only). A step that names `make-integrity-guard`
+   without being byte-equal to that pin is refused anywhere in a floor lane.
+   A workflow file with a **duplicate key** is refused outright, so the guard
+   never reads a different value than the one a reviewer sees first.
+
+   Of the verifier's thirteen, eleven change the make step's bytes or add a key
+   and are refused statically by 8b or 8c. The other two are
+   `$GITHUB_ENV` / `$GITHUB_PATH` writes. They are refused statically when the
+   writer sits between the anchor and make, or IS the anchor step. When the
+   writer is an EARLIER step they are refused at RUNTIME, by the anchor —
+   provided the write is to a variable the anchor checks (the list above), or
+   makes `make` resolve outside the approved system directories. The anchor
+   checks where `make` RESOLVES, not the order of PATH: prepending a directory
+   that holds no `make` is not refused, and has no effect on which `make` runs.
+   `docs/evidence/hardening-b1/R1-evasion-table.txt` and
+   `R2-anchor-environment.txt` carry one row for each.
+3. **Check 8c asserts the lane actually RUNS its gate invocations.** Pinning a
+   shape does not stop a step being DELETED or replaced by one that reaches make
+   through an indirection no classifier can see (`M=make; $M -i ci`). So
+   `pinned-steps.yml` also records, per job, the invocations that MUST be
+   present byte-equal. This closes the indirection class without parsing shell,
+   because it does not care what replaced them.
+4. **`build-test` runs BOTH suites directly**, with no make, from bodies pinned
+   the same way — the unit suite and `-tags=integration ./...`, the same package
+   set, flags and services as the recipes.
+5. **`scripts/go-test-report.py` makes an EMPTY suite red.** The direct steps
+   emit `go test -json`; the report judges `go test`'s own exit code, names every
+   failure and every skip, fails on any skip not allowlisted BY TEST NAME WITH A
+   REASON, and holds the count to committed floors — whole-suite **and one per
+   package**, because a whole-suite floor does not detect one package
+   disappearing.
+
+`ci-required-guard.py` runs checks 3, 4, 8, 8b, 8c, 9 and 10 over
+`set(FLOOR_LANES) | set(required)` — the floor is not also the ceiling on what
+gets checked. It also refuses, on a checked lane, a job-level `container:`, a
+`defaults.run` at either scope, an undigested service image, and a
+MAKEFLAGS/GNUMAKEFLAGS/MFLAGS/MAKEFILES/SHELL/PATH/BASH_ENV/ENV `env:` at job or
+workflow level.
+
+#### What these controls are, and what they are NOT
+
+They are **default-deny on the shape and surroundings of make steps and direct
+test steps in floor lanes.** That is the whole claim. This list is not called
+exhaustive, because the previous one was and a verifier found thirteen things
+missing from it.
+
+What they **cannot** do:
+
+- **They do not constrain what any OTHER step does to the machine.** A checked
+  lane may contain arbitrary `run:` steps, `uses:` actions, and — through them —
+  anything at all before the anchor runs: replacing the Go toolchain, rewriting
+  the Makefile or the test files on disk, installing a different `python3`.
+  The anchor observes what its own assertions cover (the Makefile and its
+  includes, its environment, what `make` resolves to) and nothing else.
+  **Review is the control for that, and CODEOWNERS is advisory** until the
+  owner's ruleset exists (it currently returns 403 on their plan).
+- **The anchor checks a named set of variables, not the whole environment.**
+  A `$GITHUB_ENV` write by an earlier step of any variable NOT in the list
+  above (`GOTOOLCHAIN`, `GODEBUG`, `CGO_ENABLED`, …) is not refused. The
+  per-package floors in the direct test steps still turn a suite that was made
+  to run nothing red; anything subtler is review-only.
+- **The anchor checks what `make` IS, not what it DOES.** A real file named
+  `make`, written into `/usr/local/bin` by an earlier step, that forwards the
+  anchor's own `make -pn` and exits 0 otherwise, passes — and the anchor's log
+  line says so, rather than claiming to have ruled it out. Planting it needs
+  another step to modify the machine, which is the first bullet's boundary.
+- **A wrapper script or composite action that calls make is not read.** It
+  carries no `make` token on the workflow line, so it is not classified as a
+  make step. Check 8c limits the damage — the required invocations must still
+  be present — but a lane may additionally run one.
+- **A reusable workflow (`jobs.<id>.uses:`) has no `steps:` here at all**, so
+  checks 4, 8, 8b, 8c, 9 and 10 have nothing to read. It would still have to
+  resolve to a check name.
+- **The pins, the floors and the skip allowlist are committed files.** Widening
+  `.github/pinned-steps.yml`, lowering a floor or adding an allowed skip is a
+  visible, reviewed diff in a file whose only purpose is to be a gate — the same
+  posture as `FLOOR_LANES`. It is not prevented; it is made visible.
+- **A skip count is corroborated by CI only for the three DIRECT steps.**
+  `make ci`'s own `test-race` and both `cache-matrix` legs still run a
+  non-verbose `go test`, which prints nothing for a skipped test. The direct
+  steps cover the same package set, so nothing is unmeasured — but the
+  corroboration comes from those steps, not from every lane.
+- Everything here is checked out from the pull request under test and can be
+  edited in it.
+
+Every remaining claim above maps to a fixture or a table case that goes red:
+`scripts/testdata/guard/` (75), `scripts/testdata/gotest/` (12),
+`scripts/testdata/fakedocker/` (6), and the anchor's own environment in
+`TestMakeIntegrityGuardEnvironment` (both modes, one row per variable class) —
+all driven from the required `scripts` package. The review-only bullets above
+are the ones with no fixture, and they say so.
 
 Read the guarantee at exactly that strength; the guard's own docstring states it
 the same way.
@@ -108,7 +195,8 @@ dodge: a scan's result depends on the world, and a required lane that goes red
 on its own is how a team learns to merge past red. Its refusals are not
 weakened by that — `scripts/image-scan-verdict.py` fails on a scanner ERROR, on
 an empty or `null` result set, on an unrecognised OS, on a report about another
-image, and on an exit code nothing recorded, each with its own fixture.
+image, on an exit code nothing recorded, and on a `--fail-on` that names no
+failing severity at all, each with its own fixture or named test.
 
 Integration tests need real services and are behind `-tags=integration`:
 
@@ -119,7 +207,15 @@ make test-integration-shuffle   # the same suite, -shuffle=on
 
 They **fail rather than skip** when those are unset, for the same reason.
 
-CI runs both, on both cache flavours. The shuffled lane exists because an
+CI runs both, on both cache flavours — but **`build-test` invokes the
+integration suite DIRECTLY**, `go test -race -count=1 -tags=integration ./...`
+with the same package set, flags and services the recipe uses, so a no-opped
+make cannot silence it (before sweep B1 every integration invocation in this
+repository went through make). The recipes keep their own required coverage in
+both `cache-matrix` legs, so nothing was traded away, and the change cost no
+extra runtime: the direct steps replaced the `make` steps that stood there.
+
+The shuffled lane exists because an
 order- or timing-dependent failure makes a required lane go red at random, and
 a lane that is re-run until it is green has stopped being evidence. `go test`
 prints `-test.shuffle <seed>` as the first line of a FAILING package's output
@@ -147,18 +243,23 @@ decision it protects.
 | No credential, signed URL, session id or API key ever reaches a log line | `internal/obs`, `TestRedactionOfEveryValueClass` |
 | Default-deny authorization over the frozen ADR-007 matrix | `internal/authz`, `TestFrozenMatrix` (315 cases) |
 | A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
-| A one-line edit to the **Makefile or its includes** cannot turn every required lane into a no-op (a one-word edit to a workflow's own `make` line still can — see "What these two controls do NOT give you") | `scripts/make-integrity-guard.py`, run as an out-of-make workflow step BEFORE any `make`; `ci-required-guard.py` checks 8–9 assert that step is present, unconditional and not continue-on-error, and that one required lane runs the **unit** suite via `go test ./...` without make. Fixtures under `scripts/testdata/makeguard/` |
+| A lane that is REQUIRED but not on the FLOOR is checked like any other — trigger, continue-on-error, anchor adjacency, pinned make steps, required invocations, provenance | `ci-required-guard.py` runs checks 3, 4, 8, 8b, 8c and 10 over `set(FLOOR_LANES) \| set(required)`; fixture `scripts/testdata/guard/required-not-floor/` |
+| A one-line edit to the **Makefile or its includes**, and any edit to a workflow's own make line, cannot turn a required lane into a no-op | DEFAULT-DENY on the step's SHAPE, not a blacklist of shell spellings. The anchor, `./scripts/make-integrity-guard.sh --workflow`, is **pinned byte-equal** and must be the step IMMEDIATELY before every make step; in that pinned strict mode it refuses, in its own process, a set MAKEFLAGS family, any make recipe variable (MAKELEVEL, …), any variable the makefiles take from the environment (`GO`, `GOFLAGS`, …), MAKEFILES/BASH_ENV/ENV, and a `make` that is not a file named make in a system directory. `ci-required-guard.py` check **8b** requires each make step's `run:` to be **byte-equal** to a literal in `.github/pinned-steps.yml` with no key but name/run/id, refuses a look-alike anchor and a duplicate YAML key, and check **8c** requires the lane to actually RUN its recorded invocations. 75 fixtures under `scripts/testdata/guard/`, `TestMakeIntegrityGuardEnvironment`, plus `scripts/testdata/makeguard/`. **Residual (review-only): what another step does to the machine — a wrapper script, a forwarding `make` binary, a variable outside the anchor's list** |
+| Whatever make did, a real failing test — UNIT **or INTEGRATION** — still fails a required lane | `ci-required-guard.py` check 9 requires a make-free unit AND integration `go test ./...` in a required lane, each **byte-equal to a pinned body**: the exit handling (`\|\| exit 1` on the report, `exit "$rc"` last) is what makes a failing test fail the step, and a substring check could not see it removed (PR#9 VERIFY, FINDING 6). Fixtures `no-direct-test-lane/`, `no-direct-integration-lane/`, `direct-lane-without-report/`, `direct-lane-without-exit-rc/` |
+| A test lane cannot pass having run NOTHING, one package cannot disappear inside the headroom, and its skip count is readable from the job log | the direct steps emit `go test -json`; `scripts/go-test-report.py` judges `go test`'s own exit code, names every failure and skip, fails on any skip not allowlisted by test name with a reason, and holds the count to committed floors in `scripts/test-floors.json` — whole-suite **and one per package, for every package in both suites** (PR#9 VERIFY, FINDING 7). 12 fixtures under `scripts/testdata/gotest/` |
+| An image assertion cannot pass on a `docker run` FAILURE | `scripts/assert-runtime-image.sh` captures and judges every `docker run` exit; `$DOCKER` is injectable, and `scripts/testdata/fakedocker/` drives it against six stub daemons — including `broken-probes-1-3`, which reproduces the shape where main's inline step printed all three reassuring lines and exited 0 |
+| A `--fail-on` that cannot fail is refused, not honoured | `scripts/image-scan-verdict.py` exits 3 on an empty or unrecognised `--fail-on`; `TestImageScanVerdictRefusesAThresholdThatCannotFail` |
 | A variable the contract names keeps that name in every service | `internal/config`, `TestTheContractAndTheLoaderNameTheSameVariable`, which reads `api/search-internal.openapi.yaml`'s own bytes |
 | A retired config name is a production boot refusal, never a silent ignore | `internal/config`, `RetiredKeys`, `TestProductionRefusesARetiredKeyName` |
-| A lane records the tree it actually stood in, not the SHA it was asked about | `scripts/provenance.sh`, called by every required workflow |
+| A lane records the tree it actually stood in, not the SHA it was asked about | `scripts/provenance.sh`, called by every required **job** that checks out — `append-only` included since sweep B1 — and asserted by `ci-required-guard.py` check 10, with fixtures `no-provenance/` and `provenance-conditional/`. It is a control, not a printout: a checkout pinned to the head (no `HEAD^2`) and a mismatched `PR_HEAD_SHA` both exit 1 |
 | An unset or unrecognised visibility DENIES; it is never normalised to public | `internal/authz`, `TestUnknownVisibilityDenies` |
 | A value this repository publishes is never a production secret | `internal/config`, `knownPublishedSecrets`, `TestProductionRefusesPublishedTestKeys` |
 | A crash-looping job is dead-lettered, not left at the head of the claim order | `SweepExpiredLeases`, `TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue` |
 | A merged migration's bytes are frozen | the `append-only` CI job (merge-base diff) + `migration-manifest.sh` + CODEOWNERS |
 | Every doctor verdict is tested | `internal/doctor` (the checks are pure; `cmd/vizra` only does I/O) |
 | The container healthcheck cannot pass while the service it probes is broken | `internal/healthcheck` (the probe reads the service's own `/readyz`, never its own opinion) and `internal/jobs.HealthHandler` (the worker's readiness is the claim loop's progress plus a probe-time PostgreSQL ping, not "the process exists"). Demonstrated end to end in `internal/integration/healthcheck_test.go`, which runs the SHIPPED binaries as separate processes against real PostgreSQL and reads their exit codes |
-| An image-scan lane cannot pass vacuously — scanner error, empty or `null` results, an unrecognised OS, a report about another image, a swallowed exit | `scripts/image-scan-verdict.py`, with its own exit code 3 for "there was no valid scan"; 16 fixtures under `scripts/testdata/imagescan/`, `scripts/imagescan_test.go` |
-| The runtime image carries no toolchain, and the libraries it ships actually load | the runtime stage is `FROM` a clean digest-pinned base (never `FROM vips`, never a purge, no `\|\| true` anywhere in the `Dockerfile`); `docker-build` asserts the toolchain is absent, that `/var/lib/vizra/media` is writable by uid 10001, and that the loader list `vips -l` produces IN THE RUNTIME IMAGE equals the one recorded at build time |
+| An image-scan lane cannot pass vacuously — scanner error, empty or `null` results, an unrecognised OS, a report about another image, a swallowed exit, **or a `--fail-on` that names no failing severity** | `scripts/image-scan-verdict.py`, with its own exit code 3 for "there was no valid scan"; 16 fixtures under `scripts/testdata/imagescan/`, `scripts/imagescan_test.go` |
+| The runtime image carries no toolchain, and the libraries it ships actually load | the runtime stage is `FROM` a clean digest-pinned base (never `FROM vips`, never a purge, no `\|\| true` anywhere in the `Dockerfile`); `docker-build` asserts the toolchain is absent (through `scripts/assert-runtime-image.sh`, which judges every `docker run` exit so the assertion cannot pass on a container that never ran), that `/var/lib/vizra/media` is writable by uid 10001, and that the loader list `vips -l` produces IN THE RUNTIME IMAGE equals the one recorded at build time |
 | migrate-lint, the gate guard and the import lint have their own negative cases | `scripts/scripts_test.go` against `scripts/testdata/` |
 | `last_error` is redacted before it is truncated | `internal/jobs`, `TestLastErrorIsRedactedBeforeItIsStored` |
 | PostgreSQL is the SINGLE clock authority for job eligibility: a "run now" enqueue takes `run_after` from the database, never from the application host | `EnqueueJob`'s `COALESCE(…, now())`, `TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost` |

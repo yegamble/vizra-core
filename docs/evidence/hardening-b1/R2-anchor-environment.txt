@@ -1,0 +1,61 @@
+# R2 — the ANCHOR's own process (fix round 2: R-2 and R-5).
+# source: fc4885bab980660edae8783d32815133e676966a (.github/ and scripts/ clean; only docs/evidence differs); 2026-09-23T03:18:24Z; Darwin/arm64
+#
+# Round 2 chose STRICT vs LENIENT from MAKELEVEL's mere presence. An earlier step can
+# put MAKELEVEL in $GITHUB_ENV, and the lenient blacklist then passed -ki, n and --ign
+# (PR#9 re-verification, R-2). The round-2 version of THIS transcript never injected
+# MAKELEVEL — its only MAKELEVEL rows were `make ci-guard`, where make sets it. This one
+# does. Mode is now chosen by the INVOCATION: `--workflow` is the pinned anchor literal.
+# Every row starts from an environment with all checked variables removed.
+
+== --workflow — exactly as the pinned anchor step invokes it (STRICT) ==
+  control                                      EXIT=0  
+  MAKELEVEL=1 MAKEFLAGS=-ki          (verifier) EXIT=1  the environment has MAKELEVEL='1', and this is the WORKFLOW anchor.
+  MAKELEVEL=1 MAKEFLAGS=n            (verifier) EXIT=1  the environment has MAKELEVEL='1', and this is the WORKFLOW anchor.
+  MAKELEVEL= MAKEFLAGS=--ign         (verifier) EXIT=1  the environment has MAKELEVEL='', and this is the WORKFLOW anchor.
+  MAKELEVEL=1 GNUMAKEFLAGS=-ki       (verifier) EXIT=1  the environment has MAKELEVEL='1', and this is the WORKFLOW anchor.
+  MAKELEVEL=1 MAKEFLAGS=e            (verifier) EXIT=1  the environment has MAKELEVEL='1', and this is the WORKFLOW anchor.
+  MAKELEVEL=1 alone                            EXIT=1  the environment has MAKELEVEL='1', and this is the WORKFLOW anchor.
+  MAKEFLAGS=-i                                 EXIT=1  the environment sets MAKEFLAGS='-i', and this is the WORKFLOW anchor.
+  MAKEFLAGS=--no-such-flag (a blacklist passes it) EXIT=1  the environment sets MAKEFLAGS='--no-such-flag', and this is the WORKFLOW 
+  MAKEFLAGS= (present, empty)                  EXIT=1  the environment sets MAKEFLAGS='', and this is the WORKFLOW anchor.
+  MFLAGS=-i                                    EXIT=1  the environment sets MFLAGS='-i', and this is the WORKFLOW anchor.
+  MAKE_RESTARTS=1                              EXIT=1  the environment has MAKE_RESTARTS='1', and this is the WORKFLOW anchor.
+  MAKEOVERRIDES=SHELL=/usr/bin/true            EXIT=1  the environment has MAKEOVERRIDES='SHELL=/usr/bin/true', and this is the W
+  MAKECMDGOALS=ci                              EXIT=1  the environment has MAKECMDGOALS='ci', and this is the WORKFLOW anchor.
+  GO=true      (Makefile: GO ?= go)            EXIT=1  the environment sets GO='true', and this is the WORKFLOW anchor.
+  GOFLAGS=-run=^$                              EXIT=1  the environment sets GOFLAGS='-run=^$', and this is the WORKFLOW anchor.
+  SQLC=true    (Makefile: SQLC ?= sqlc)        EXIT=1  the environment sets SQLC='true', and this is the WORKFLOW anchor.
+  MAKEFILES=/tmp/x.mk                          EXIT=1  the environment sets MAKEFILES='/tmp/x.mk'.
+  BASH_ENV=/tmp/fn.sh                          EXIT=1  the environment sets BASH_ENV='/tmp/fn.sh'.
+  ENV=/tmp/fn.sh                               EXIT=1  the environment sets ENV='/tmp/fn.sh'.
+  SHELL=/usr/bin/true                          EXIT=1  the environment sets SHELL='/usr/bin/true', which is not a usable shell pr
+  PATH=<stub dir with a make script>:$PATH     EXIT=1  `make` resolves to '/private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn
+  PATH=<dir with make -> /usr/bin/true>:$PATH  EXIT=1  `make` resolves to '/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.6
+  an exported shell function named make        EXIT=1  `make` is a function, not a program on disk (`type -t make` says 'function
+
+  the identity ok line on a clean run says only what it checked (R-5):
+    ok    `make` resolves to /usr/bin/make (type -t: file; real file /usr/bin/make, named make, in an approved system directory). This does not inspect the program's CONTENT: a forwarding stub planted there by an earlier step is outside what this guard can see.
+
+== no argument — `make ci-guard`'s local-parity mode: an ALLOWLIST of make's own exports ==
+  (measured: GNU Make 4.3 on ubuntu:24.04 and 3.81 on this host; the words are recorded
+   beside _ALLOWED_FLAG_WORD in make-integrity-guard.py)
+  control                                      EXIT=0  
+  plain make           MAKEFLAGS=''            EXIT=0  
+  make -j2 (4.3)       ' -j2 --jobserver-auth=3,4' EXIT=0  
+  make -j2 (3.81)      ' --jobserver-fds=3,4 -j' EXIT=0  
+  make -s -w           'sw'                    EXIT=0  
+  MAKEFLAGS=-ki        (verifier)              EXIT=1  the environment sets MAKEFLAGS='-ki'; ['-ki'] is not a flag make itself
+  MAKEFLAGS=n          (verifier)              EXIT=1  the environment sets MAKEFLAGS='n'; ['n'] is not a flag make itself
+  MAKEFLAGS=--ign      (verifier)              EXIT=1  the environment sets MAKEFLAGS='--ign'; ['--ign'] is not a flag make itsel
+  GNUMAKEFLAGS=-ki     (verifier)              EXIT=1  the environment sets GNUMAKEFLAGS='-ki'; ['-ki'] is not a flag make itself
+  GO=go1.27.1  (a developer's own go; reported, not refused) EXIT=0  
+
+== parity through make itself ==
+  make  ci-guard                               EXIT=0
+  make -j2 ci-guard                            EXIT=0
+  make -s ci-guard                             EXIT=0
+  MAKEFLAGS=-i make ci-guard                   EXIT=0
+  ^ -i makes make ignore the recipe's failure, so this exits 0 whatever the guard said.
+    That is WHY the control is the out-of-make, pinned `--workflow` step — the rows at
+    the top of this transcript — and never `make ci-guard`.

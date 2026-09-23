@@ -1,0 +1,187 @@
+# pinned-steps.yml — the DEFAULT-DENY allowlist for the two kinds of step that
+# carry this repository's gate.
+#
+# WHY THIS FILE REPLACED A TOKENISER
+# ----------------------------------
+# Sweep B1 refused a *blacklist* of make flags, variable overrides and
+# MAKEFLAGS-family `env:` by reading each make step's `run:` as shell. A
+# verifier then found THIRTEEN spellings that left both guards green
+# (docs/evidence/warroom/2026-09-21-vizra-core-pr9-hardening-b1-VERIFY.md):
+#
+#   make -j -i ci            `-i` eaten as -j's optional argument
+#   make -l -i ci            same, via --load-average
+#   export MAKEFLAGS=-i      on a line above `make ci` in the same run:
+#   export GNUMAKEFLAGS=-i   same
+#   $GITHUB_ENV write        MAKEFLAGS set by an EARLIER step, for later ones
+#   $GITHUB_PATH write       a stub `make` prepended to PATH
+#   M=make ; $M -i ci        make reached through a variable
+#   ${MAKE:-make} -i ci      same
+#   make(){ :; } ; make ci   a shell function shadowing make
+#   PATH=/tmp/sh:$PATH make  a PATH shadow
+#   echo `make -i ci`        command substitution in backticks
+#   if: always() && false    the step never runs; the job stays green
+#   working-directory:       `-C` by another name — a different Makefile
+#   shell: bash -c '{0}||true'  the step's exit status discarded
+#
+# A blacklist over arbitrary shell cannot be exhaustive: the shell has unbounded
+# ways to name a command. So the control was INVERTED. A step in a floor lane
+# that mentions `make` at all no longer has its flags parsed — it must be
+# BYTE-EQUAL to one of the literals below, and may carry no keys but `name`,
+# `run` and `id`. Eleven of the thirteen change the bytes of the make step or add a key, so they fail
+# that test statically. The other two are $GITHUB_ENV / $GITHUB_PATH writes: refused
+# statically when the writer sits between the anchor and make or IS the anchor step
+# (the anchor below is pinned too), and at RUNTIME by the anchor when the writer is an
+# earlier step and the write sets a variable the anchor checks, or makes `make`
+# resolve outside the approved system directories. The anchor checks where `make`
+# RESOLVES, not the order of PATH.
+#
+# HOW IT IS ENFORCED
+# ------------------
+# scripts/ci-required-guard.py, checks 8b (make steps) and 9 (direct test
+# steps), over `set(FLOOR_LANES) | set(required)`. Comparison is byte-equality
+# after trimming exactly one trailing newline (YAML block scalars keep one).
+#
+# CHANGING THIS FILE
+# ------------------
+# Adding an entry widens what a floor lane may run. It is a deliberate,
+# reviewed edit to a file whose only purpose is to be a gate — the same posture
+# as FLOOR_LANES. It is NOT prevented; it is made visible. One invocation per
+# entry: a multi-command script that mentions make is refused and must be split
+# into its own step, so that every gate invocation is readable on one line.
+
+# --------------------------------------------------------------------------
+# THE ANCHOR. Pinned byte-for-byte exactly like the make steps (fix round 2).
+#
+# Round 2 recognised "the anchor" by SUBSTRING — any step whose text contained
+# `make-integrity-guard` — and never compared its body to anything. So the step
+# immediately before `make ci` could be the real guard followed by a write
+# (`… && echo MAKEFLAGS=-i >> "$GITHUB_ENV"`), or a no-op that merely named it
+# (`: make-integrity-guard`), and adjacency was satisfied while the write
+# reached make and not the guard (PR#9 re-verification, FINDING R-1, N1–N4).
+#
+# Now: the step immediately before each make step must BE this literal, carrying
+# no key but name/run/id, and a step anywhere in a floor lane that mentions
+# `make-integrity-guard` without being byte-equal to it is refused.
+#
+# `--workflow` is load-bearing, not decoration. It selects the anchor's STRICT
+# environment mode — chosen by the invocation, never by the environment (R-2).
+# `make ci-guard` invokes the script without it; that path is not a control, and
+# no floor lane can use it, because it is not byte-equal to this pin.
+# --------------------------------------------------------------------------
+anchor_step: |
+  ./scripts/make-integrity-guard.sh --workflow
+
+# --------------------------------------------------------------------------
+# MAKE STEPS. Exactly the make invocations that exist today. No flags, no
+# variable overrides, no chains, no redirection.
+# --------------------------------------------------------------------------
+make_steps:
+  - |
+    make tidy-check
+  - |
+    make ci
+  - |
+    make build
+  - |
+    make test-integration
+  - |
+    make test-integration-shuffle
+  - |
+    make fixtures
+  - |
+    make fixtures-verify
+  - |
+    make govulncheck
+
+# --------------------------------------------------------------------------
+# DIRECT TEST STEPS. The second layer: whatever `make ci` did, a real failing
+# test still fails a required lane.
+#
+# The exit handling is load-bearing and is why these are pinned too. The
+# verifier's FINDING 6 was a REGRESSION against main: because the step captures
+# `go test`'s status into `$rc`, deleting the single `go-test-report.py` line
+# left a planted `t.Fatal` exiting 0 while check 9 still printed `ok`. Two
+# things fix it, and both are inside these bytes:
+#
+#   * `|| exit 1` on the report — the report's own verdict fails the step;
+#   * `exit "$rc"` as the LAST command — `go test`'s own non-zero exit fails
+#     the step even if the report line were removed.
+#
+# Pinning the whole body means removing or editing either line is RED by name.
+# --------------------------------------------------------------------------
+direct_test_steps:
+  - |
+    set -uo pipefail
+    rc=0
+    go test -race -count=1 -json ./... > unit-events.json || rc=$?
+    echo "$rc" > unit-exit.txt
+    echo "go test (unit) exited $rc"
+    python3 scripts/go-test-report.py \
+      --events unit-events.json --suite unit \
+      --floors scripts/test-floors.json --go-exit-file unit-exit.txt || exit 1
+    exit "$rc"
+  - |
+    set -uo pipefail
+    if [ -z "${VIZRA_TEST_DATABASE_URL:-}" ]; then
+      echo "::error::VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."
+      exit 1
+    fi
+    rc=0
+    go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+    echo "$rc" > int-exit.txt
+    echo "go test (integration) exited $rc"
+    python3 scripts/go-test-report.py \
+      --events int-events.json --suite integration \
+      --floors scripts/test-floors.json --go-exit-file int-exit.txt || exit 1
+    exit "$rc"
+  - |
+    set -uo pipefail
+    rc=0
+    go test -race -count=1 -shuffle=on -tags=integration -json ./... > int-shuffle-events.json || rc=$?
+    echo "$rc" > int-shuffle-exit.txt
+    echo "go test (integration, shuffled) exited $rc"
+    python3 scripts/go-test-report.py \
+      --events int-shuffle-events.json --suite integration \
+      --floors scripts/test-floors.json --go-exit-file int-shuffle-exit.txt || exit 1
+    exit "$rc"
+
+# --------------------------------------------------------------------------
+# REQUIRED INVOCATIONS — the POSITIVE half of the control.
+#
+# Pinning the SHAPE of a make step stops a step being turned into something
+# else. It does not stop one being DELETED, or replaced by a step that reaches
+# make by an indirection the classifier cannot see:
+#
+#     M=make ; $M -i ci          ${MAKE:-make} -i ci
+#
+# Neither carries a `make` token, so neither is classified as a make step and
+# neither is pinned — but both leave the lane with no `make ci` step at all.
+# So the guard also asserts, per lane, that the gate invocations below are
+# PRESENT, byte-equal, as steps of that job. Deleting or replacing one is RED
+# whatever replaced it, because the assertion is about what MUST be there
+# rather than about what must not.
+#
+# Keyed by the job's display name, matched against the job named by the lane
+# and every job it transitively `needs`.
+# --------------------------------------------------------------------------
+required_invocations:
+  build-test:
+    - |
+      make tidy-check
+    - |
+      make ci
+    - |
+      make build
+  cache-matrix-leg:
+    - |
+      make test-integration
+    - |
+      make test-integration-shuffle
+  fixtures:
+    - |
+      make fixtures
+    - |
+      make fixtures-verify
+  govulncheck:
+    - |
+      make govulncheck

@@ -1,0 +1,298 @@
+# D1 — item 1: a floor lane's make step cannot be no-opped from the workflow line.
+# Mutations applied to the REAL .github/workflows/build-test.yml at 6b25fc5e724921840eea9c6d6ea17d06f84be83c.
+# The harness aborts unless the digest moved and the restore is byte-identical.
+# Compare B0-baseline-four-spellings.txt, where the first four each exited 0.
+# host: Darwin/arm64  make: GNU Make 3.81  python3: Python 3.9.6
+
+== control: the unmodified tree ==
+ci-required-guard.sh      EXIT=0 (expect 0)
+make-integrity-guard.sh   EXIT=0 (expect 0)
+
+==============================================================
+MUTATION: D1: run: make -i ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -i ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  7f8c0475cac8adaa579453cc4be22070809eb5b1104fb8d54936bf93cb6aeb14
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '-i' carries -i — -i/--ignore-errors: every recipe's failure is ignored and make exits 0
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make -i ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make SHELL=/usr/bin/true ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make SHELL=/usr/bin/true ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  0ae4a3f9f6e955c06b4779e12a1a5ababf345f6fff20d8d0289c872ef5950ee3
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make SHELL=/usr/bin/true ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make MAKEFLAGS=-i ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make MAKEFLAGS=-i ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  3f9a01fd5876310035837d26f859205b86090a0b2c98d72f4d63457f75c9f278
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make MAKEFLAGS=-i ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make ci SHELL=/usr/bin/true
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make ci SHELL=/usr/bin/true\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  a7ff127ccbd5195e752405f4cce60ea40b7ea03f3a9d7d4007967957e26b8fd0
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make ci SHELL=/usr/bin/true -> exit 1
+
+==============================================================
+MUTATION: D1: run: make --ign ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make --ign ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  afae4ea49e200c04560e4a19f07032bc7bea9ee591175c08e9ef47a3cff1d194
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '--ign' — -i/--ignore-errors: every recipe's failure is ignored and make exits 0
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make --ign ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make --dry ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make --dry ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  6b2d2371737e9d8e68669379fcc4c1d20a1f1b520af55617c699eb67ed164f0b
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '--dry' — -n/--dry-run: recipes are printed, not executed
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make --dry ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make -srik ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -srik ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  a5a4c06e915e129211452d67831246afd656ab22b4d8cedd1aad7cdf01a847ef
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '-srik' carries -i — -i/--ignore-errors: every recipe's failure is ignored and make exits 0
+        '-srik' carries -k — -k/--keep-going: make carries on past a failed target instead of stopping at it
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make -srik ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make -f build/other.mk ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -f build/other.mk ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  062a39495a989dc6316923dc35beee7677e87557f09e7cb8169160fac2239a5c
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '-f' carries -f — -f/--file: make reads a DIFFERENT makefile from the one make-integrity-guard read
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make -f build/other.mk ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: make -C build ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: make -C build ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  9a3abbeea7e787f8f85eefb7d359af01676317b21dfc9062b0956f0588a94ca5
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '-C' carries -C — -C/--directory: make changes directory first, so it reads a different makefile
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: make -C build ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: bash -c \"make -i ci\"
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: bash -c \"make -i ci\"\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  99d0bb4e58d3e2454b418714c7f41a6b52da5754a804b70f1cee7a3054d521ae
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: bash -c \"make -i ci\" -> exit 1
+
+==============================================================
+MUTATION: D1: run: env MAKEFLAGS=-i make ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: env MAKEFLAGS=-i make ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  a13c5f64d1eb09c821a6396ae730d10e15a312204dd2eb574d51eaafe1ee5844
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: env MAKEFLAGS=-i make ci -> exit 1
+
+==============================================================
+MUTATION: D1: run: go build ./... \&\& make --keep-going ci
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();assert s.count('        run: make ci\n')==1;io.open(p,'w').write(s.replace('        run: make ci\n','        run: go build ./... \&\& make --keep-going ci\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  82db9131b22552c139cdea1fc4a399e30fc4cffcba7171f54ddd7b7d5f5c258a
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' no-ops `make` from the WORKFLOW LINE:
+        '--keep-going' — -k/--keep-going: make carries on past a failed target instead of stopping at it
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: run: go build ./... \&\& make --keep-going ci -> exit 1
+
+==============================================================
+MUTATION: D1: step-level env: MAKEFLAGS: -i
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='      - name: make ci\n        run: make ci\n';new='      - name: make ci\n        env:\n          MAKEFLAGS: -i\n        run: make ci\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  1b13ebc3f38e04ad77c9889d961a2a60cd90cca934c09fd645a9eef109387913
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) step 'make ci' env sets MAKEFLAGS: '-i' on a `make` step.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: step-level env: MAKEFLAGS: -i -> exit 1
+
+==============================================================
+MUTATION: D1: job-level env: GNUMAKEFLAGS: --ignore-errors
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='  build-test:\n    name: build-test\n';new='  build-test:\n    name: build-test\n    env:\n      GNUMAKEFLAGS: --ignore-errors\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  d5f2570273f39ba25dec355ab6c6c021bab3c64a346ac62d4b22e6a501d7ee30
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) job-level env sets GNUMAKEFLAGS: '--ignore-errors', and this job invokes `make`.
+        A job- or workflow-level env reaches every step, so it no-ops the make steps
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: job-level env: GNUMAKEFLAGS: --ignore-errors -> exit 1
+
+==============================================================
+MUTATION: D1: workflow-level env: MAKEFILES: build/extra.mk
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();old='permissions:\n  contents: read\n';new='permissions:\n  contents: read\nenv:\n  MAKEFILES: build/extra.mk\n';assert s.count(old)==1;io.open(p,'w').write(s.replace(old,new))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  45f61271fd483e18bad17bf13f70c599f92f7ca423569daf96a16ccf878cb86f
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) workflow-level env sets MAKEFILES: 'build/extra.mk', and this job invokes `make`.
+        A job- or workflow-level env reaches every step, so it no-ops the make steps
+  FAIL  checked lane 'cache-matrix -> needs:cache-matrix-leg' (build-test.yml) workflow-level env sets MAKEFILES: 'build/extra.mk', and this job invokes `make`.
+        A job- or workflow-level env reaches every step, so it no-ops the make steps
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: workflow-level env: MAKEFILES: build/extra.mk -> exit 1
+
+==============================================================
+MUTATION: D1: an untokenisable run: (unbalanced quote) is a FAILURE, not a skip
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "import io;p='.github/workflows/build-test.yml';s=io.open(p).read();io.open(p,'w').write(s.replace('        run: make ci\n','        run: make ci \\\"oops\n'))"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|no-ops|env sets|  +["'\''-]' | head -8; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  ced38c9c3cb479aa245f8727ffd339b1d08750357ad0b418e3415c7e0636d4c8
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'build-test' (build-test.yml) has a `make` step 'make ci' whose `run:` cannot be tokenised as shell: No closing quotation (line: 'make ci "oops')
+        FAILURE, not a skip — otherwise unbalanced quotes would be a way to hide the argv.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D1: an untokenisable run: (unbalanced quote) is a FAILURE, not a skip -> exit 1
+
+== control again, after every restore ==
+ci-required-guard.sh      EXIT=0 (expect 0)
+git status --porcelain: [ M docs/evidence/hardening-b1/D1-workflow-line.txt]

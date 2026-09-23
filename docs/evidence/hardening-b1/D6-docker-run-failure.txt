@@ -1,0 +1,60 @@
+# D6 (CORRECTED) — item 6: docker-build's image assertions cannot pass on a
+#                 `docker run` FAILURE.
+# tree: e710c3cff18bd63c87a692937b608fa762627d99 (working tree)
+#
+# WHAT THE FIRST VERSION OF THIS TRANSCRIPT GOT WRONG (PR#9 VERIFY, FINDING 5).
+# It claimed main's inline shape, "run verbatim against a stub daemon that exits
+# 125", exits 0. It does not: it exits 125. The middle assertion
+# (`devpkgs=$(docker run …)`) has no `|| true` on the OUTER command substitution,
+# so under the step's own `set -euo pipefail` a 125 there KILLS the step. The
+# transcript showed neither that error nor the "no -dev packages installed" line a
+# success would print. The number was stronger than the thing being demonstrated.
+#
+# WHAT PR#7's FINDING 1 ACTUALLY CLAIMED, quoted: the step "prints 'no build
+# tooling on PATH' and PASSES" — a claim about that ASSERTION, not about the
+# step's exit code. Severity SHOULD, and the verifier called it "defence in depth,
+# not a live hole". That claim is true and is what is reproduced below.
+
+== main's inline shape at 5eb2829, extracted with a YAML parser, run verbatim ==
+  extracted       30 lines from 5eb2829:.github/workflows/docker-build.yml
+  (the step named 'Assert the toolchain is absent from the runtime image')
+
+-- stub: scripts/testdata/fakedocker/broken
+     checking for: gcc cc g++ cpp ld as ar make cmake meson ninja pkg-config pkgconf curl wget xz go git 
+     docker: Error response from daemon: no such image
+     no build tooling on PATH
+     docker: Error response from daemon: no such image
+   OLD SHAPE EXIT=125
+
+-- stub: scripts/testdata/fakedocker/broken-probes-1-3
+     checking for: gcc cc g++ cpp ld as ar make cmake meson ninja pkg-config pkgconf curl wget xz go git 
+     docker: Error response from daemon: no such image
+     no build tooling on PATH
+     no -dev packages installed
+     docker: Error response from daemon: no such image
+     no /src
+   OLD SHAPE EXIT=0
+
+  So: against `broken` (every probe fails) main's step exits 125 — the verifier is
+  right and my first transcript was wrong. Against `broken-probes-1-3` (probes 1
+  and 3 fail, the dpkg probe succeeds) it prints ALL THREE reassuring lines and
+  EXITS 0. That is the defect: assertions 1 and 3 each pass on a docker failure.
+
+== the NEW script, same two stubs, plus the four others ==
+  clean                EXIT=0  assert-runtime-image: ok — vizra-core:ci carries no toolchain, no -dev packages and 
+  broken               EXIT=1  ::error::assert-runtime-image: the container did not run while checking the build to
+  broken-probes-1-3    EXIT=1  ::error::assert-runtime-image: the container did not run while checking the build to
+  has-toolchain        EXIT=1  ::error::assert-runtime-image: the runtime image carries build tooling:
+  has-src              EXIT=1  ::error::assert-runtime-image: the libvips source tree is still in the runtime image
+  weird-exit           EXIT=1  ::error::assert-runtime-image: the container did not run while checking /src (docker
+
+== the named tests, in the required `scripts` package ==
+  --- PASS: TestAssertRuntimeImageFixtures (0.92s)
+      --- PASS: TestAssertRuntimeImageFixtures/clean (0.25s)
+      --- PASS: TestAssertRuntimeImageFixtures/broken (0.16s)
+      --- PASS: TestAssertRuntimeImageFixtures/broken-probes-1-3 (0.08s)
+      --- PASS: TestAssertRuntimeImageFixtures/has-toolchain (0.07s)
+      --- PASS: TestAssertRuntimeImageFixtures/has-src (0.14s)
+      --- PASS: TestAssertRuntimeImageFixtures/weird-exit (0.21s)
+  --- PASS: TestAssertRuntimeImageRefusesAVacuousDenylist (0.15s)
+  ok  	github.com/yegamble/vizra-core/scripts	1.519s

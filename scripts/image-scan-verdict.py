@@ -23,18 +23,28 @@ So this script takes the scanner's exit code as an INPUT it must judge, and
 asserts the report describes the image the lane meant to scan, produced by the
 scanner, over a distribution the scanner recognised. Only then does it count.
 
+And the VERDICT'S OWN threshold can be vacuous: an empty `--fail-on` names no
+failing severity, so every finding is compared against an empty set and the lane
+reports clean over a CRITICAL. That is refused too (sweep B1; PR#7 VERIFY,
+FINDING 2).
+
 Exit codes
   0   scanned, and nothing at or above the failing severities
   1   scanned, and there are findings at or above the failing severities
   3   THE LANE DID NOT PRODUCE A VALID SCAN — scanner error, missing, empty,
-      malformed, vacuous, or a report about the wrong image. Not a findings
-      verdict: nobody may read this as "clean".
+      malformed, vacuous, a report about the wrong image, or a `--fail-on` that
+      cannot fail. Not a findings verdict: nobody may read this as "clean".
 
 Usage
   image-scan-verdict.py --report trivy-image.json --image-ref vizra-core:scan
                         --scanner-exit-code-file trivy-exit-code.txt
                         [--fail-on HIGH,CRITICAL]
-                        [--min-packages N]
+                        [--min-results N]
+
+`--min-results` counts result SECTIONS, not packages: the lane does not pass
+`--list-all-pkgs`, so there is no package inventory in the report to count. The
+name is the honest one; an earlier version of this docstring advertised a
+`--min-packages N` that does not exist (PR#7 VERIFY, recorded observations).
 """
 
 from __future__ import annotations
@@ -76,6 +86,21 @@ def main() -> int:
     unknown = fail_on - set(SEVERITY_ORDER)
     if unknown:
         die(f"--fail-on names severities Trivy does not use: {sorted(unknown)}")
+    # An EMPTY set has no unknown members, so the check above passes it, and
+    # `sev in fail_on` is then never true: the one script whose whole thesis is
+    # "a scan lane must not pass vacuously" passed vacuously over a CRITICAL.
+    # Measured at 5eb2829 against this repository's own `findings` fixture:
+    # `--fail-on ''` and `--fail-on ','` both exited 0 with "found nothing at or
+    # above []" while the report carried 1 CRITICAL (PR#7 VERIFY, FINDING 2).
+    # It is reachable by a one-character edit to image-scan.yml:126.
+    if not fail_on:
+        die(
+            f"--fail-on is empty ({args.fail_on!r}); a verdict with no failing severities "
+            f"cannot fail.",
+            "Every finding would be counted and then compared against an empty set, so the",
+            "lane would report a clean bill of health over a CRITICAL. Name at least one of",
+            f"{SEVERITY_ORDER}.",
+        )
 
     # --- 0. the scanner's own exit code, judged rather than discarded -------
     if not args.scanner_exit_code_file.is_file():

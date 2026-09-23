@@ -1,0 +1,56 @@
+# D5 — item 5: append-only's provenance step, and the CONTROL that makes it one.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c
+
+== the step is present and unconditional in every checked lane that checks out ==
+  build-test.yml         append-only        checkout=True  provenance=True  conditional=False
+  build-test.yml         build-test         checkout=True  provenance=True  conditional=False
+  build-test.yml         cache-matrix-leg   checkout=True  provenance=True  conditional=False
+  build-test.yml         cache-matrix       checkout=False provenance=False conditional=False
+  ci-required.yml        ci-required        checkout=True  provenance=True  conditional=False
+  docker-build.yml       docker-build       checkout=True  provenance=True  conditional=False
+  fixtures.yml           fixtures           checkout=True  provenance=True  conditional=False
+  govulncheck.yml        govulncheck        checkout=True  provenance=True  conditional=False
+  image-scan.yml         image-scan         checkout=True  provenance=True  conditional=False
+
+== the CONTROL: a fabricated merge ref in a throwaway repository ==
+  base      = 0f12071417d603771007e2c5d61246a375913c69
+  head      = f6dbcd4f6427e670e91875822b7f82815c11270e
+  merge ref = 5afab0a92734c58c23a68c24abd66c60c0dc5962   (HEAD^1=base, HEAD^2=head — the shape refs/pull/N/merge has)
+
+  (a) CORRECT: PR_HEAD_SHA == HEAD^2
+      EXIT=0   (expect 0)
+      checked: HEAD^2 == the PR head SHA, so this really is the merge ref.
+
+  (b) MISMATCHED HEAD: PR_HEAD_SHA names a different commit
+      EXIT=1   (expect 1)
+      ::error::HEAD^2 (f6dbcd4f6427e670e91875822b7f82815c11270e) is not the PR head SHA (0f12071417d603771007e2c5d61246a375913c69). The checkout is not the
+
+  (c) PINNED TO THE HEAD: the checkout IS the head commit, so there is no HEAD^2
+      EXIT=1   (expect 1)
+      ::error::HEAD has no second parent, so this checkout is NOT refs/pull/N/merge — most
+
+== and the guard refuses a checked lane that checks out with no provenance step ==
+==============================================================
+MUTATION: D5: delete append-only's provenance step
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "
+import io
+p='.github/workflows/build-test.yml'; s=io.open(p).read()
+a=s.index('      # This lane computes a merge base and ECHOES A SHA')
+b=s.index('      - name: Merged migrations are frozen')
+io.open(p,'w').write(s[:a]+s[b:])"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|provenance' | head -4; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  84a859767a96e93c17cb4a4bd7dcbd4d52d9b1f221fe9340b4dece91389beb5a
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  checked lane 'append-only' (build-test.yml) checks the repository out and has NO scripts/provenance.sh step.
+ci-required-guard: FAILED
+  ok    checked lane 'build-test' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'cache-matrix' performs no checkout, so it needs no provenance step
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D5: delete append-only's provenance step -> exit 1
+

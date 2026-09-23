@@ -1,0 +1,16 @@
+# REQUIRED but absent from FLOOR_LANES. Before sweep B1 the guard gave this
+# lane one line — "ok … resolves to a job" — and never looked at it.
+name: extra
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  extra-lane:
+    name: extra-lane
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: make -i ci

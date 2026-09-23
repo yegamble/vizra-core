@@ -41,6 +41,18 @@ jobs:
           # The whole history: a merge-base diff needs more than a shallow clone.
           fetch-depth: 0
 
+      # This lane computes a merge base and ECHOES A SHA, and until sweep B1 it
+      # did so without saying which tree it was standing in — the exact shape of
+      # meta-PR3 FINDING 5, and the last required lane that still had it
+      # (PR#6 VERIFY, FINDING 4). `provenance.sh` is a control, not a printout:
+      # it exits 1 when the checkout is pinned to the head (no HEAD^2) and when
+      # HEAD^2 is not the PR head SHA. scripts/ci-required-guard.py check 10 now
+      # asserts every checked lane that checks out also runs it.
+      - name: Provenance — which tree this lane tested
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/provenance.sh
+
       - name: Merged migrations are frozen
         env:
           # On pull_request this is the target branch. On merge_group the queue
@@ -97,6 +109,13 @@ jobs:
 
   build-test:
     name: build-test
+    # Job-level, not step-level: a pinned make step and a pinned direct test
+    # step may carry no key but name/run/id, so their environment lives here
+    # where ci-required-guard checks it against the MAKEFLAGS/PATH/SHELL family.
+    env:
+      VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+      VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+      VIZRA_TEST_CACHE_FLAVOUR: valkey
     # GitHub-hosted ubuntu-24.04 is the clean target (ADR-009). The owner's
     # machine is arm64 and is not a substitute.
     runs-on: ubuntu-24.04
@@ -184,34 +203,56 @@ jobs:
       # moving it down turns `ci-required` red.
       # ---------------------------------------------------------------
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: go.mod and go.sum are tidy
         run: make tidy-check
 
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: make ci
         run: make ci
 
       # ---------------------------------------------------------------
-      # THE SECOND LAYER: the unit suite, run DIRECTLY, with no make.
+      # THE SECOND LAYER: the suites, run DIRECTLY, with no make.
       #
-      # The anchor above refuses a neutered Makefile by name. This step is
+      # The anchor above refuses a neutered Makefile by name. These steps are
       # the control for the case the anchor cannot cover: whatever `make ci`
-      # did or did not do, the suite runs here and a real failing test fails
-      # this required lane. Every other test invocation in this repository
-      # goes through a make recipe, so before this step a no-opped make made
-      # the whole suite SILENT rather than red.
+      # did or did not do, the suites run here and a real failing test fails
+      # this required lane.
       #
-      # It duplicates `make ci`'s `test-race` deliberately — the duplication
-      # IS the control, and costs one unit-suite run. scripts/ci-required-
-      # guard.py asserts a step like this exists in a floor lane, invokes
-      # `go test` without `make`, and covers `./...`.
+      # `-json` plus scripts/go-test-report.py is sweep B1's other half. A bare
+      # `go test ./...` exits 0 having run NOTHING — measured at 5eb2829 with
+      # every *_test.go moved aside (PR#6 VERIFY, FINDING 3) — and a
+      # non-verbose `go test` prints nothing at all for a SKIPPED test, so no
+      # lane here could corroborate a skip count (PR#7 VERIFY, § 1). The report
+      # judges `go test`'s own exit code, names every failure and every skip,
+      # holds the executed count to a committed floor in scripts/test-floors.json,
+      # and prints the counts into this log.
       # ---------------------------------------------------------------
-      - name: Unit suite, invoked directly (no make)
-        run: go test -race -count=1 ./...
+      - name: Unit suite, invoked directly (no make), with counts
+        run: |
+          set -uo pipefail
+          rc=0
+          go test -race -count=1 -json ./... > unit-events.json || rc=$?
+          echo "$rc" > unit-exit.txt
+          echo "go test (unit) exited $rc"
+          python3 scripts/go-test-report.py \
+            --events unit-events.json --suite unit \
+            --floors scripts/test-floors.json --go-exit-file unit-exit.txt || exit 1
+          exit "$rc"
 
       - name: ci-required guard
         run: ./scripts/ci-required-guard.sh
+
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: Build all three entry points
         run: make build
@@ -219,14 +260,7 @@ jobs:
       - name: vizra version
         run: ./bin/vizra version
 
-      # A migration-lane that never touched a database would be a lie. This runs
-      # the embedded migrator against real PostgreSQL 18 on an EMPTY database
-      # (VZ-FOUND-003 success case).
-      - name: Integration tests (PostgreSQL 18 + Valkey)
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: valkey
+      - name: Start Valkey for the integration suites
         run: |
           set -euo pipefail
           # Valkey 9.1.2, digest resolved 2026-09-20 (ADR-001). Run here rather
@@ -240,28 +274,72 @@ jobs:
             sleep 1
           done
           docker exec vizra-cache valkey-cli ping | grep -q PONG
-          make test-integration
+
+      # A migration-lane that never touched a database would be a lie. This runs
+      # the embedded migrator against real PostgreSQL 18 on an EMPTY database
+      # (VZ-FOUND-003 success case).
+      #
+      # INVOKED DIRECTLY, with no make, from sweep B1. Until then EVERY
+      # integration invocation in this repository went through a make recipe, so
+      # under any make evasion a failing INTEGRATION test — the migrator against
+      # real PostgreSQL 18, the permanent Valkey/Redis-7.2 matrix ADR-001 Q-004
+      # exists for — was SILENT, not red (PR#6 VERIFY, FINDING 2). This is the
+      # same package set (`./...`), the same flags (`-race -count=1
+      # -tags=integration`) and the same services as the `test-integration`
+      # recipe; that recipe keeps its own required coverage in both cache-matrix
+      # legs below, so nothing is traded away. It costs NO extra runtime: this
+      # step replaces the recipe invocation that used to stand here.
+      - name: Integration suite, invoked directly (no make), with counts
+        run: |
+          set -uo pipefail
+          if [ -z "${VIZRA_TEST_DATABASE_URL:-}" ]; then
+            echo "::error::VIZRA_TEST_DATABASE_URL is not set. This lane is BLOCKED, not passed."
+            exit 1
+          fi
+          rc=0
+          go test -race -count=1 -tags=integration -json ./... > int-events.json || rc=$?
+          echo "$rc" > int-exit.txt
+          echo "go test (integration) exited $rc"
+          python3 scripts/go-test-report.py \
+            --events int-events.json --suite integration \
+            --floors scripts/test-floors.json --go-exit-file int-exit.txt || exit 1
+          exit "$rc"
 
       # The SAME suite in a random permutation. Verifier FINDING V-1 was an
       # order- and timing-dependent failure that the fixed source order exposed
       # only sometimes; a lane that can go red at random gets re-run until
       # green, and at that point it has stopped being evidence. The seed is in
       # the log, so a failing permutation is reproducible with -shuffle=<seed>.
-      - name: Integration tests, shuffled order (PostgreSQL 18 + Valkey)
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: valkey
-        run: make test-integration-shuffle
+      - name: Integration suite, shuffled order, invoked directly (no make)
+        run: |
+          set -uo pipefail
+          rc=0
+          go test -race -count=1 -shuffle=on -tags=integration -json ./... > int-shuffle-events.json || rc=$?
+          echo "$rc" > int-shuffle-exit.txt
+          echo "go test (integration, shuffled) exited $rc"
+          python3 scripts/go-test-report.py \
+            --events int-shuffle-events.json --suite integration \
+            --floors scripts/test-floors.json --go-exit-file int-shuffle-exit.txt || exit 1
+          exit "$rc"
 
-      - name: Upload the test log
+      # The machine-readable event streams the counts above were read from, so
+      # a reviewer can re-derive them rather than trusting the summary. The
+      # previous version of this step published `bin/` under the name
+      # "build-test-logs" and no test log at all (PR#7 VERIFY, recorded
+      # observations).
+      - name: Upload the test event streams
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: build-test-logs
+          name: build-test-events-${{ github.sha }}
           path: |
-            bin/
-          if-no-files-found: ignore
+            unit-events.json
+            int-events.json
+            int-shuffle-events.json
+            unit-exit.txt
+            int-exit.txt
+            int-shuffle-exit.txt
+          if-no-files-found: warn
           retention-days: 7
 
   # ADR-001 Q-004: go-redis publishes no Valkey support statement and Valkey
@@ -270,6 +348,13 @@ jobs:
   # Redis-using code, for the life of the project.
   cache-matrix-leg:
     name: cache-matrix-leg
+    # Job-level, not step-level: a pinned make step and a pinned direct test
+    # step may carry no key but name/run/id, so their environment lives here
+    # where ci-required-guard checks it against the MAKEFLAGS/PATH/SHELL family.
+    env:
+      VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
+      VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
+      VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -360,24 +445,21 @@ jobs:
       # moving it down turns `ci-required` red.
       # ---------------------------------------------------------------
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: Integration tests against ${{ matrix.flavour }}
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration
 
       # See the shuffled step in build-test: order dependence is checked on
       # BOTH cache flavours, because an order-dependent failure that only
       # appears against one server is exactly the kind of thing this permanent
       # matrix exists to catch (ADR-001 Q-004).
+      # The anchor is IMMEDIATELY before every make step: anything running
+      # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
+      # $GITHUB_PATH, which GitHub applies to LATER steps only.
+      - name: Refuse a neutered Makefile
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: Integration tests against ${{ matrix.flavour }}, shuffled order
-        env:
-          VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
-          VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
-          VIZRA_TEST_CACHE_FLAVOUR: ${{ matrix.flavour }}
         run: make test-integration-shuffle
 
   # The aggregate. `ci-required` requires the context `cache-matrix`; GitHub

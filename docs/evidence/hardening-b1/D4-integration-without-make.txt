@@ -1,0 +1,72 @@
+# D4 — item 4: the integration suite has a path to red that does not run through make.
+# tree: 6b25fc5e724921840eea9c6d6ea17d06f84be83c   services: my own vzb1-pg (55611) / vzb1-cache (63911)
+
+== GREEN: the REAL lane command from build-test.yml, with no make anywhere ==
+go test (integration) exited 0
+go-test-report: suite 'integration' from vzb1-i.json
+  packages ok:              15
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1092  (floor: 940)
+    top-level:              225
+    passed:                 1092
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+  github.com/yegamble/vizra-core/internal/integration: 45 test(s) (floor: 40)
+go-test-report: ok — 1092 test(s) executed across 15 package(s), 0 unexpected skips, floor 940 met
+report EXIT=0
+
+== RED: the direct integration step DELETED from the workflow ==
+==============================================================
+MUTATION: D4: delete the direct integration step
+  file:   .github/workflows/build-test.yml
+  mutate: python3 -c "
+import io,re
+p='.github/workflows/build-test.yml'; s=io.open(p).read()
+a=s.index('      - name: Integration suite, invoked directly (no make), with counts')
+b=s.index('      # The SAME suite in a random permutation')
+c=s.index('      - name: Integration suite, shuffled order, invoked directly (no make)')
+d=s.index('      # The machine-readable event streams')
+io.open(p,'w').write(s[:a]+s[b:c]+s[d:])"
+  check:  ./scripts/ci-required-guard.sh 2>&1 | grep -E 'FAIL|INTEGRATION' | head -5; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  sha256 AFTER:  a150a679dfe9ffc9ccf62d23f2fd937c7d015e462c1d164bb62646f13344d6fd
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+  FAIL  no required lane runs the INTEGRATION suite directly; every integration test invocation goes through `make`.
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 9ae42ceb784c889c56e55df10c2c44bb955419c126069aa88167457e890b9b12
+  restore byte-identical: yes
+  RESULT: D4: delete the direct integration step -> exit 1
+
+
+== RED: internal/integration EMPTIED — the per-package floor, not the suite floor ==
+(the whole-suite count would still be ~1047 of a 940 floor, comfortably clear)
+integration test files: 2, list sha256 3980f322d295628295cf38ee905b06eaa388c76fb331e39bdaea538a1816e965
+go test (integration) exited 0   <-- 0
+go-test-report: suite 'integration' from vzb1-ie.json
+  packages ok:              14
+  packages failed:          0
+  packages [no test files]: 8
+  tests executed:           1047  (floor: 940)
+    top-level:              194
+    passed:                 1047
+    failed:                 0
+    skipped:                0
+  `go test` exit code:      0
+  github.com/yegamble/vizra-core/internal/integration: 0 test(s) (floor: 40)
+::error::go-test-report: package github.com/yegamble/vizra-core/internal/integration executed 0 test(s); its recorded floor is 40.
+         This suite is a superset — emptying one package would barely move the whole-suite
+         count. This per-package floor is what makes that package's absence red.
+go-test-report: FAILED (1 problem(s))
+report EXIT=1   <-- RED on the per-package floor
+restore byte-identical: yes
+git status --porcelain internal/: []
+
+# NOTE on the mutation above: it removes BOTH direct integration steps (the
+# primary and the shuffled one). Removing only one leaves the other satisfying
+# check 9, which is correct — the check asks for A make-free invocation, not a
+# specific step. The red above is the state where none remains.

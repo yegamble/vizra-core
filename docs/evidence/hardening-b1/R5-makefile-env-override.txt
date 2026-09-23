@@ -1,0 +1,34 @@
+# R5 — found while fixing round 2 (not reported by the verifier): the Makefile takes
+#      six variables FROM the environment, and round 2's anchor checked none of them.
+# Run in a scratch COPY (rsync, no .git) of the chore/m0-hardening-b1 working tree,
+# so the checkout's internal/ is never touched. source: fc4885bab980660edae8783d32815133e676966a. 2026-09-23T03:20:22Z; Darwin/arm64
+
+== the Makefile's `?=` assignments (`?=` means the ENVIRONMENT wins) ==
+  Makefile:15:GO          ?= go
+  Makefile:16:SQLC        ?= sqlc
+  Makefile:17:GOFLAGS     ?=
+  Makefile:21:RELEASE     ?= dev
+  Makefile:22:COMMIT      ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+  Makefile:23:BUILT_AT    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+== a failing test planted in internal/site (in the copy) ==
+  make test-race                         EXIT=2  1 line(s) mention the planted failure
+  GO=true make test-race                 EXIT=0  <-- `true test -race …`: the gate ran nothing
+  GOFLAGS=-run=^$ make test-race         EXIT=0  <-- go reads GOFLAGS directly: no test selected
+
+== the anchor, as the pinned step invokes it ==
+  GO=true         anchor --workflow  EXIT=1  the environment sets GO='true', and this is the WORKFLOW anc
+  GOFLAGS=-run=^$ anchor --workflow  EXIT=1  the environment sets GOFLAGS='-run=^$', and this is the WORK
+  (clean)         anchor --workflow  EXIT=0  [--workflow] none of the 6 variable(s) the makefiles take from the environment is set: ['BUILT_AT', 'COMMIT', 
+
+== and statically: a job-level env setting one of them ==
+  fixture job-env-makefile-override      EXIT=1  checked lane 'build-test' (floor.yml) job-level env sets GO: 'true', which the Makefile ta
+
+== the GOFLAGS case also reaches the DIRECT test steps (they inherit $GITHUB_ENV too) ==
+  GOFLAGS=-run=^$ then the pinned unit step's own commands:
+    go test (unit) exited 0
+    report EXIT=1  only 0 test(s) executed; the recorded floor for 'unit' is 910.
+    tests executed:           0  (floor: 910)
+  (measured on the same working tree before commit fc4885b; the code is identical)
+  The direct steps carry no anchor of their own; the floors in go-test-report.py are what
+  make a suite that selected nothing red there.

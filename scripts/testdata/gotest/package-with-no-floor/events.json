@@ -1,0 +1,12 @@
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestOne"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestTwo"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestThree"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestFour"}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestOne", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestTwo", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestThree", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestFour", "Elapsed": 0.01}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/brandnew", "Test": "TestNew"}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/brandnew", "Test": "TestNew", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Elapsed": 0.1}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/brandnew", "Elapsed": 0.1}

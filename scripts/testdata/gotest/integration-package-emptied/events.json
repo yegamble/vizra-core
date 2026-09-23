@@ -1,0 +1,82 @@
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit0"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit1"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit2"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit3"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit4"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit5"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit6"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit7"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit8"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit9"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit10"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit11"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit12"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit13"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit14"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit15"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit16"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit17"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit18"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit19"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit20"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit21"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit22"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit23"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit24"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit25"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit26"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit27"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit28"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit29"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit30"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit31"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit32"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit33"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit34"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit35"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit36"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit37"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit38"}
+{"Action": "run", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit39"}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit0", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit1", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit2", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit3", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit4", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit5", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit6", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit7", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit8", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit9", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit10", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit11", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit12", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit13", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit14", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit15", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit16", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit17", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit18", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit19", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit20", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit21", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit22", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit23", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit24", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit25", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit26", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit27", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit28", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit29", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit30", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit31", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit32", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit33", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit34", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit35", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit36", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit37", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit38", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Test": "TestUnit39", "Elapsed": 0.01}
+{"Action": "pass", "Package": "github.com/yegamble/vizra-core/internal/thing", "Elapsed": 0.1}
+{"Action": "skip", "Package": "github.com/yegamble/vizra-core/internal/integration", "Elapsed": 0.0}

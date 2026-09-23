@@ -1,0 +1,28 @@
+# R3 — FINDING 6: a failing test now fails the direct step even with the
+#      go-test-report line deleted. Verifier measured at e710c3c:
+#        step as committed, planted t.Fatal  -> exit 1
+#        report call deleted                 -> exit 0   <-- FAILING test, step GREEN
+#        main's shape, same test             -> exit 1
+#      A REGRESSION against main, and check 9 printed 'ok' about it.
+# tree: e710c3cff18bd63c87a692937b608fa762627d99 (working tree)
+
+== planted scripts/zz_planted_test.go ==
+
+== (a) the step AS PINNED in .github/pinned-steps.yml, run verbatim ==
+  STEP EXIT=1   (expect non-zero)
+    go test (unit) exited 1
+    ::error::go-test-report: FAILED: github.com/yegamble/vizra-core/scripts.TestVZB2PlantedFailure
+                 zz_planted_test.go:5: PLANTED FAILURE
+
+== (b) the report call DELETED — the verifier's exact mutation ==
+  STEP EXIT=1   (0 at e710c3c; the trailing exit "$rc" is what makes it non-zero now)
+    go test (unit) exited 1
+
+== (c) main's shape at 5eb2829, for comparison ==
+  STEP EXIT=1   (expect non-zero — this is what the regression lost)
+
+  restored; git status --porcelain scripts/zz_planted_test.go -> []
+
+== (d) and the guard refuses BOTH mutations statically ==
+  direct-lane-without-report       EXIT=1  required lane 'build-test' (floor.yml) step 'Unit suite, invoked direc
+  direct-lane-without-exit-rc      EXIT=1  required lane 'build-test' (floor.yml) step 'Unit suite, invoked direc

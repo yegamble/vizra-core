@@ -1,0 +1,20 @@
+# R6 — R2-1: the anchor checks where `make` RESOLVES, not the order of PATH.
+# The PR#9 verifier (PASS at e2a3e01) held the merge on one sentence: AGENTS.md said an
+# earlier step's $GITHUB_PATH write is refused if it "puts a directory other than a system
+# one first on PATH". It is not — only a `make` that RESOLVES outside the system dirs is.
+# source: e2a3e0177bdcda4ddb16b4b53cadafa69bb21ef4 + the docs-only correction; 2026-09-23T04:33:51Z; Darwin/arm64
+
+  control                                                    EXIT=0  
+  PATH=<EMPTY non-system dir>:$PATH      (verifier)          EXIT=0  
+  PATH=<non-system dir holding a make stub>:$PATH            EXIT=1  `make` resolves to '/private/var/folders/f0/
+
+  The empty directory changes nothing about which `make` runs, and the anchor passes it.
+  The corrected sentence says exactly that; the old one claimed the empty-directory row was refused.
+
+== the correction touches only documentation and comment lines ==
+  scripts/ci-required-guard.py: 58336 -> 58474 bytes; docstrings stripped 18/18;
+    AST identical after stripping docstrings: True; changed lines [105, 106, 107] all inside a
+    string literal: True; __doc__ referenced at runtime: False
+  .github/pinned-steps.yml: parsed document identical: True;
+    every changed line is a YAML comment: True
+  AGENTS.md: prose only.
