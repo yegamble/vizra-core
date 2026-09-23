@@ -59,7 +59,14 @@
     "generator's other two proposals from that SAME measured run (unit 1184 / integration 1349",
     "executed at 56504c1) are applied too: cmd/vizra 8 -> 10 (measured 12) and internal/config",
     "82 -> 86 (measured 101), in both suites. Every per-package floor now equals the generator's",
-    "output for that run: checked mechanically, all 17 unit and 18 integration package floors match."
+    "output for that run: checked mechanically, all 17 unit and 18 integration package floors match.",
+    "",
+    "Round 4 (verifier R4-A, the fixed-window limiter) added four integration tests. Measured at",
+    "085d78b on BOTH cache images (PostgreSQL 18.6; Valkey 9.1.2 and Redis 7.2.16), `go test -race",
+    "-count=1 -tags=integration -json ./...`: 1353 executed, internal/integration 169, 0 skipped.",
+    "The generator's formula then calls for internal/integration 140 -> 144 and integration",
+    "min_tests 1147 -> 1150; applied. The unit suite is unchanged (1184; generator 1006 = committed).",
+    "Every other per-package floor already equals the generator's output. Nothing was lowered."
   ],
   "suites": {
     "unit": {
@@ -86,7 +93,7 @@
       "allowed_skips": {}
     },
     "integration": {
-      "min_tests": 1147,
+      "min_tests": 1150,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 10,
@@ -99,7 +106,7 @@
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
         "github.com/yegamble/vizra-core/internal/httpapi": 48,
-        "github.com/yegamble/vizra-core/internal/integration": 140,
+        "github.com/yegamble/vizra-core/internal/integration": 144,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 14,
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
