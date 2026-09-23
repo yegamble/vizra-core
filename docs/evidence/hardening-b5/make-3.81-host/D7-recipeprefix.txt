@@ -1,0 +1,14 @@
+# D7 .RECIPEPREFIX hides a '-' prefixed gate recipe (fixture recipeprefix; fix round 2, R1-F1)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097  (identical in any commit with the same scripts/ bytes)
+
+raw `make ci` on these bytes (no anchor): exit 2
+anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:3 names `.RECIPEPREFIX`: `.RECIPEPREFIX := >`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:3 names `.RECIPEPREFIX`: `.RECIPEPREFIX := >`
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+recipeprefix_scenario: control HELD (exit 0)
+recipeprefix_scenario exit=0

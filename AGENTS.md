@@ -54,9 +54,13 @@ kinds of step that carry the gate, and it does not read their shell at all:
 1. **The anchor — `./scripts/make-integrity-guard.sh --workflow`, pinned
    byte-for-byte** in `.github/pinned-steps.yml` — runs as its own step
    IMMEDIATELY before every make step. It refuses a `SHELL` / `.SHELLFLAGS` /
-   `MAKEFLAGS` / `GNUMAKEFLAGS` / `.ONESHELL` override, a `-`/`@-` prefix or
-   `|| true` suffix on a gate recipe, and a duplicate gate target — in the
-   Makefile **and everything it includes**. And it checks its OWN process, in a
+   `MAKEFLAGS` / `GNUMAKEFLAGS` / `.ONESHELL` override (in any assignment form,
+   target- and pattern-specific included), any `.RECIPEPREFIX` or
+   `.SECONDEXPANSION`, a `-`/`@-`/`+` prefix or `|| true` suffix on a gate
+   recipe — literal ones before make, ones that variable expansion produces
+   after make has run on the pinned bytes — and a duplicate gate target, in the
+   Makefile **and everything it includes** (sweep B5, below, gives each check's
+   exact timing). And it checks its OWN process, in a
    STRICT mode selected by the pinned `--workflow` argument, **never by the
    environment**:
    - MAKEFLAGS / GNUMAKEFLAGS / MFLAGS are **unset** — not empty, not "free of
@@ -144,10 +148,24 @@ chair ruled the control is the **bytes** (tick 132):
   reading is sound **only because the bytes containing those directives are
   themselves digest-pinned** — it reads REVIEWED text; a changed byte never
   reaches it. It is not a defence against hostile text, and does not need to be.
-- Every TEXT check — SHELL / .SHELLFLAGS / MAKEFLAGS / GNUMAKEFLAGS / .ONESHELL
-  assignments, `-`/`+` prefixes and `|| true` suffixes on gate recipes,
-  duplicate and conditional gate targets, the `?=` environment variables — runs
-  on the pinned read set **before make is invoked**.
+- Every TEXT check runs on the pinned read set **before make is invoked**:
+  SHELL / .SHELLFLAGS / MAKEFLAGS / GNUMAKEFLAGS / MFLAGS assignments in every
+  form (global with any modifier, `define`, target- and pattern-specific —
+  `%: SHELL := /usr/bin/true` passed the anchor and neutered `make ci` before
+  fix round 2, measured on 3.81), `.ONESHELL`, any mention of `.RECIPEPREFIX`
+  (on GNU Make 4.3 `.RECIPEPREFIX := >` hid a `-` prefixed gate recipe from
+  every tab-keyed check: anchor exit 0, `make ci` exit 0 over a failing gate —
+  PR#10 re-verification, R1-F1) or `.SECONDEXPANSION`, literal `-`/`+` prefixes
+  and `|| true` suffixes on gate recipes, duplicate and conditional gate
+  targets, and the `?=` environment variables.
+- What only make can resolve is refused AFTER make has run on the pinned
+  bytes, by name: a computed variable name that sets SHELL / MAKEFLAGS /
+  `.RECIPEPREFIX` or declares `.SECONDEXPANSION` (read from make's `-pn`
+  database); a `-`/`+` prefix a LEADING variable expands to (make applies the
+  prefixes after expansion — `$(IGN)./run` with `IGN := -` ignored a failing
+  gate with the anchor green, measured on 3.81), a leading function or
+  target-specific variable being refused as undeterminable; and a `|| true`
+  suffix in make's expanded dry-run output.
 - make's **first** invocation is ONE `make -q Makefile <every other pinned
   makefile>`, asking whether make would REMAKE any of them. It must be one
   invocation naming them all: `-q` applies in make's remake phase only to
@@ -214,6 +232,10 @@ What they **cannot** do:
   above (`GOTOOLCHAIN`, `GODEBUG`, `CGO_ENABLED`, …) is not refused. The
   per-package floors in the direct test steps still turn a suite that was made
   to run nothing red; anything subtler is review-only.
+- **The value of any other variable in the pinned bytes is not checked.**
+  `GO := true`, a narrower `PKGS`, a recipe that simply does less — the anchor
+  names the constructs above; everything else a reviewed Makefile says is
+  review's to catch.
 - **The Makefile pin is only as good as the review of the pinned bytes.** It
   moves the question from "can the anchor parse make?" to "did a human approve
   these bytes?" and does not answer the second. The reviewed `$(shell …)` calls
@@ -250,8 +272,9 @@ What they **cannot** do:
 
 Every remaining claim above maps to a fixture or a table case that goes red:
 `scripts/testdata/guard/` (75), `scripts/testdata/gotest/` (12),
-`scripts/testdata/fakedocker/` (6), `scripts/testdata/makeguard/` (32, each with
-its own pin), `scripts/testdata/makefilepin/` (12, check 11), the byte mutations
+`scripts/testdata/fakedocker/` (6), `scripts/testdata/makeguard/` (46, each with
+its own pin), `scripts/testdata/makefilepin/` (13, check 11), every refused
+spelling in `TestEveryRefusedSpellingIsRefusedBeforeMake`, the byte mutations
 of the real tree in `scripts/makefiledigest_test.go`, and the anchor's own
 environment in `TestMakeIntegrityGuardEnvironment` (both modes, one row per
 variable class) — all driven from the required `scripts` package. The

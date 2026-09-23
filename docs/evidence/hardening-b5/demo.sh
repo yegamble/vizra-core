@@ -197,6 +197,59 @@ export -f include_sibling
   rm -rf "$old" "$REC.p" "$REC.q"
 } > "$out/P1-check11-parity.txt" 2>&1
 
+# D7 / C10 — fix round 2 (PR#10 re-verification, R1-F1). The committed
+# fixture `recipeprefix` (pinned): `.RECIPEPREFIX := >` and a `>`-prefixed gate
+# recipe whose second line is `> -./run-the-real-tests.sh`, with that script
+# made to FAIL. Exit 0 means the control HELD: the anchor refused in both modes
+# by naming `.RECIPEPREFIX`, with make never started. Raw `make ci` is shown
+# for contrast: on 4.3 it exits 0 over the failing script (the hole); 3.81 has
+# no .RECIPEPREFIX and fails to parse.
+recipeprefix_scenario() {
+  local t rc=0
+  t="$(mktemp -d)"
+  cp -R scripts/testdata/makeguard/recipeprefix/. "$t/"
+  printf '#!/bin/sh\necho "the gate FAILED"\nexit 1\n' > "$t/run-the-real-tests.sh"
+  chmod +x "$t/run-the-real-tests.sh"
+  echo "raw \`make ci\` on these bytes (no anchor): exit $(cd "$t" && make ci >/dev/null 2>&1; echo $?)"
+  for mode in --workflow ""; do
+    python3 scripts/testdata/spawn-recorder.py "$REC" --root "$t" --targets ci $mode > "$REC.out" 2>&1
+    local arc=$? makes
+    makes="$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(sum(1 for c in d['calls'] if c['argv'][0].rsplit('/',1)[-1] in ('make','gmake')))" "$REC")"
+    echo "anchor [${mode:-lenient}] exit=$arc make-processes=$makes"
+    grep -E '^ +FAIL|make-integrity-guard: (passed|FAILED)' "$REC.out" | cut -c1-200
+    [ "$arc" = 1 ] || rc=1
+    [ "$makes" = 0 ] || rc=1
+    grep -q 'names `.RECIPEPREFIX`' "$REC.out" || rc=1
+    rm -f "$REC.out"
+  done
+  rm -rf "$t"
+  echo "recipeprefix_scenario: control $([ $rc = 0 ] && echo HELD || echo BROKEN) (exit $rc)"
+  return $rc
+}
+export -f recipeprefix_scenario
+
+{
+  header "D7 .RECIPEPREFIX hides a '-' prefixed gate recipe (fixture recipeprefix; fix round 2, R1-F1)"
+  recipeprefix_scenario
+  echo "recipeprefix_scenario exit=$?"
+} > "$out/D7-recipeprefix.txt" 2>&1
+
+{
+  header "C10 the pre-make .RECIPEPREFIX refusal removed (the resolver backstop remains)"
+  bash "$M" "C10 RECIPEPREFIX token refusal removed" scripts/make-integrity-guard.py \
+    "python3 -c \"p='scripts/make-integrity-guard.py';s=open(p).read();n='    \\\".RECIPEPREFIX\\\": ';assert s.count(n)==1;open(p,'w').write(s.replace(n,'    \\\".RECIPEPREFIX-disabled-by-C10\\\": '))\"" \
+    "recipeprefix_scenario"
+  echo "== after restore =="; recipeprefix_scenario
+} > "$out/C10-recipeprefix-refusal-removed.txt" 2>&1
+
+{
+  header "C10b the pre-make refusal AND the resolver backstop removed (the 08a59a9 state)"
+  bash "$M" "C10b RECIPEPREFIX refusal and backstop removed" scripts/make-integrity-guard.py \
+    "python3 -c \"p='scripts/make-integrity-guard.py';s=open(p).read();a='    \\\".RECIPEPREFIX\\\": ';b='    if prefix.strip():';assert s.count(a)==1 and s.count(b)==1;open(p,'w').write(s.replace(a,'    \\\".RECIPEPREFIX-disabled-by-C10b\\\": ').replace(b,'    if False:'))\"" \
+    "recipeprefix_scenario"
+  echo "== after restore =="; recipeprefix_scenario
+} > "$out/C10b-recipeprefix-refusal-and-backstop-removed.txt" 2>&1
+
 if [ "${DEMO_ONLY:-}" = "D" ]; then
   echo "DEMO_ONLY=D: code mutations (C*) skipped; they need go."
   echo "tree after the byte demonstrations: $(git status --porcelain | wc -l | tr -d ' ') uncommitted path(s)"
@@ -288,5 +341,37 @@ export -f gotest
     "gotest 'TestMakeIntegrityGuardFixtures'"
   echo "== after restore =="; gotest 'TestMakeIntegrityGuardFixtures'
 } > "$out/C9-text-checks-after-make.txt" 2>&1
+
+{
+  header "C11 the resolver's check_resolved call removed (R1-F2: the post-make branch has its own red cases)"
+  bash "$M" "C11 the resolver's check_resolved call removed (R1-F2: the post-make branch has its own red cases)" scripts/make-integrity-guard.py \
+    "python3 -c \"p='scripts/make-integrity-guard.py';s=open(p).read();n='        check_resolved(g, t, v)\\n';assert s.count(n)==1;open(p,'w').write(s.replace(n,'        pass\\n'))\"" \
+    "gotest 'TestMakeIntegrityGuardFixtures/resolver-|TestMakeIntegrityGuardPassesOnTheRealMakefile'"
+  echo "== after restore =="; gotest 'TestMakeIntegrityGuardFixtures/resolver-|TestMakeIntegrityGuardPassesOnTheRealMakefile'
+} > "$out/C11-resolver-removed.txt" 2>&1
+
+{
+  header "C12 the expanded-prefix check removed"
+  bash "$M" "C12 the expanded-prefix check removed" scripts/make-integrity-guard.py \
+    "python3 -c \"p='scripts/make-integrity-guard.py';s=open(p).read();n='    check_expanded_prefixes(g, variables)\\n';assert s.count(n)==1;open(p,'w').write(s.replace(n,''))\"" \
+    "gotest 'TestMakeIntegrityGuardFixtures/prefix-from-|TestMakeIntegrityGuardPassesOnTheRealMakefile'"
+  echo "== after restore =="; gotest 'TestMakeIntegrityGuardFixtures/prefix-from-|TestMakeIntegrityGuardPassesOnTheRealMakefile'
+} > "$out/C12-expanded-prefix-check-removed.txt" 2>&1
+
+{
+  header "C13 the target- and pattern-specific assignment refusal removed"
+  bash "$M" "C13 the target- and pattern-specific assignment refusal removed" scripts/make-integrity-guard.py \
+    "python3 -c \"p='scripts/make-integrity-guard.py';s=open(p).read();n='            if m and (m.group(3) in controlled or \\\\\\\"$\\\\\\\" in m.group(3)):';assert s.count(n)==1;open(p,'w').write(s.replace(n,'            if False:'))\"" \
+    "gotest 'TestMakeIntegrityGuardFixtures/pattern-specific-shell|TestEveryRefusedSpellingIsRefusedBeforeMake'"
+  echo "== after restore =="; gotest 'TestMakeIntegrityGuardFixtures/pattern-specific-shell|TestEveryRefusedSpellingIsRefusedBeforeMake'
+} > "$out/C13-target-specific-refusal-removed.txt" 2>&1
+
+{
+  header "C14 the expanded-suffix (dry-run) check removed"
+  bash "$M" "C14 the expanded-suffix (dry-run) check removed" scripts/make-integrity-guard.py \
+    "python3 -c \"p='scripts/make-integrity-guard.py';s=open(p).read();n='    if swallowed:';assert s.count(n)==1;open(p,'w').write(s.replace(n,'    if False:'))\"" \
+    "gotest 'TestMakeIntegrityGuardFixtures/suffix-from-variable'"
+  echo "== after restore =="; gotest 'TestMakeIntegrityGuardFixtures/suffix-from-variable'
+} > "$out/C14-expanded-suffix-check-removed.txt" 2>&1
 
 echo "tree after all demonstrations: $(git status --porcelain | wc -l | tr -d ' ') uncommitted path(s)"

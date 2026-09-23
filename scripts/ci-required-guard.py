@@ -1096,6 +1096,8 @@ def check_makefile_pin(g: Guard, pin_path: Path) -> None:
                 "It pins the sha256 of every file make reads. Without it the workflow anchor refuses to run",
                 "make at all — and nothing records which Makefile bytes were reviewed.",
             )
+        elif p.kind == "pin" and p.pin_kind in ("not-a-file", "unreadable", "encoding"):
+            g.fail(f"{pin_path}: {p.message}")
         elif p.kind == "pin" and p.pin_kind == "empty":
             g.fail(f"{pin_path} pins no file. An empty pin would let make read anything, so the anchor refuses it.")
         elif p.kind == "pin":

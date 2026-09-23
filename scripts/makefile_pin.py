@@ -68,8 +68,8 @@ _PARSE_TIME_EXEC_RE = re.compile(r"\$[({]shell[\s)}]|!=")
 
 
 class PinError(Exception):
-    """The pin file itself is unusable. `kind` is one of: missing, unreadable,
-    encoding, header, shape, path, duplicate, empty."""
+    """The pin file itself is unusable. `kind` is one of: missing, not-a-file,
+    unreadable, encoding, header, shape, path, duplicate, empty."""
 
     def __init__(self, kind: str, message: str) -> None:
         super().__init__(message)
@@ -79,8 +79,8 @@ class PinError(Exception):
 @dataclass
 class Problem:
     """One reason make must not be run. `kind` is one of: pin, no-makefile,
-    absent, not-regular, mismatch, encoding, default-name, eval, computed,
-    outside, unpinned, stale."""
+    absent, not-regular, unreadable, mismatch, encoding, default-name, eval,
+    computed, outside, unpinned, stale."""
 
     kind: str
     file: str
@@ -106,6 +106,8 @@ class PinResult:
 def load_makefile_pin(pin_path: Path) -> dict:
     """Parse the pin. Every deviation from the shape raises PinError."""
     label = PIN_FILE
+    if pin_path.is_dir():
+        raise PinError("not-a-file", f"{label} is a directory, not a file.")
     try:
         raw = pin_path.read_bytes()
     except FileNotFoundError:
@@ -268,7 +270,13 @@ def verify_pin(root: Path, pin_path: Path = None) -> PinResult:
                                       f"{rel} is not a regular file (a symlink, FIFO or device is refused): make "
                                       f"would read whatever it points at, which is not what was digested."))
             continue
-        data = path.read_bytes()
+        try:
+            data = path.read_bytes()
+        except OSError as err:
+            r.problems.append(Problem("unreadable", rel,
+                                      f"{rel} is pinned but cannot be read ({err.strerror or err}); its digest "
+                                      f"cannot be checked, so make is not run on it."))
+            continue
         r.digests[rel] = sha256(data)
         if r.digests[rel] != r.pins[rel]:
             r.problems.append(Problem("mismatch", rel,

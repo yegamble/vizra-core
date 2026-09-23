@@ -65,10 +65,19 @@ advisory. Changing the Makefile:
 shasum -a 256 Makefile      # paste into .github/pinned-makefiles.yml, same diff
 ```
 
-On pinned bytes it then refuses a `SHELL` / `.SHELLFLAGS` / `MAKEFLAGS` /
-`GNUMAKEFLAGS` / `.ONESHELL` override, a `-`/`@-` prefix or `|| true` suffix on
-a gate recipe, and a duplicate gate target — over the prerequisite closure, with
-make's own `MAKEFILE_LIST` required to equal the pinned set.
+Before make, on the pinned text, it refuses: a `SHELL` / `.SHELLFLAGS` /
+`MAKEFLAGS` / `GNUMAKEFLAGS` / `MFLAGS` assignment in any form (global with any
+modifier, `define`, target- or pattern-specific) other than the two approved
+global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX` or `.SECONDEXPANSION`;
+a LITERAL `-`/`@-`/`+` prefix or `|| true`-family suffix on a gate recipe line;
+and a duplicate or conditional gate target — over the prerequisite closure.
+After make has run on the pinned bytes, the resolver refuses what only make can
+see: a computed variable name that sets SHELL / MAKEFLAGS / `.RECIPEPREFIX` or
+declares `.SECONDEXPANSION`, a `-`/`+` prefix a leading variable expands to (a
+leading function or target-specific variable is refused as undeterminable), a
+`|| true` suffix in the expanded dry-run command, and a `MAKEFILE_LIST` that is
+not the pinned set. The value of any OTHER variable (`GO`, `PKGS`, …) in the
+pinned bytes is not checked here: review is the control for that.
 
 `ci-required-guard` runs its checks over `set(FLOOR_LANES) | set(required)`.
 Since sweep B1 round 2 the make-step control is **default-deny on the shape**,
@@ -211,3 +220,16 @@ Same host, heavily loaded (load average ~360). CI could not run (billing).
 | `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
 | `./scripts/ci-required-guard.sh` | 0 | |
 | GNU Make 4.3 (`ubuntu:24.04` container): both anchors, ci-required-guard, D0–D6, C7, P1 | 0 / 0 / 0 / as expected | `docs/evidence/hardening-b5/make-4.3-ubuntu24.04/` |
+
+### Sweep B5 fix round 2, measured on scripts/ tree `7d236f17…`
+
+Same host (GNU Make 3.81, go1.27.1); CI could not run (billing).
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 14 ok, 8 `[no test files]`, 0 FAIL (`internal/fixtures` 320s) |
+| direct unit step + `go-test-report.py` | 0 | **1206 executed, 0 failed, 0 skipped**, floor 943, 14 packages; `scripts` 286 |
+| `go test -race -count=1 ./scripts/` | 0 | 286 pass, 0 fail, 0 skip |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | |
+| `./scripts/ci-required-guard.sh` | 0 | |
+| GNU Make 4.3 (`ubuntu:24.04` container): both anchors, ci-required-guard, D0–D7, C7, C10, C10b, P1, all 46 makeguard fixtures | 0 / 0 / 0 / as expected | `docs/evidence/hardening-b5/make-4.3-ubuntu24.04/` |

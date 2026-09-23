@@ -1,187 +1,337 @@
 # go test -race -count=1 -v, the sweep-B5 tests (and the anchor/guard tests they touch) in the required scripts package
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097
 
+=== NAME  TestMakefileDigestMutations/an_included_file's_bytes
     makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
     makefiledigest_test.go:440: mutated inc.mk: sha256 0df3e4f99207847768a84f2c7e0fe3be0d13e787e3beca71ebcbeffae61ef0ef -> 54253f4a4ab8e4b84ae15a862f2917f6c5d668d0d15a74cd6a6b333de3b2e6dc
+=== NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
+    makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
+    makefiledigest_test.go:440: mutated Makefile: sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2 -> fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14
+    makefiledigest_test.go:440: mutated extra.mk: sha256 (absent) -> 75a9c3a69c90c481cee5ea8ea92650f9d027941d767a1fcf08406752dba51369
 === NAME  TestMakefileDigestMutations/one_byte_of_the_Makefile
     makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
     makefiledigest_test.go:440: mutated Makefile: sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2 -> 78e6e7d25d9db35f06162c243d55a891c89c1fb6950cb9f9bdf40e616783e1fd
-=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
-    makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
-    makefiledigest_test.go:440: mutated .github/pinned-makefiles.yml: sha256 01ea83454e0ffb6b73d1c19a6b02868a8a4a6fbe1026737903657982e4c30d17 -> 30ae183ab276df8dc77b02931bfb452f8d46d4c143181c5b36cfd216b9af0286
 === NAME  TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not
     makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
     makefiledigest_test.go:440: mutated .github/pinned-makefiles.yml: sha256 a864461782430d3db84e64e5e64d156858fe3262c3eb42b256c7cfc99d7b0093 -> a23aa7083da22ece0cd69d6e863d4862267f960f22a6edd347a863a05ee1418f
     makefiledigest_test.go:440: mutated Makefile: sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2 -> fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14
     makefiledigest_test.go:440: mutated extra.mk: sha256 (absent) -> 75a9c3a69c90c481cee5ea8ea92650f9d027941d767a1fcf08406752dba51369
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
+    makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
 === NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
     makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
+    makefiledigest_test.go:440: mutated .github/pinned-makefiles.yml: sha256 01ea83454e0ffb6b73d1c19a6b02868a8a4a6fbe1026737903657982e4c30d17 -> 30ae183ab276df8dc77b02931bfb452f8d46d4c143181c5b36cfd216b9af0286
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
     makefiledigest_test.go:440: mutated .github/pinned-makefiles.yml: sha256 a864461782430d3db84e64e5e64d156858fe3262c3eb42b256c7cfc99d7b0093 -> ec501d7e343cac1d04f9932c608eb051819cb2eff992362d8f333740b7701bfb
-=== NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
-    makefiledigest_test.go:426: control (pinned bytes, --workflow): exit 0, make started 4 time(s) (recorded)
-    makefiledigest_test.go:440: mutated Makefile: sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2 -> fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14
-    makefiledigest_test.go:440: mutated extra.mk: sha256 (absent) -> 75a9c3a69c90c481cee5ea8ea92650f9d027941d767a1fcf08406752dba51369
 === NAME  TestMakefileDigestMutations/one_byte_of_the_Makefile
     makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  Makefile: sha256 78e6e7d25d9db35f06162c243d55a891c89c1fb6950cb9f9bdf40e616783e1fd does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2).
+=== NAME  TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not
+    makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  make would read extra.mk, which has no entry in .github/pinned-makefiles.yml.
+=== NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
+    makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile: sha256 fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14 does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2).
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
+    makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
 === NAME  TestMakefileDigestMutations/an_included_file's_bytes
     makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  inc.mk: sha256 54253f4a4ab8e4b84ae15a862f2917f6c5d668d0d15a74cd6a6b333de3b2e6dc does not match .github/pinned-makefiles.yml (0df3e4f99207847768a84f2c7e0fe3be0d13e787e3beca71ebcbeffae61ef0ef).
 === NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
     makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  make would read inc.mk, which has no entry in .github/pinned-makefiles.yml.
-=== NAME  TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not
-    makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  make would read extra.mk, which has no entry in .github/pinned-makefiles.yml.
-=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
-    makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
-=== NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
-    makefiledigest_test.go:449: mutated, --workflow: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  Makefile: sha256 fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14 does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2).
 === NAME  TestMakefileDigestMutations/one_byte_of_the_Makefile
     makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  Makefile: sha256 78e6e7d25d9db35f06162c243d55a891c89c1fb6950cb9f9bdf40e616783e1fd does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2).
     makefiledigest_test.go:453: restored: every file byte-identical to the control tree (2 file(s))
-=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
+=== NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
     makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  make would read inc.mk, which has no entry in .github/pinned-makefiles.yml.
-    makefiledigest_test.go:453: restored: every file byte-identical to the control tree (3 file(s))
-=== NAME  TestMakefileDigestMutations/an_included_file's_bytes
-    makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  inc.mk: sha256 54253f4a4ab8e4b84ae15a862f2917f6c5d668d0d15a74cd6a6b333de3b2e6dc does not match .github/pinned-makefiles.yml (0df3e4f99207847768a84f2c7e0fe3be0d13e787e3beca71ebcbeffae61ef0ef).
-    makefiledigest_test.go:453: restored: every file byte-identical to the control tree (3 file(s))
-=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
-    makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
+            FAIL  Makefile: sha256 fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14 does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2).
     makefiledigest_test.go:453: restored: every file byte-identical to the control tree (2 file(s))
 === NAME  TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not
     makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  make would read extra.mk, which has no entry in .github/pinned-makefiles.yml.
     makefiledigest_test.go:453: restored: every file byte-identical to the control tree (2 file(s))
-=== NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
-    makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  Makefile: sha256 fcc7ad6364c2f6ef597c8a54f130b9daa318152acb4d315de5dbac757a277a14 does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2).
-    makefiledigest_test.go:453: restored: every file byte-identical to the control tree (2 file(s))
-=== NAME  TestMakefileDigestMutations/one_byte_of_the_Makefile
-    makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
-=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
-    makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
-=== NAME  TestMakefileDigestMutations/an_included_file's_bytes
-    makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
 === NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
+    makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
+    makefiledigest_test.go:453: restored: every file byte-identical to the control tree (2 file(s))
+=== NAME  TestMakefileDigestMutations/an_included_file's_bytes
+    makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  inc.mk: sha256 54253f4a4ab8e4b84ae15a862f2917f6c5d668d0d15a74cd6a6b333de3b2e6dc does not match .github/pinned-makefiles.yml (0df3e4f99207847768a84f2c7e0fe3be0d13e787e3beca71ebcbeffae61ef0ef).
+    makefiledigest_test.go:453: restored: every file byte-identical to the control tree (3 file(s))
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
+    makefiledigest_test.go:449: mutated, lenient: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  make would read inc.mk, which has no entry in .github/pinned-makefiles.yml.
+    makefiledigest_test.go:453: restored: every file byte-identical to the control tree (3 file(s))
+=== NAME  TestMakefileDigestMutations/one_byte_of_the_Makefile
     makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
 === NAME  TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not
     makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's)
+    makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
+=== NAME  TestMakefileDigestMutations/an_included_file's_bytes
+    makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
 === NAME  TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated
+    makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
+=== NAME  TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's)
     makefiledigest_test.go:455: restored (--workflow): exit 0, make started 4 time(s) (recorded)
 --- PASS: TestMakefileDigestMutations (0.00s)
-    --- PASS: TestMakefileDigestMutations/one_byte_of_the_Makefile (7.09s)
-    --- PASS: TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's) (7.27s)
-    --- PASS: TestMakefileDigestMutations/an_included_file's_bytes (7.50s)
-    --- PASS: TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's) (7.54s)
-    --- PASS: TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not (7.67s)
-    --- PASS: TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated (7.91s)
+    --- PASS: TestMakefileDigestMutations/one_byte_of_the_Makefile (3.19s)
+    --- PASS: TestMakefileDigestMutations/an_extra_include_line,_Makefile_re-pinned_but_the_included_file_not (3.23s)
+    --- PASS: TestMakefileDigestMutations/a_pin_entry_deleted_(the_Makefile's) (3.28s)
+    --- PASS: TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated (3.28s)
+    --- PASS: TestMakefileDigestMutations/an_included_file's_bytes (3.29s)
+    --- PASS: TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's) (3.31s)
 --- PASS: TestDigestHarnessRefusesAnUnappliedMutation (0.00s)
     makefiledigest_test.go:544: recorded 5 process(es) map[bash:1 make:4]; none was handed a runner command-file variable
     makefiledigest_test.go:566: a real child (`env`) printed 86 variable(s); none of the 6 command-file variables
---- PASS: TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles (3.10s)
---- PASS: TestTheSpawnRecorderSeesEveryWayTheGuardStartsAProcess (0.01s)
+--- PASS: TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles (0.96s)
+--- PASS: TestTheSpawnRecorderSeesEveryWayTheGuardStartsAProcess (0.02s)
 --- PASS: TestCIRequiredGuardMakefilePin (0.01s)
-    --- PASS: TestCIRequiredGuardMakefilePin/empty (2.42s)
-    --- PASS: TestCIRequiredGuardMakefilePin/stale (2.99s)
-    --- PASS: TestCIRequiredGuardMakefilePin/makefile-symlink (3.24s)
-    --- PASS: TestCIRequiredGuardMakefilePin/stale-entry (3.52s)
-    --- PASS: TestCIRequiredGuardMakefilePin/quoted-key (3.56s)
-    --- PASS: TestCIRequiredGuardMakefilePin/pinned-file-missing (3.56s)
-    --- PASS: TestCIRequiredGuardMakefilePin/include-computed (3.63s)
-    --- PASS: TestCIRequiredGuardMakefilePin/include-unpinned (3.75s)
-    --- PASS: TestCIRequiredGuardMakefilePin/no-makefile-entry (2.72s)
-    --- PASS: TestCIRequiredGuardMakefilePin/gnumakefile-present (2.30s)
-    --- PASS: TestCIRequiredGuardMakefilePin/missing (2.50s)
-    --- PASS: TestCIRequiredGuardMakefilePin/good (2.24s)
+    --- PASS: TestCIRequiredGuardMakefilePin/missing (1.50s)
+    --- PASS: TestCIRequiredGuardMakefilePin/empty (1.57s)
+    --- PASS: TestCIRequiredGuardMakefilePin/quoted-key (1.72s)
+    --- PASS: TestCIRequiredGuardMakefilePin/makefile-symlink (1.82s)
+    --- PASS: TestCIRequiredGuardMakefilePin/stale (1.83s)
+    --- PASS: TestCIRequiredGuardMakefilePin/pinned-file-missing (1.85s)
+    --- PASS: TestCIRequiredGuardMakefilePin/include-unpinned (1.90s)
+    --- PASS: TestCIRequiredGuardMakefilePin/pin-is-directory (1.94s)
+    --- PASS: TestCIRequiredGuardMakefilePin/gnumakefile-present (1.78s)
+    --- PASS: TestCIRequiredGuardMakefilePin/good (1.81s)
+    --- PASS: TestCIRequiredGuardMakefilePin/no-makefile-entry (1.56s)
+    --- PASS: TestCIRequiredGuardMakefilePin/include-computed (1.74s)
+    --- PASS: TestCIRequiredGuardMakefilePin/stale-entry (1.68s)
 --- PASS: TestEveryMakeGuardAndPinFixtureIsExercised (0.00s)
-=== NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/the_Makefile
-    makefiledigest_test.go:732: control (no sibling): exit 0, make started 4 time(s) (recorded)
-    makefiledigest_test.go:753: added Makefile.sh (sha256 307c93a2b909420adb870f8e86ef94d1820f431beca4b14e0a070f9447584384), newer than Makefile (sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2)
+    makefiledigest_test.go:734: control (no sibling): exit 0, make started 4 time(s) (recorded)
+    makefiledigest_test.go:755: added Makefile.sh (sha256 307c93a2b909420adb870f8e86ef94d1820f431beca4b14e0a070f9447584384), newer than Makefile (sha256 e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2)
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile
-    makefiledigest_test.go:732: control (no sibling): exit 0, make started 4 time(s) (recorded)
-    makefiledigest_test.go:753: added a.mk.sh (sha256 49ab3b767370b4223319128f694c6c09855ca84babb587be51322e9f6b507220), newer than a.mk (sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7)
+    makefiledigest_test.go:734: control (no sibling): exit 0, make started 4 time(s) (recorded)
+    makefiledigest_test.go:755: added a.mk.sh (sha256 49ab3b767370b4223319128f694c6c09855ca84babb587be51322e9f6b507220), newer than a.mk (sha256 d623dbc7dd068328a6cf71d8eacdec1dd470da44ee78e90b6e3121f0e1d892e7)
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/the_Makefile
-    makefiledigest_test.go:779: workflow=true: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile]
+    makefiledigest_test.go:781: workflow=true: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile]
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile
-    makefiledigest_test.go:779: workflow=true: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile a.mk b.mk]
+    makefiledigest_test.go:781: workflow=true: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile a.mk b.mk]
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/the_Makefile
-    makefiledigest_test.go:779: workflow=false: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile]
+    makefiledigest_test.go:781: workflow=false: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile]
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile
-    makefiledigest_test.go:779: workflow=false: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile a.mk b.mk]
+    makefiledigest_test.go:781: workflow=false: exit 1, every pinned file byte-identical afterwards, make started once: [make -q Makefile a.mk b.mk]
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/the_Makefile
-    makefiledigest_test.go:787: sibling removed: exit 0, make started 4 time(s) (recorded)
+    makefiledigest_test.go:789: sibling removed: exit 0, make started 4 time(s) (recorded)
 === NAME  TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile
-    makefiledigest_test.go:787: sibling removed: exit 0, make started 4 time(s) (recorded)
+    makefiledigest_test.go:789: sibling removed: exit 0, make started 4 time(s) (recorded)
 --- PASS: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe (0.00s)
-    --- PASS: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/the_Makefile (5.74s)
-    --- PASS: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile (6.17s)
-    makefiledigest_test.go:815: local/MAKEFILES: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  the environment sets MAKEFILES='/nonexistent/b5.mk'.
+    --- PASS: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/the_Makefile (3.00s)
+    --- PASS: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile (3.46s)
 === NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFLAGS=-ki
-    makefiledigest_test.go:815: local/MAKEFLAGS=-ki: exit 1; processes started: 1, of which make: 0 (recorded)
+    makefiledigest_test.go:817: local/MAKEFLAGS=-ki: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  the environment sets MAKEFLAGS='-ki'; ['-ki'] is not a flag make itself
 === NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/BASH_ENV
-    makefiledigest_test.go:815: workflow/BASH_ENV: exit 1; processes started: 1, of which make: 0 (recorded)
+    makefiledigest_test.go:817: workflow/BASH_ENV: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  the environment sets BASH_ENV='/nonexistent/b5.sh'.
-=== NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i
-    makefiledigest_test.go:815: workflow/MAKEFLAGS=-i: exit 1; processes started: 1, of which make: 0 (recorded)
-            FAIL  the environment sets MAKEFLAGS='-i', and this is the WORKFLOW anchor.
 === NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/GO=true
-    makefiledigest_test.go:815: workflow/GO=true: exit 1; processes started: 1, of which make: 0 (recorded)
+    makefiledigest_test.go:817: workflow/GO=true: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  the environment sets GO='true', and this is the WORKFLOW anchor.
+=== NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i
+    makefiledigest_test.go:817: workflow/MAKEFLAGS=-i: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  the environment sets MAKEFLAGS='-i', and this is the WORKFLOW anchor.
 === NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFILES
-    makefiledigest_test.go:815: workflow/MAKEFILES: exit 1; processes started: 1, of which make: 0 (recorded)
+    makefiledigest_test.go:817: workflow/MAKEFILES: exit 1; processes started: 1, of which make: 0 (recorded)
             FAIL  the environment sets MAKEFILES='/nonexistent/b5.mk'.
---- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake (0.00s)
-    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFILES (1.20s)
-    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFLAGS=-ki (1.26s)
-    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/BASH_ENV (1.33s)
-    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i (1.33s)
-    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/GO=true (1.36s)
-    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFILES (1.38s)
---- PASS: TestCIRequiredGuardPassesOnTheRealWorkflows (1.88s)
---- PASS: TestMakeIntegrityGuardFixtures (0.04s)
-    --- PASS: TestMakeIntegrityGuardFixtures/pin-missing (1.17s)
-    --- PASS: TestMakeIntegrityGuardFixtures/duplicate-target (1.39s)
-    --- PASS: TestMakeIntegrityGuardFixtures/digest-mismatch (1.42s)
-    --- PASS: TestMakeIntegrityGuardFixtures/semicolon-true (1.51s)
-    --- PASS: TestMakeIntegrityGuardFixtures/good (1.55s)
-    --- PASS: TestMakeIntegrityGuardFixtures/pin-malformed (1.60s)
-    --- PASS: TestMakeIntegrityGuardFixtures/oneshell (1.64s)
-    --- PASS: TestMakeIntegrityGuardFixtures/pin-without-makefile (1.71s)
-    --- PASS: TestMakeIntegrityGuardFixtures/dash-prefix (1.21s)
-    --- PASS: TestMakeIntegrityGuardFixtures/plus-prefix (1.49s)
-    --- PASS: TestMakeIntegrityGuardFixtures/or-true (1.18s)
-    --- PASS: TestMakeIntegrityGuardFixtures/no-shell-pin (1.06s)
-    --- PASS: TestMakeIntegrityGuardFixtures/missing-target (1.40s)
-    --- PASS: TestMakeIntegrityGuardFixtures/included-makeflags (1.37s)
-    --- PASS: TestMakeIntegrityGuardFixtures/shell-colon (1.29s)
-    --- PASS: TestMakeIntegrityGuardFixtures/at-dash-prefix (1.45s)
-    --- PASS: TestMakeIntegrityGuardFixtures/makeflags-ignore (1.07s)
-    --- PASS: TestMakeIntegrityGuardFixtures/makefile-symlink (1.17s)
-    --- PASS: TestMakeIntegrityGuardFixtures/conditional-target (1.29s)
-    --- PASS: TestMakeIntegrityGuardFixtures/eval-in-pinned-bytes (1.35s)
-    --- PASS: TestMakeIntegrityGuardFixtures/include-outside (1.22s)
-    --- PASS: TestMakeIntegrityGuardFixtures/pin-empty (1.35s)
-    --- PASS: TestMakeIntegrityGuardFixtures/include-pinned-good (1.66s)
-    --- PASS: TestMakeIntegrityGuardFixtures/include-computed (1.60s)
-    --- PASS: TestMakeIntegrityGuardFixtures/shellflags-neutered (1.30s)
-    --- PASS: TestMakeIntegrityGuardFixtures/missing-prerequisite (1.30s)
-    --- PASS: TestMakeIntegrityGuardFixtures/gnumakeflags (1.39s)
-    --- PASS: TestMakeIntegrityGuardFixtures/gnumakefile-present (1.39s)
-    --- PASS: TestMakeIntegrityGuardFixtures/shell-override (1.42s)
-    --- PASS: TestMakeIntegrityGuardFixtures/stale-pin-entry (1.35s)
-    --- PASS: TestMakeIntegrityGuardFixtures/include-unpinned (1.32s)
-    --- PASS: TestMakeIntegrityGuardFixtures/included-shell (1.09s)
---- PASS: TestMakeIntegrityGuardPassesOnTheRealMakefile (3.76s)
+=== NAME  TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFILES
+    makefiledigest_test.go:817: local/MAKEFILES: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  the environment sets MAKEFILES='/nonexistent/b5.mk'.
+--- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake (0.01s)
+    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFLAGS=-ki (0.46s)
+    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/GO=true (0.49s)
+    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/BASH_ENV (0.49s)
+    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i (0.49s)
+    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFILES (0.50s)
+    --- PASS: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFILES (0.53s)
+    makefiledigest_test.go:897: secondexpansion: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.SECONDEXPANSION`: `.SECONDEXPANSION:`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/private_SHELL
+    makefiledigest_test.go:897: private SHELL: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 sets SHELL to something other than the approved value: `private SHELL := /usr/bin/true`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_=_no_spaces
+    makefiledigest_test.go:897: recipeprefix = no spaces: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX=>`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_private_.SHELLFLAGS
+    makefiledigest_test.go:897: pattern-specific private .SHELLFLAGS: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 is a target- or pattern-specific assignment of .SHELLFLAGS: `%: private .SHELLFLAGS := -c`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_SHELL
+    makefiledigest_test.go:897: pattern-specific SHELL: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 is a target- or pattern-specific assignment of SHELL: `%: SHELL := /usr/bin/true`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/control:_pattern-specific_ordinary_variable
+    makefiledigest_test.go:894: control: exit 0, make started 4 time(s) (recorded)
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_MAKEFLAGS
+    makefiledigest_test.go:897: pattern-specific MAKEFLAGS: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 is a target- or pattern-specific assignment of MAKEFLAGS: `%: MAKEFLAGS += -i`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/control:_nothing_added
+    makefiledigest_test.go:894: control: exit 0, make started 4 time(s) (recorded)
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_define
+    makefiledigest_test.go:897: recipeprefix define: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `define .RECIPEPREFIX`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_trailing_comment
+    makefiledigest_test.go:897: recipeprefix trailing comment: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX := > # a comment`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_override_export
+    makefiledigest_test.go:897: recipeprefix override export: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `override export .RECIPEPREFIX := >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_override_SHELL
+    makefiledigest_test.go:897: pattern-specific override SHELL: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 is a target- or pattern-specific assignment of SHELL: `%: override SHELL = /usr/bin/true`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_leading_spaces
+    makefiledigest_test.go:897: recipeprefix leading spaces: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX := >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_line_continuation
+    makefiledigest_test.go:897: recipeprefix line continuation: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX := \`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_target-specific
+    makefiledigest_test.go:897: recipeprefix target-specific: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `ci: .RECIPEPREFIX := >`
+            FAIL  gate target `ci` is defined 2 times: Makefile:5, Makefile:8
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion_among_targets
+    makefiledigest_test.go:897: secondexpansion among targets: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.SECONDEXPANSION`: `.PHONY .SECONDEXPANSION:`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_private
+    makefiledigest_test.go:897: recipeprefix private: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `private .RECIPEPREFIX := >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion_spaced
+    makefiledigest_test.go:897: secondexpansion spaced: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.SECONDEXPANSION`: `.SECONDEXPANSION :`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/define_MAKEFLAGS
+    makefiledigest_test.go:897: define MAKEFLAGS: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 assigns MAKEFLAGS with `define`: `define MAKEFLAGS`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion_double_colon
+    makefiledigest_test.go:897: secondexpansion double colon: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.SECONDEXPANSION`: `.SECONDEXPANSION::`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_export
+    makefiledigest_test.go:897: recipeprefix export: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `export .RECIPEPREFIX := >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/target-specific_SHELL
+    makefiledigest_test.go:897: target-specific SHELL: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 is a target- or pattern-specific assignment of SHELL: `ci: SHELL := /usr/bin/true`
+            FAIL  gate target `ci` is defined 2 times: Makefile:5, Makefile:8
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_?=
+    makefiledigest_test.go:897: recipeprefix ?=: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX ?= >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_override
+    makefiledigest_test.go:897: recipeprefix override: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `override .RECIPEPREFIX = >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_::=
+    makefiledigest_test.go:897: recipeprefix ::=: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX ::= >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_+=
+    makefiledigest_test.go:897: recipeprefix +=: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX   +=   >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_:=
+    makefiledigest_test.go:897: recipeprefix :=: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX := >`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_!=
+    makefiledigest_test.go:897: recipeprefix !=: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 names `.RECIPEPREFIX`: `.RECIPEPREFIX != printf '>'`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_computed_name
+    makefiledigest_test.go:897: pattern-specific computed name: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:9 is a target- or pattern-specific assignment of a variable whose NAME make computes: `%: $(NAME) := /usr/bin/true`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/override_define_SHELL
+    makefiledigest_test.go:897: override define SHELL: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 assigns SHELL with `define`: `override define SHELL`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/define_SHELL
+    makefiledigest_test.go:897: define SHELL: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 assigns SHELL with `define`: `define SHELL`
+=== NAME  TestEveryRefusedSpellingIsRefusedBeforeMake/prefix-pattern_export_GNUMAKEFLAGS
+    makefiledigest_test.go:897: prefix-pattern export GNUMAKEFLAGS: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  Makefile:8 is a target- or pattern-specific assignment of GNUMAKEFLAGS: `test-%: export GNUMAKEFLAGS := -k`
+--- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake (0.04s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion (0.31s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/private_SHELL (0.31s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_=_no_spaces (0.33s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_private_.SHELLFLAGS (0.33s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_SHELL (0.43s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/control:_pattern-specific_ordinary_variable (0.48s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_MAKEFLAGS (0.49s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/control:_nothing_added (0.62s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_define (0.38s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_trailing_comment (0.30s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_override_SHELL (0.43s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_override_export (0.43s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_leading_spaces (0.42s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_line_continuation (0.60s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_target-specific (0.46s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion_among_targets (0.40s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_private (0.37s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion_spaced (0.38s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/define_MAKEFLAGS (0.48s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/secondexpansion_double_colon (0.51s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_export (0.34s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/target-specific_SHELL (0.43s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_?= (0.42s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_override (0.40s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_::= (0.33s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_+= (0.38s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_:= (0.30s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/recipeprefix_!= (0.30s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_computed_name (0.29s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/override_define_SHELL (0.24s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/define_SHELL (0.24s)
+    --- PASS: TestEveryRefusedSpellingIsRefusedBeforeMake/prefix-pattern_export_GNUMAKEFLAGS (0.25s)
+    makefiledigest_test.go:921: control (readable): exit 0, make started 4 time(s) (recorded)
+    makefiledigest_test.go:928: anchor, inc.mk mode 000: exit 1; processes started: 1, of which make: 0 (recorded)
+            FAIL  inc.mk is pinned but cannot be read (Permission denied); its digest cannot be checked, so make is not run on it.
+--- PASS: TestAnUnreadablePinnedFileIsRefusedByName (1.42s)
+--- PASS: TestCIRequiredGuardPassesOnTheRealWorkflows (0.45s)
+--- PASS: TestMakeIntegrityGuardFixtures (0.05s)
+    --- PASS: TestMakeIntegrityGuardFixtures/eval-in-pinned-bytes (0.46s)
+    --- PASS: TestMakeIntegrityGuardFixtures/shell-override (0.50s)
+    --- PASS: TestMakeIntegrityGuardFixtures/digest-mismatch (0.52s)
+    --- PASS: TestMakeIntegrityGuardFixtures/stale-pin-entry (0.53s)
+    --- PASS: TestMakeIntegrityGuardFixtures/include-outside (0.55s)
+    --- PASS: TestMakeIntegrityGuardFixtures/secondexpansion (0.64s)
+    --- PASS: TestMakeIntegrityGuardFixtures/pattern-specific-shell (0.67s)
+    --- PASS: TestMakeIntegrityGuardFixtures/include-computed (0.67s)
+    --- PASS: TestMakeIntegrityGuardFixtures/include-unpinned (0.50s)
+    --- PASS: TestMakeIntegrityGuardFixtures/recipeprefix (0.61s)
+    --- PASS: TestMakeIntegrityGuardFixtures/makefile-symlink (0.46s)
+    --- PASS: TestMakeIntegrityGuardFixtures/define-shell (0.62s)
+    --- PASS: TestMakeIntegrityGuardFixtures/gnumakefile-present (0.58s)
+    --- PASS: TestMakeIntegrityGuardFixtures/prefix-from-variable (0.92s)
+    --- PASS: TestMakeIntegrityGuardFixtures/include-pinned-good (1.03s)
+    --- PASS: TestMakeIntegrityGuardFixtures/suffix-from-variable (0.88s)
+    --- PASS: TestMakeIntegrityGuardFixtures/resolver-computed-secondexpansion (1.08s)
+    --- PASS: TestMakeIntegrityGuardFixtures/resolver-computed-makeflags (0.95s)
+    --- PASS: TestMakeIntegrityGuardFixtures/resolver-computed-recipeprefix (1.29s)
+    --- PASS: TestMakeIntegrityGuardFixtures/prefix-from-chained-variable (1.32s)
+    --- PASS: TestMakeIntegrityGuardFixtures/make-q-parse-error (0.99s)
+    --- PASS: TestMakeIntegrityGuardFixtures/prefix-from-pattern-specific (1.50s)
+    --- PASS: TestMakeIntegrityGuardFixtures/prefix-from-function (1.20s)
+    --- PASS: TestMakeIntegrityGuardFixtures/resolver-computed-shell (1.25s)
+    --- PASS: TestMakeIntegrityGuardFixtures/at-dash-prefix (0.86s)
+    --- PASS: TestMakeIntegrityGuardFixtures/pin-missing (1.04s)
+    --- PASS: TestMakeIntegrityGuardFixtures/pin-empty (0.79s)
+    --- PASS: TestMakeIntegrityGuardFixtures/pin-malformed (0.98s)
+    --- PASS: TestMakeIntegrityGuardFixtures/conditional-target (1.05s)
+    --- PASS: TestMakeIntegrityGuardFixtures/shellflags-neutered (0.80s)
+    --- PASS: TestMakeIntegrityGuardFixtures/pin-without-makefile (1.03s)
+    --- PASS: TestMakeIntegrityGuardFixtures/duplicate-target (0.74s)
+    --- PASS: TestMakeIntegrityGuardFixtures/missing-prerequisite (1.26s)
+    --- PASS: TestMakeIntegrityGuardFixtures/missing-target (0.83s)
+    --- PASS: TestMakeIntegrityGuardFixtures/semicolon-true (0.93s)
+    --- PASS: TestMakeIntegrityGuardFixtures/or-true (1.10s)
+    --- PASS: TestMakeIntegrityGuardFixtures/included-shell (0.87s)
+    --- PASS: TestMakeIntegrityGuardFixtures/plus-prefix (0.84s)
+    --- PASS: TestMakeIntegrityGuardFixtures/shell-colon (1.01s)
+    --- PASS: TestMakeIntegrityGuardFixtures/included-makeflags (0.87s)
+    --- PASS: TestMakeIntegrityGuardFixtures/gnumakeflags (0.90s)
+    --- PASS: TestMakeIntegrityGuardFixtures/no-shell-pin (0.95s)
+    --- PASS: TestMakeIntegrityGuardFixtures/dash-prefix (0.93s)
+    --- PASS: TestMakeIntegrityGuardFixtures/makeflags-ignore (0.77s)
+    --- PASS: TestMakeIntegrityGuardFixtures/oneshell (1.06s)
+    --- PASS: TestMakeIntegrityGuardFixtures/good (1.14s)
+--- PASS: TestMakeIntegrityGuardPassesOnTheRealMakefile (4.96s)
 PASS
-ok  	github.com/yegamble/vizra-core/scripts	37.279s
+ok  	github.com/yegamble/vizra-core/scripts	27.655s
 go test exit=0

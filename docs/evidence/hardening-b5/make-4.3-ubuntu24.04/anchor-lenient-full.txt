@@ -29,41 +29,66 @@ make-integrity-guard: /src
   ok    `ci`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `ci`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `ci`: `.ONESHELL:` is not in effect
+  ok    `ci`: .RECIPEPREFIX is not set
+  ok    `ci`: `.SECONDEXPANSION:` is not in effect
   ok    `ci`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `ci`: no expanded gate command ends in a `|| true`-family suffix
   ok    `ci`: make reports no duplicate-definition override
   ok    `tidy-check`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `tidy-check`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `tidy-check`: `.ONESHELL:` is not in effect
+  ok    `tidy-check`: .RECIPEPREFIX is not set
+  ok    `tidy-check`: `.SECONDEXPANSION:` is not in effect
   ok    `tidy-check`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `tidy-check`: no expanded gate command ends in a `|| true`-family suffix
   ok    `tidy-check`: make reports no duplicate-definition override
   ok    `build`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `build`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `build`: `.ONESHELL:` is not in effect
+  ok    `build`: .RECIPEPREFIX is not set
+  ok    `build`: `.SECONDEXPANSION:` is not in effect
   ok    `build`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `build`: no expanded gate command ends in a `|| true`-family suffix
   ok    `build`: make reports no duplicate-definition override
   ok    `test-integration`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `test-integration`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `test-integration`: `.ONESHELL:` is not in effect
+  ok    `test-integration`: .RECIPEPREFIX is not set
+  ok    `test-integration`: `.SECONDEXPANSION:` is not in effect
   ok    `test-integration`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `test-integration`: no expanded gate command ends in a `|| true`-family suffix
   ok    `test-integration`: make reports no duplicate-definition override
   ok    `test-integration-shuffle`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `test-integration-shuffle`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `test-integration-shuffle`: `.ONESHELL:` is not in effect
+  ok    `test-integration-shuffle`: .RECIPEPREFIX is not set
+  ok    `test-integration-shuffle`: `.SECONDEXPANSION:` is not in effect
   ok    `test-integration-shuffle`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `test-integration-shuffle`: no expanded gate command ends in a `|| true`-family suffix
   ok    `test-integration-shuffle`: make reports no duplicate-definition override
   ok    `fixtures`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `fixtures`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `fixtures`: `.ONESHELL:` is not in effect
+  ok    `fixtures`: .RECIPEPREFIX is not set
+  ok    `fixtures`: `.SECONDEXPANSION:` is not in effect
   ok    `fixtures`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `fixtures`: no expanded gate command ends in a `|| true`-family suffix
   ok    `fixtures`: make reports no duplicate-definition override
   ok    `fixtures-verify`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `fixtures-verify`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `fixtures-verify`: `.ONESHELL:` is not in effect
+  ok    `fixtures-verify`: .RECIPEPREFIX is not set
+  ok    `fixtures-verify`: `.SECONDEXPANSION:` is not in effect
   ok    `fixtures-verify`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `fixtures-verify`: no expanded gate command ends in a `|| true`-family suffix
   ok    `fixtures-verify`: make reports no duplicate-definition override
   ok    `govulncheck`: make resolves SHELL to the approved /usr/bin/env bash
   ok    `govulncheck`: make resolves .SHELLFLAGS to the approved '-eu -o pipefail -c'
   ok    `govulncheck`: `.ONESHELL:` is not in effect
+  ok    `govulncheck`: .RECIPEPREFIX is not set
+  ok    `govulncheck`: `.SECONDEXPANSION:` is not in effect
   ok    `govulncheck`: MAKEFLAGS carries nothing beyond this guard's own -pn ('np')
+  ok    `govulncheck`: no expanded gate command ends in a `|| true`-family suffix
   ok    `govulncheck`: make reports no duplicate-definition override
+  ok    no gate recipe line expands to a `-` or `+` prefix (62 line(s), leading variable references resolved from make's database)
 make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)

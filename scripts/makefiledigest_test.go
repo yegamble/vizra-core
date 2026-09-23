@@ -621,6 +621,8 @@ func TestCIRequiredGuardMakefilePin(t *testing.T) {
 		{pin: "stale-entry", wantFail: true, wantText: "pins old.mk, which make would NOT read"},
 		{pin: "include-unpinned", wantFail: true, wantText: "make would read inc.mk, which has no entry"},
 		{pin: "include-computed", wantFail: true, wantText: "names a file make COMPUTES"},
+		// Fix round 2 NIT: a directory where the pin should be is named as one.
+		{pin: "pin-is-directory", wantFail: true, wantText: "is a directory, not a file"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.pin, func(t *testing.T) {
@@ -814,5 +816,121 @@ func TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake(t *testing.T) {
 			out, rec := runRecorded(t, repoRoot(t), tc.workflow, tc.env...)
 			assertRefusedBeforeMake(t, tc.name, out, rec, tc.wantText)
 		})
+	}
+}
+
+// Fix round 2 (PR#10 re-verification, R1-F1, and the chair's ruling): the
+// directives and assignments the TEXT checks refuse are refused in EVERY
+// spelling make accepts — any operator, `override`/`export`/`private`
+// modifiers, whitespace variants, `define`, target- and pattern-specific
+// forms — before make is started (recorded, not read from the output). Each
+// row is the `good` fixture plus the lines shown, re-pinned: reviewed-bytes
+// shape, no payload. The control rows must PASS, with make started, or the
+// refusals prove nothing.
+func TestEveryRefusedSpellingIsRefusedBeforeMake(t *testing.T) {
+	good, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "testdata", "makeguard", "good", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const (
+		rp  = "names `.RECIPEPREFIX`"
+		se  = "names `.SECONDEXPANSION`"
+		tsa = "target- or pattern-specific assignment of"
+		def = "with `define`"
+	)
+	cases := []struct {
+		name, extra, wantText string
+	}{
+		{"recipeprefix :=", ".RECIPEPREFIX := >\n", rp},
+		{"recipeprefix = no spaces", ".RECIPEPREFIX=>\n", rp},
+		{"recipeprefix +=", ".RECIPEPREFIX   +=   >\n", rp},
+		{"recipeprefix ?=", ".RECIPEPREFIX ?= >\n", rp},
+		{"recipeprefix ::=", ".RECIPEPREFIX ::= >\n", rp},
+		{"recipeprefix !=", ".RECIPEPREFIX != printf '>'\n", rp},
+		{"recipeprefix override", "override .RECIPEPREFIX = >\n", rp},
+		{"recipeprefix export", "export .RECIPEPREFIX := >\n", rp},
+		{"recipeprefix override export", "override export .RECIPEPREFIX := >\n", rp},
+		{"recipeprefix private", "private .RECIPEPREFIX := >\n", rp},
+		{"recipeprefix leading spaces", "   .RECIPEPREFIX := >\n", rp},
+		{"recipeprefix trailing comment", ".RECIPEPREFIX := > # a comment\n", rp},
+		{"recipeprefix define", "define .RECIPEPREFIX\n>\nendef\n", rp},
+		{"recipeprefix target-specific", "ci: .RECIPEPREFIX := >\n", rp},
+		{"recipeprefix line continuation", ".RECIPEPREFIX := \\\n>\n", rp},
+		{"secondexpansion", ".SECONDEXPANSION:\n", se},
+		{"secondexpansion spaced", ".SECONDEXPANSION :\n", se},
+		{"secondexpansion double colon", ".SECONDEXPANSION::\n", se},
+		{"secondexpansion among targets", ".PHONY .SECONDEXPANSION:\n", se},
+		{"pattern-specific SHELL", "%: SHELL := /usr/bin/true\n", tsa + " SHELL"},
+		{"target-specific SHELL", "ci: SHELL := /usr/bin/true\n", tsa + " SHELL"},
+		{"pattern-specific MAKEFLAGS", "%: MAKEFLAGS += -i\n", tsa + " MAKEFLAGS"},
+		{"pattern-specific override SHELL", "%: override SHELL = /usr/bin/true\n", tsa + " SHELL"},
+		{"pattern-specific private .SHELLFLAGS", "%: private .SHELLFLAGS := -c\n", tsa + " .SHELLFLAGS"},
+		{"prefix-pattern export GNUMAKEFLAGS", "test-%: export GNUMAKEFLAGS := -k\n", tsa + " GNUMAKEFLAGS"},
+		{"pattern-specific computed name", "NAME := SHELL\n%: $(NAME) := /usr/bin/true\n", tsa + " a variable whose NAME make computes"},
+		{"define SHELL", "define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def},
+		{"override define SHELL", "override define SHELL\n/usr/bin/true\nendef\n", "assigns SHELL " + def},
+		{"define MAKEFLAGS", "define MAKEFLAGS\n-i\nendef\n", "assigns MAKEFLAGS " + def},
+		{"private SHELL", "private SHELL := /usr/bin/true\n", "sets SHELL to something other than the approved value"},
+		// Controls: a pattern-specific assignment of an ordinary variable, and a
+		// comment-free tree, are NOT refused.
+		{"control: pattern-specific ordinary variable", "%: FOO := bar\n", ""},
+		{"control: nothing added", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(dir, ".github"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "Makefile"), append(append([]byte{}, good...), tc.extra...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := repin(dir, "Makefile"); err != nil {
+				t.Fatal(err)
+			}
+			out, rec := runRecorded(t, dir, true)
+			if tc.wantText == "" {
+				assertGreen(t, "control", out, rec)
+				return
+			}
+			assertRefusedBeforeMake(t, tc.name, out, rec, tc.wantText)
+		})
+	}
+}
+
+// Fix round 2 NIT: a pinned file that cannot be READ is refused by name — in
+// the anchor (make not started) and in check 11 — never by a traceback.
+func TestAnUnreadablePinnedFileIsRefusedByName(t *testing.T) {
+	if os.Geteuid() == 0 {
+		// root reads a mode-000 file anyway, so the case cannot be constructed.
+		t.Fatal("this test must not run as root: chmod 000 would not make the file unreadable")
+	}
+	dir := copyRealTree(t)
+	inc := filepath.Join(dir, "inc.mk")
+	if err := os.WriteFile(inc, []byte("# inc.mk: pinned\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := appendBytes(filepath.Join(dir, "Makefile"), "include inc.mk\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repin(dir, "Makefile", "inc.mk"); err != nil {
+		t.Fatal(err)
+	}
+	out, rec := runRecorded(t, dir, true)
+	assertGreen(t, "control (readable)", out, rec)
+	if err := os.Chmod(inc, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(inc, 0o644) })
+
+	out, rec = runRecorded(t, dir, true)
+	assertRefusedBeforeMake(t, "anchor, inc.mk mode 000", out, rec, "inc.mk is pinned but cannot be read")
+	if strings.Contains(out, "Traceback") {
+		t.Fatalf("the anchor refused with a traceback, not by name:\n%s", out)
+	}
+	gout, code := run(t, "ci-required-guard.sh", "--makefile-pins", filepath.Join(dir, ".github", "pinned-makefiles.yml"))
+	if code != 1 || !strings.Contains(gout, "inc.mk is pinned but cannot be read") || strings.Contains(gout, "Traceback") {
+		t.Fatalf("check 11: exit %d; want exit 1 naming inc.mk, no traceback:\n%s", code, gout)
 	}
 }

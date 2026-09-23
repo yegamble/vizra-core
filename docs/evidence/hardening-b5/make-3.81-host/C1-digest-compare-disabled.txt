@@ -1,7 +1,7 @@
 # C1 the digest comparison disabled (scripts/makefile_pin.py, shared by the anchor and check 11)
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097  (identical in any commit with the same scripts/ bytes)
 
 ==============================================================
 MUTATION: C1 digest compare disabled
@@ -9,30 +9,30 @@ MUTATION: C1 digest compare disabled
   mutate: python3 -c "p='scripts/makefile_pin.py';s=open(p).read();n='        if r.digests[rel] != r.pins[rel]:\n';assert s.count(n)==1;open(p,'w').write(s.replace(n,'        if False:\n'))"
   check:  gotest 'TestMakefileDigestMutations|TestMakeIntegrityGuardFixtures/digest-mismatch|TestCIRequiredGuardMakefilePin/stale'
 --------------------------------------------------------------
-  sha256 BEFORE: 7321bba51b9ccd99c3970386c8b45f647591aa02aad9aa1d49e37130049854ce
-  sha256 AFTER:  8c6a46d2e1513dcf114bbfb51cf12289f7b6219c033535e51d4cd563a4a7f6f3
+  sha256 BEFORE: 0159a788608d6b8469aaa883fdb8a97adc4708ee778cde66eab14b9049e24c09
+  sha256 AFTER:  c0bada470865779660960e1344438a8fc4d11ffbacbd3f591e0bede1784b88b9
   CHECK EXIT: 1
 --- check output (last 40 lines) ---
 --- FAIL: TestMakefileDigestMutations (0.00s)
-    --- FAIL: TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated (4.87s)
+    --- FAIL: TestMakefileDigestMutations/an_extra_include_line,_pin_not_updated (1.40s)
         makefiledigest_test.go:449: mutated, --workflow: the refusal does not name "Makefile: sha256":
-    --- FAIL: TestMakefileDigestMutations/one_byte_of_the_Makefile (6.75s)
-    --- FAIL: TestMakefileDigestMutations/an_included_file's_bytes (7.33s)
+    --- FAIL: TestMakefileDigestMutations/an_included_file's_bytes (1.88s)
+    --- FAIL: TestMakefileDigestMutations/one_byte_of_the_Makefile (1.91s)
 --- FAIL: TestCIRequiredGuardMakefilePin (0.00s)
-    --- FAIL: TestCIRequiredGuardMakefilePin/stale (3.20s)
-        makefiledigest_test.go:631: exit 0, want failed=true
+    --- FAIL: TestCIRequiredGuardMakefilePin/stale (0.67s)
+        makefiledigest_test.go:633: exit 0, want failed=true
 --- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
-    --- FAIL: TestMakeIntegrityGuardFixtures/digest-mismatch (2.61s)
-        scripts_test.go:370: exit 0 (failed=false), want failed=true.
+    --- FAIL: TestMakeIntegrityGuardFixtures/digest-mismatch (0.95s)
+        scripts_test.go:404: exit 0 (failed=false), want failed=true.
 FAIL
-FAIL	github.com/yegamble/vizra-core/scripts	16.884s
+FAIL	github.com/yegamble/vizra-core/scripts	4.568s
 FAIL
 go test exit=1
 ------------------------------------
-  sha256 RESTORED: 7321bba51b9ccd99c3970386c8b45f647591aa02aad9aa1d49e37130049854ce
+  sha256 RESTORED: 0159a788608d6b8469aaa883fdb8a97adc4708ee778cde66eab14b9049e24c09
   restore byte-identical: yes
   RESULT: C1 digest compare disabled -> exit 1
 
 == after restore ==
-ok  	github.com/yegamble/vizra-core/scripts	14.563s
+ok  	github.com/yegamble/vizra-core/scripts	5.591s
 go test exit=0

@@ -356,6 +356,40 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// The positive control for includes: pinned includes are read, and make's
 		// own MAKEFILE_LIST is corroborated against the static reading.
 		{dir: "include-pinned-good", wantFail: false, wantText: "MAKEFILE_LIST ['Makefile', 'a.mk', 'b.mk'] is exactly the pinned set"},
+
+		// Fix round 2 (PR#10 re-verification, R1-F1): `.RECIPEPREFIX` moved every
+		// recipe off the TAB the recipe checks key on, and on GNU Make 4.3 the
+		// anchor passed while `make ci` ran a failing `-` prefixed gate as exit 0.
+		// Refused wherever it is named, before make — every spelling is in
+		// makefiledigest_test.go's TestEveryRefusedSpellingIsRefusedBeforeMake.
+		{dir: "recipeprefix", wantFail: true, notInvoked: true, wantText: "names `.RECIPEPREFIX`"},
+		{dir: "secondexpansion", wantFail: true, notInvoked: true, wantText: "names `.SECONDEXPANSION`"},
+		// Found in fix round 2: a PATTERN-specific SHELL applies to every target
+		// and is invisible to the resolver's global database — measured on 3.81,
+		// anchor exit 0 and `make ci` exit 0 over a failing gate script.
+		{dir: "pattern-specific-shell", wantFail: true, notInvoked: true, wantText: "pattern-specific assignment of SHELL"},
+		{dir: "define-shell", wantFail: true, notInvoked: true, wantText: "assigns SHELL with `define`"},
+		// R1-F2: a name only make resolves reaches the RESOLVER, which refuses it
+		// by name after make has run on the pinned bytes. These are the only
+		// fixtures whose refusal comes from check_resolved, so each post-make
+		// branch has a red case of its own.
+		{dir: "resolver-computed-shell", wantFail: true, wantText: "make resolves SHELL to '/usr/bin/true'"},
+		{dir: "resolver-computed-makeflags", wantFail: true, wantText: "make resolves MAKEFLAGS to"},
+		{dir: "resolver-computed-recipeprefix", wantFail: true, wantText: "make resolves .RECIPEPREFIX to '>'"},
+		{dir: "resolver-computed-secondexpansion", wantFail: true, wantText: "`.SECONDEXPANSION:` is in effect"},
+		// Found while fixing R1-F1: make applies `-`/`+` AFTER expansion, so a
+		// prefix a VARIABLE produces ignored a failing gate with the anchor green
+		// (measured on 3.81). The leading references are now resolved from make's
+		// own database; one whose value cannot be determined that way is refused.
+		{dir: "prefix-from-variable", wantFail: true, wantText: "expands to a recipe line prefixed `-`"},
+		{dir: "prefix-from-chained-variable", wantFail: true, wantText: "expands to a recipe line prefixed `@-`"},
+		{dir: "prefix-from-function", wantFail: true, wantText: "starts with a make function"},
+		{dir: "prefix-from-pattern-specific", wantFail: true, wantText: "which a target- or pattern-specific assignment sets"},
+		// ... and a swallowing SUFFIX a variable produces is read from make's own
+		// dry run, which prints the expanded command.
+		{dir: "suffix-from-variable", wantFail: true, wantText: "make's own dry run prints command(s) whose exit status is discarded"},
+		// NIT: `make -q` exit 2 is make failing, not "would remake".
+		{dir: "make-q-parse-error", wantFail: true, wantText: "failed (exit 2): make reported an ERROR"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {
@@ -493,6 +527,11 @@ func TestMakeIntegrityGuardPassesOnTheRealMakefile(t *testing.T) {
 		"make runs only on REVIEWED bytes",
 		"MAKEFILE_LIST ['Makefile'] is exactly the pinned set",
 		"only on the pinned bytes of Makefile",
+		// Fix round 2: the post-make backstops reported on, not merely not-failed.
+		".RECIPEPREFIX is not set",
+		"`.SECONDEXPANSION:` is not in effect",
+		"no gate recipe line expands to a `-` or `+` prefix",
+		"no expanded gate command ends in a `|| true`-family suffix",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the guard did not report on %q; a check that silently stopped running prints nothing:\n%s", want, out)

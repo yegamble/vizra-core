@@ -1,7 +1,7 @@
 # P1 check 11 parity: the 62d16aa ci-required-guard vs this tree's, on the new makefilepin fixtures
 # host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
-# tree: a656144767064dc1cc9ccee3d6d01e759315dc65  (0 uncommitted path(s) before the run)
-# scripts/ tree object: 70d09e55fa3c39867461f206a275a4cd5ff81753  (identical in any commit with the same scripts/ bytes)
+# tree: 0ba5bbd375806e4afa5e2ff1c0b16d115b017419  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 7d236f17e430929f9b0475946c345b107dbe3097  (identical in any commit with the same scripts/ bytes)
 
 gnumakefile-present: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: GNUmakefile exists beside the Makefile. With no -f, GNU make reads GNUmakefile INSTEAD of Makefile, so the pinned Makefi
 makefile-symlink: check11@62d16aa exit=0 | check11@this-tree exit=1    FAIL  pinned-makefiles.yml: Makefile is not a regular file (a symlink, FIFO or device is refused): make would read whatever it points at, which is n

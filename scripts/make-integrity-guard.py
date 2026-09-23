@@ -45,6 +45,15 @@ the runner), and the two disagree in ways that matter:
   stderr)            for target"; GNU 4.x: "overriding RECIPE    do NOT fail this guard
                      for target". Both are matched.
 
+  EXPANSION (after `make -pn`, fix round 2): make applies the `@` / `-` / `+`
+  recipe prefixes AFTER expanding a line, so `$(IGN)./run` with `IGN := -`
+  ignores a failure while the TEXT reading sees `$(IGN)` and the dry run prints
+  no `-`. The leading references of every gate recipe line are resolved from
+  the `-pn` database; a leading function, automatic variable, substitution
+  reference or target/pattern-specific variable is refused as undeterminable.
+  A `|| true`-family suffix that expansion produces is read from the dry run's
+  stdout, which prints the expanded command.
+
 Plus the ENVIRONMENT, because `MAKEFLAGS=-i make ci` never appears in any file —
 and neither does `GO=true`, which a `?=` assignment lets win. With `--workflow`
 (the only invocation a floor lane may use: ci-required-guard pins the anchor
@@ -92,14 +101,24 @@ not discarded:
     file in the runner's command-file directory (clean_env), nor MAKEFLAGS,
     MAKEFILES, BASH_ENV or ENV;
   * a Makefile (or anything it `include`s) whose TEXT assigns `SHELL`,
-    `.SHELLFLAGS`, `MAKEFLAGS` or `GNUMAKEFLAGS`, or sets `.ONESHELL`, fails the
-    lane BY NAME before make is ever invoked — the text checks run on the
-    pinned read set, before the gate (fix round 1; they used to run after four
-    make processes). A value only make can resolve (a computed variable name,
-    say) is refused by the RESOLVER, which necessarily runs make first — on
-    the pinned bytes only;
-  * a gate target whose recipe carries a `-` / `@-` prefix or a `|| true`-family
-    suffix fails the lane by name, before make is invoked;
+    `.SHELLFLAGS`, `MAKEFLAGS`, `GNUMAKEFLAGS` or `MFLAGS` — globally, with
+    `export` / `override` / `private`, with `define`, or target- or
+    pattern-specifically (`%: SHELL := /usr/bin/true` applies to every target
+    and the resolver's global database cannot see it; measured, fix round 2) —
+    or sets `.ONESHELL`, or NAMES `.RECIPEPREFIX` or `.SECONDEXPANSION`
+    anywhere (any operator, modifier or spelling; comments included), fails the
+    lane BY NAME before make is ever invoked: the text checks run on the pinned
+    read set, before the gate. A value only make can resolve — a variable NAME
+    make computes (`$(X) := /usr/bin/true`, `$(A)PREFIX := >`,
+    `$(A)EXPANSION:`) — is refused by the RESOLVER, which necessarily runs make
+    first, on the pinned bytes only. Measured: GNU Make 4.3 prints
+    `.RECIPEPREFIX := >` and 3.81/4.3 a `.SECONDEXPANSION:` target in the `-pn`
+    database when a computed name sets them;
+  * a gate target recipe line carrying a LITERAL `-` / `@-` / `+` prefix or
+    `|| true`-family suffix fails the lane by name, before make is invoked. A
+    prefix or suffix that EXPANSION produces fails by name after make has run
+    on the pinned bytes (see EXPANSION above). Recipe lines start with a TAB
+    here, because `.RECIPEPREFIX` is refused;
   * a gate target defined twice — where make silently runs the LAST definition
     while a reader, and any text-based check, sees the first — fails the lane by
     name.
@@ -274,6 +293,35 @@ DANGEROUS_FLAG_WORDS = (
 )
 
 MAKE_CONDITIONALS = ("ifeq", "ifneq", "ifdef", "ifndef")
+
+# Directives refused wherever they are NAMED in the pinned bytes — comments and
+# recipes included, so no spelling, operator or modifier make accepts can carry
+# them past this check. Fix round 2 (PR#10 re-verification, R1-F1):
+#   .RECIPEPREFIX     changes the character that starts a recipe line. Every
+#                     recipe check here keys on the TAB, so `.RECIPEPREFIX := >`
+#                     plus `> -./run-the-real-tests.sh` made GNU Make 4.3 run a
+#                     failing gate as exit 0 with this anchor green.
+#   .SECONDEXPANSION  makes make expand prerequisite lists a second time, while
+#                     it reads the database — the desk review's FINDING 1 class.
+# A name make COMPUTES (`$(X)PREFIX := >`) contains neither token; the RESOLVER
+# refuses that after make has run on the pinned bytes (check_resolved).
+REFUSED_TOKENS = {
+    ".RECIPEPREFIX": "It changes what starts a recipe line, and every recipe check here keys on the TAB: a "
+                     "`-` prefix behind another recipe prefix is invisible to them (GNU Make 4.3 ran a failing "
+                     "gate as exit 0).",
+    ".SECONDEXPANSION": "It makes make expand prerequisite lists a SECOND time while it reads the database, "
+                        "which is evaluation this guard's reading does not model. A gate Makefile has no use for it.",
+}
+
+# A target- or pattern-specific assignment: `TARGETS: [modifiers] NAME op value`.
+# `%: SHELL := /usr/bin/true` applies to EVERY target and is invisible to the
+# resolver, which reads the global database: measured on GNU Make 3.81 (fix
+# round 2), anchor exit 0 and `make ci` exit 0 over a failing gate script.
+_TARGET_SPECIFIC_RE = re.compile(
+    r"^([^:=#\t][^:=#]*?)\s*::?(?!=)\s*((?:(?:export|override|private|unexport)\s+)*)"
+    r"([^\s:=+?!]+)\s*(\?=|:{1,3}=|\+=|!=|=)")
+# `define NAME` (any modifiers), the multi-line form of an assignment.
+_DEFINE_RE = re.compile(r"^\s*(?:(?:export|override|private)\s+)*define\s+(\S+)")
 
 
 class Guard:
@@ -462,6 +510,17 @@ def check_no_pinned_makefile_would_be_remade(g: Guard, root: Path, files: list[s
         if proc.returncode != 0:
             bad.append((goals, proc.returncode, (proc.stdout + proc.stderr).strip().splitlines()[:4]))
     for goals, code, lines in bad:
+        if code != 1:
+            # -q's own vocabulary: 0 up to date, 1 something would be remade,
+            # 2 make itself failed (a parse error, say). Only 1 means "remake".
+            g.fail(
+                f"`make -q {' '.join(goals)}` failed (exit {code}): make reported an ERROR, not \"up to date\" "
+                f"and not \"would remake\".",
+                "A parse error in the pinned bytes, or a makefile make could not remake, exits 2. Nothing else",
+                "is run. make's own message:",
+                *lines,
+            )
+            continue
         g.fail(
             f"make would REMAKE one of {', '.join(goals)} before reading it (`make -q {' '.join(goals)}` "
             f"exit {code}).",
@@ -512,15 +571,19 @@ def resolve_database(g: Guard, root: Path, target: str):
         return None, None
 
     variables: dict[str, str] = {}
-    oneshell = False
+    oneshell = secondexpansion = False
     for line in proc.stdout.splitlines():
         if line.startswith(".ONESHELL:"):
             oneshell = True
+            continue
+        if line.startswith(".SECONDEXPANSION:"):
+            secondexpansion = True
             continue
         m = re.match(r"^([A-Za-z_.][A-Za-z0-9_.-]*)\s*[:+?]?=\s?(.*)$", line)
         if m and m.group(1) not in variables:
             variables[m.group(1)] = m.group(2)
     variables["__ONESHELL__"] = "yes" if oneshell else ""
+    variables["__SECONDEXPANSION__"] = "yes" if secondexpansion else ""
     files = [f for f in variables.get("MAKEFILE_LIST", "").split() if f]
     return variables, files
 
@@ -561,6 +624,27 @@ def check_resolved(g: Guard, target: str, variables: dict) -> None:
     else:
         g.ok(f"`{target}`: `.ONESHELL:` is not in effect")
 
+    # Fix round 2 (R1-F1). The TEXT check refuses these wherever they are
+    # named; this is the backstop for a name make computes (`$(RP)PREFIX := >`),
+    # which contains neither token. MEASURED: GNU Make 4.3's `-pn` database
+    # prints `.RECIPEPREFIX := ` (empty) by default and `.RECIPEPREFIX := >`
+    # when set that way; both 3.81 and 4.3 print a `.SECONDEXPANSION:` target
+    # when a computed name declares it.
+    prefix = variables.get(".RECIPEPREFIX", "")
+    if prefix.strip():
+        g.fail(
+            f"make resolves .RECIPEPREFIX to {prefix!r} while resolving `{target}`.",
+            "Every recipe check here keys on the TAB; with another recipe prefix a `-` prefixed gate",
+            "recipe is invisible to them.",
+        )
+    else:
+        g.ok(f"`{target}`: .RECIPEPREFIX is not set")
+    if variables.get("__SECONDEXPANSION__"):
+        g.fail(f"`.SECONDEXPANSION:` is in effect while resolving `{target}`.",
+               "make expands prerequisite lists a second time while it reads the database.")
+    else:
+        g.ok(f"`{target}`: `.SECONDEXPANSION:` is not in effect")
+
     # MAKEFLAGS. This guard invoked make as `-pn`, so `p` and `n` are ours.
     # Anything else was added by a file or by the environment.
     raw = variables.get("MAKEFLAGS", "")
@@ -598,6 +682,17 @@ def check_warnings(g: Guard, root: Path, target: str) -> None:
             "duplicate can replace a whole gate recipe with `@true` and leave the file looking correct.",
         )
         return
+    # A swallowing suffix a VARIABLE produces (`./run $(SWALLOW)` with
+    # `SWALLOW := || true`) is invisible to the text reading; --dry-run prints
+    # the EXPANDED command, so it is read here (fix round 2).
+    swallowed = [ln.rstrip() for ln in (proc.stdout or "").splitlines()
+                 if any(ln.rstrip().endswith(sfx) for sfx in SWALLOWING_SUFFIXES)]
+    if swallowed:
+        g.fail(f"`{target}`: make's own dry run prints command(s) whose exit status is discarded:",
+               *swallowed[:5],
+               "A check whose failure is swallowed is not a check — here the suffix came from expansion.")
+    else:
+        g.ok(f"`{target}`: no expanded gate command ends in a `|| true`-family suffix")
     # Other warnings are REPORTED but do not fail: GNU make 4.3 emits a benign
     # "modification time in the future" warning on some mounted filesystems, and
     # a guard that goes red for that is a guard people route around. Saying so
@@ -760,7 +855,7 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
     g.ok(f"make will read {len(files)} makefile(s), from the pinned bytes: {', '.join(files)}")
 
     assignment_re = re.compile(
-        r"^\s*(?:export\s+|override\s+)*(" + "|".join(
+        r"^\s*(?:export\s+|override\s+|private\s+)*(" + "|".join(
             re.escape(n) for n in (*CONTROLLED_ASSIGNMENTS, *FORBIDDEN_ASSIGNMENTS)
         ) + r")\s*([:+?!]?=)\s*(.*?)\s*$"
     )
@@ -777,6 +872,32 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
             continue
         lines = text.split("\n")
         is_root = Path(rel).name == "Makefile" and Path(rel).parent in (Path("."), Path(""))
+
+        for n, line in enumerate(lines, 1):
+            for token, why in REFUSED_TOKENS.items():
+                if token in line:
+                    g.fail(f"{rel}:{n} names `{token}`: `{line.strip()[:120]}`", why,
+                           "Refused wherever it is named — any operator, modifier or spelling — before make runs.")
+
+        controlled = (*CONTROLLED_ASSIGNMENTS, *FORBIDDEN_ASSIGNMENTS)
+        for n, line in mp.logical_lines(text):
+            if line.startswith("\t"):
+                continue
+            m = _TARGET_SPECIFIC_RE.match(line)
+            if m:
+                TARGET_SPECIFIC_NAMES.add(m.group(3))
+            if m and (m.group(3) in controlled or "$" in m.group(3)):
+                g.fail(
+                    f"{rel}:{n} is a target- or pattern-specific assignment of "
+                    f"{'a variable whose NAME make computes' if '$' in m.group(3) else m.group(3)}: "
+                    f"`{line.strip()[:120]}`",
+                    "It applies to that target and everything it builds; `%: SHELL := /usr/bin/true` applies to",
+                    "EVERY target, and the resolver — which reads make's global database — cannot see it.",
+                )
+            d = _DEFINE_RE.match(line)
+            if d and (d.group(1) in controlled or "$" in d.group(1)):
+                g.fail(f"{rel}:{n} assigns {d.group(1)} with `define`: `{line.strip()[:120]}`",
+                       f"Only `SHELL := {APPROVED_SHELL}` and `.SHELLFLAGS := {APPROVED_SHELLFLAGS}` are accepted.")
 
         for n, line in enumerate(lines, 1):
             if line.startswith("\t"):
@@ -869,6 +990,68 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
               f"not lanes: {', '.join(sorted(undefined))}")
 
 
+# Every gate recipe line the text reading saw, for check_expanded_prefixes, and
+# every variable some target- or pattern-specific assignment sets.
+GATE_RECIPE_LINES: list = []
+TARGET_SPECIFIC_NAMES: set = set()
+
+# A leading SIMPLE variable reference: `$(NAME)`, `${NAME}` or `$X`. A function
+# call (`$(if …)`), a substitution reference (`$(X:a=b)`) and an automatic
+# variable (`$@`) do not match, and are refused where a prefix could come from.
+_LEAD_REF_RE = re.compile(r"^\$(?:\(([^()${}:\s]+)\)|\{([^()${}:\s]+)\}|([A-Za-z0-9_]))")
+
+
+def check_expanded_prefixes(g: Guard, variables: dict) -> None:
+    """A `-` or `+` recipe prefix that a VARIABLE produces, resolved against make's own database.
+
+    Fix round 2 (found while fixing R1-F1): GNU make recognises `@`, `-` and
+    `+` AFTER expanding the line, so `IGN := -` plus a recipe line
+    `$(IGN)./run-the-real-tests.sh` ignores the gate's failure. MEASURED on GNU
+    Make 3.81: anchor exit 0, `make ci` exit 0 with `Error 1 (ignored)`. The
+    text reading sees `$(IGN)`, and `make --dry-run` prints the line without
+    the prefix — so the leading references are expanded here, from the `-pn`
+    database of the pinned bytes. A line whose prefix cannot be determined that
+    way — a leading make function, automatic variable or substitution
+    reference, or a variable some target- or pattern-specific assignment sets
+    (the database holds only the global value) — is refused.
+    """
+    bad = 0
+    for rel, lineno, target, body in GATE_RECIPE_LINES:
+        rest, prefix, why = body, "", ""
+        for _ in range(25):
+            rest = rest.lstrip()
+            while rest and rest[0] in RECIPE_PREFIX_CHARS:
+                prefix += rest[0]
+                rest = rest[1:].lstrip()
+            if not rest.startswith("$") or rest.startswith("$$"):
+                break
+            m = _LEAD_REF_RE.match(rest)
+            if not m:
+                why = "it starts with a make function, automatic variable or substitution reference"
+                break
+            name = m.group(1) or m.group(2) or m.group(3)
+            if name in TARGET_SPECIFIC_NAMES:
+                why = f"it starts with $({name}), which a target- or pattern-specific assignment sets"
+                break
+            rest = variables.get(name, "") + rest[m.end():]
+        else:
+            why = "its leading references nest more than 25 deep"
+        if why:
+            g.fail(f"{rel}:{lineno} — gate target `{target}`: the recipe prefix of `{body}` cannot be "
+                   f"determined: {why}.",
+                   "make applies `-` (ignore failure) and `+` (run even under -n) AFTER expansion.")
+            bad += 1
+        elif "-" in prefix or "+" in prefix:
+            g.fail(f"{rel}:{lineno} — gate target `{target}`: `{body}` expands to a recipe line prefixed "
+                   f"`{prefix}` in make's own database.",
+                   "make applies the prefix after expansion: `-` ignores the line's failure, and",
+                   "`make --dry-run` prints the command without it.")
+            bad += 1
+    if not bad:
+        g.ok(f"no gate recipe line expands to a `-` or `+` prefix ({len(GATE_RECIPE_LINES)} line(s), leading "
+             f"variable references resolved from make's database)")
+
+
 def check_recipe(g: Guard, rel: str, target: str, recipe) -> None:
     """Refuse recipe lines whose failure would not fail the lane.
 
@@ -880,6 +1063,7 @@ def check_recipe(g: Guard, rel: str, target: str, recipe) -> None:
         # Legitimate for an aggregate like `ci:` whose work is its prerequisites.
         return
     for lineno, body in recipe:
+        GATE_RECIPE_LINES.append((rel, lineno, target, body))
         prefix = ""
         while body and body[0] in RECIPE_PREFIX_CHARS:
             prefix += body[0]
@@ -1209,6 +1393,9 @@ def main() -> int:
             continue
         check_resolved(g, t, v)
         check_warnings(g, root, t)
+
+    # A `-`/`+` prefix a variable produces, from make's own database.
+    check_expanded_prefixes(g, variables)
 
     # And the bytes make was run on are STILL the pinned bytes.
     recheck_pinned_bytes(g, root, pinned_digests)
