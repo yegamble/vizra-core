@@ -372,3 +372,47 @@ The include-based rows of the earlier B5 demonstrations (D3, D6, C7 in
 the checks they were written for. Those checks stay in the code as defence in
 depth; `db-scan-probe.py` and `TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe`
 cover them.
+
+### Test stability (sentinel S-0016 / S-0001), measured on tree `d817f33`
+
+Every `go test` lane — the Makefile's `test`, `test-race`, `test-integration`,
+`test-integration-shuffle` and the three pinned direct steps — passes
+`-timeout 8m`. The value comes from measurement (`docs/evidence/test-stability/timings.txt`),
+not from a guess:
+
+| Measurement | Slowest package | 8m is |
+|---|---|---|
+| CI, last 4 green build-test runs before the change | `internal/fixtures` 139.5s | 3.4x |
+| this host, two suites at once, after the change | `internal/integration` 186.4s | 2.6x |
+| this host, one lane, after the change | `internal/integration` 142.1s | 3.4x |
+
+It is below go's 10m default on purpose: the last test step of `build-test` starts
+about 8.7 minutes into a 20-minute job, and the second step of `cache-matrix-leg`
+about 3.7 minutes into a 15-minute one, so 8m still prints go's goroutine dump for
+a hang before the job is killed. A host whose load average is several times its
+core count can still exceed it; that is contention, not a property of the
+suite, and `go test -timeout` can be given directly there.
+
+What was cut: `TestManifestDetectsEveryClassOfDrift` generated the corpus 9 times
+(three only to put files on disk) and ran its cases one after another. Its cases
+now copy the shared corpus and run in parallel, and the four heavy fixtures tests
+run in parallel with each other; the package generates the corpus 6 times instead
+of 10.
+
+| Lane (own TMPDIR, own containers) | before `3994893` | after `d817f33` |
+|---|---|---|
+| `make ci` | 107s, load ~12 | 89s, load ~20 |
+| direct unit step + report | 134s, load ~12 | 109s, load ~20–50 |
+| direct integration step, Valkey 9.1.2 | 156s, leaves 74 MB | 150s, leaves nothing |
+| direct integration step, Redis 7.2 | 168s, leaves 75 MB | 144s, leaves nothing |
+| unit + integration(Valkey) at the same time | 238s / 236s | 145s / 198s |
+
+Temporary files: every package with a TestMain here runs inside ONE root from
+`internal/testtmp` (`vizra-test-<pkg>-<pid>-*`, TMPDIR pointed at it), removed at
+the end of the run. A run killed before that (go's `-timeout`, an OOM kill, a job
+timeout) leaves its root, and the next run of the same package removes it once
+its PID is gone. `TestTheFixturesTestsLeaveNoTemporaryEntry` and
+`TestTheIntegrationTestsLeaveNoTemporaryEntry` run the package's own test binary
+with a TMPDIR only they own; both are red on `3994893`
+(`docs/evidence/test-stability/host-darwin-arm64/R0-red-on-main.txt`), and T1–T4
+in the same directory are the byte mutations that turn them red again.

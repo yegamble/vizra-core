@@ -1,0 +1,80 @@
+# Wall times: go test lanes before (main 3994893) and after (this branch). Host darwin/arm64, 8 cores, SHARED with other agents: the load average is recorded per lane.
+# Each lane ran with its own TMPDIR; 'vizra-entries' is what the lane left there. Containers (own, --rm): postgres@sha256:86c951e0… (PostgreSQL 18), valkey/valkey@sha256:c123e371… (9.1.2), redis@sha256:06379549… (7.2).
+# Commands: lanes.sh (make ci; the pinned unit body; the pinned integration body on Valkey, then on Redis 7.2), contend.sh (unit + integration-valkey AT ONCE), pkgtimes.py (per-package elapsed from go test -json).
+
+## BEFORE — main 3994893, one lane at a time
+tree 399489381cd36ff4d1e74c6c7ae54590ec0d24ab go version go1.27.1 darwin/arm64 GNU Make 3.81 cpus 8
+make-ci exit=0 wall=107s load-start=[11.69 50.06 73.15] load-end=[11.67 40.01 66.62] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+unit exit=0 wall=134s load-start=[11.67 40.01 66.62] load-end=[8.97 29.48 58.54] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+int-valkey exit=0 wall=156s load-start=[8.97 29.48 58.54] load-end=[10.23 23.99 51.62] leftover-tmp-entries=1 vizra-entries=1 size= 74M
+int-redis exit=0 wall=168s load-start=[10.23 23.99 51.62] load-end=[15.29 24.48 47.24] leftover-tmp-entries=1 vizra-entries=1 size= 75M
+lanes done
+unit-events.json fixtures=pass:130.0s scripts=pass:27.9s jobs=pass:7.9s credential=pass:6.1s
+int-valkey-events.json fixtures=pass:150.9s integration=pass:113.0s scripts=pass:34.5s jobs=pass:10.5s
+int-redis-events.json fixtures=pass:163.0s integration=pass:131.3s scripts=pass:41.1s jobs=pass:11.1s
+
+## AFTER (code cut only, e80fb96, no -timeout yet), one lane at a time
+tree 90b1578122f7d9a922b66d2dff1e7c38f17dcb1c go version go1.27.1 darwin/arm64 GNU Make 3.81 cpus 8
+make-ci exit=0 wall=119s load-start=[11.73 22.91 46.02] load-end=[33.70 28.40 45.17] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+unit exit=0 wall=87s load-start=[33.70 28.40 45.17] load-end=[30.94 29.92 44.13] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+int-valkey exit=0 wall=162s load-start=[30.94 29.92 44.13] load-end=[19.35 28.86 41.49] leftover-tmp-entries=1 vizra-entries=1 size= 18M
+int-redis exit=0 wall=115s load-start=[19.35 28.86 41.49] load-end=[12.68 24.36 38.17] leftover-tmp-entries=1 vizra-entries=1 size= 18M
+lanes done
+unit-events.json fixtures=pass:78.9s scripts=pass:39.9s jobs=pass:13.6s credential=pass:10.7s
+int-valkey-events.json integration=pass:154.4s fixtures=pass:106.6s scripts=pass:43.8s jobs=pass:12.2s
+int-redis-events.json integration=pass:109.7s fixtures=pass:65.7s scripts=pass:28.8s jobs=pass:8.5s
+   (the 18M entries: the first integration leak test killed only the test binary; its orphaned go build rewrote the swept root. Fixed by killing the process group; see child.go.)
+
+## AFTER — final head d817f33 (with -timeout 8m), one lane at a time
+tree d817f339b402c90648f3a678a88547ad6c7b6451 go version go1.27.1 darwin/arm64 GNU Make 3.81 cpus 8
+make-ci exit=0 wall=89s load-start=[19.39 28.89 34.07] load-end=[20.35 27.38 33.02] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+unit exit=0 wall=109s load-start=[20.35 27.38 33.02] load-end=[51.76 38.42 36.77] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+int-valkey exit=0 wall=150s load-start=[51.76 38.42 36.77] load-end=[19.80 33.41 35.22] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+int-redis exit=0 wall=144s load-start=[19.80 33.41 35.22] load-end=[20.66 33.54 35.34] leftover-tmp-entries=0 vizra-entries=0 size=  0B
+lanes done
+unit-events.json fixtures=pass:102.7s scripts=pass:49.8s credential=pass:16.2s jobs=pass:13.1s
+int-valkey-events.json integration=pass:142.1s fixtures=pass:94.0s scripts=pass:44.3s jobs=pass:12.2s
+int-redis-events.json integration=pass:138.3s fixtures=pass:95.9s scripts=pass:46.7s jobs=pass:11.4s
+
+## CONTENDED A/B — unit + integration(valkey) at the same time
+### before (main)
+tree 399489381cd36ff4d1e74c6c7ae54590ec0d24ab load-start=[11.85 19.72 33.89]
+int-valkey exit=0 wall=236s
+unit exit=0 wall=238s
+load-end=[30.81 30.72 35.57] leftover unit=0 int=1
+unit-events.json fixtures=pass:230.3s scripts=pass:58.1s jobs=pass:11.8s credential=pass:8.0s
+int-events.json fixtures=pass:229.8s integration=pass:153.6s scripts=pass:58.1s jobs=pass:11.1s
+### after (e80fb96)
+tree e80fb96f89c2118497cf07336354a78e123643c0 load-start=[28.50 30.24 35.37]
+unit exit=0 wall=145s
+int-valkey exit=0 wall=198s
+load-end=[37.91 41.42 39.54] leftover unit=0 int=0
+unit-events.json fixtures=pass:138.7s scripts=pass:62.7s jobs=pass:17.5s credential=pass:15.9s
+int-events.json integration=pass:186.4s fixtures=pass:136.7s scripts=pass:60.6s jobs=pass:16.7s
+
+## internal/fixtures alone, -race -v, main 3994893, at load ~70 (per-test, drift sub-tests)
+load before: 16:27  up 2 days,  7:18, 5 users, load averages: 69.93 67.00 83.09
+--- PASS: TestEveryFixtureIsWhatItClaimsToBe (46.57s)
+--- PASS: TestGenerationIsDeterministicWithinAProcess (33.27s)
+--- PASS: TestCommittedManifestMatchesTheGenerator (36.19s)
+--- PASS: TestManifestDetectsEveryClassOfDrift (146.39s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/a_changed_fixture_on_disk (26.76s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/the_generator_changed_and_the_manifest_did_not (0.02s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/a_pinned_tool_version_moved_without_a_re-pin (0.02s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/the_go.mod_language_version_moved_without_a_re-pin (0.02s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/a_committed_codec_input_changed (0.02s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/a_fixture_was_dropped_from_the_manifest_and_the_set_is_no_longer_the_twelve (0.03s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/an_undeclared_extra_file_in_the_corpus_directory (19.28s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/a_dotfile_in_the_corpus_directory_is_NOT_reported (46.29s)
+    --- PASS: TestManifestDetectsEveryClassOfDrift/a_fixture_hash_in_the_manifest_was_edited (27.65s)
+ok  	github.com/yegamble/vizra-core/internal/fixtures	269.566s
+load after: 16:31  up 2 days,  7:22, 5 users, load averages: 40.23 72.77 83.84
+
+## CI per-package elapsed, last 4 successful build-test runs before this branch (gh run view --log)
+fixtures 84.8-139.5s, integration 56.7-93.6s (runs 35914283132, 35914133999, 35910352499, 35899392555)
+
+## CI step offsets (gh api …/jobs), for the -timeout budget: build-test job 20m, cache-matrix-leg job 15m
+run 35916976783: build-test make ci +1.7m, unit +4.5m, integration +6.4m, shuffled +8.4m (job 10.5m); cache-matrix-leg first step +0.5m, shuffled +3.2-3.5m (job 5.2-5.6m)
+run 35914283132: build-test make ci +1.7m, unit +4.6m, integration +6.6m, shuffled +8.7m (job 10.9m); cache-matrix-leg shuffled +3.4-3.7m
+run 35914133999: build-test make ci +1.3m, unit +3.6m, integration +5.1m, shuffled +6.7m (job 8.3m); cache-matrix-leg shuffled +3.0-3.2m
+=> a hang starting a package binary in the LAST step fires -timeout 8m at <= +8.7m+8m ~ 17m < 20m (build-test) and <= +3.7m+8m ~ 12m < 15m (cache-matrix-leg); at 10m (go's default) build-test would reach ~19m and cache-matrix-leg ~14m, with less than one package-build of margin.

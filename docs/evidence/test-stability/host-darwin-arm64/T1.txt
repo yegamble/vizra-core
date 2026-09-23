@@ -1,0 +1,31 @@
+# T1 fixtures TestMain without the testtmp root
+# host: Darwin arm64  go: go1.27.1  load: 28.84 32.10 35.57
+# tree: d817f339b402c90648f3a678a88547ad6c7b6451  (0 uncommitted path(s) before the run)
+
+==============================================================
+MUTATION: T1 fixtures TestMain without the testtmp root
+  file:   internal/fixtures/fixtures_test.go
+  mutate: python3 docs/evidence/test-stability/mutations.py T1
+  check:  gotest '' '^TestTheFixturesTestsLeaveNoTemporaryEntry$' './internal/fixtures/'
+--------------------------------------------------------------
+  sha256 BEFORE: 16bec2f8df9a7ebc8a35d85ac7dbc321ec746998f1f1359193a8760342ac3f28
+  sha256 AFTER:  8648481a93af74f65eee998fc1c609dc568178f1e273bb95349cae7c2abaac7d
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+    tmpleak_test.go:35: a normal run of the fixtures tests left [vizra-fixtures-shared-2682481941] in its TMPDIR
+--- FAIL: TestTheFixturesTestsLeaveNoTemporaryEntry (2.53s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/fixtures	2.939s
+FAIL
+go test exit=1
+------------------------------------
+  sha256 RESTORED: 16bec2f8df9a7ebc8a35d85ac7dbc321ec746998f1f1359193a8760342ac3f28
+  restore byte-identical: yes
+  RESULT: T1 fixtures TestMain without the testtmp root -> exit 1
+
+== after restore ==
+    tmpleak_test.go:39: killed the child once /vizra-test-fixtures-13805-4242158463/vizra-fixtures-shared-1131817083 existed
+    tmpleak_test.go:43: the killed run left [vizra-test-fixtures-13805-4242158463]
+--- PASS: TestTheFixturesTestsLeaveNoTemporaryEntry (3.42s)
+ok  	github.com/yegamble/vizra-core/internal/fixtures	3.824s
+go test exit=0

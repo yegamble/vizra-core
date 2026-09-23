@@ -1,0 +1,29 @@
+# T3 Sweep never removes a dead run's root
+# host: Darwin arm64  go: go1.27.1  load: 24.21 30.40 34.71
+# tree: d817f339b402c90648f3a678a88547ad6c7b6451  (0 uncommitted path(s) before the run)
+
+==============================================================
+MUTATION: T3 Sweep never removes a dead run's root
+  file:   internal/testtmp/testtmp.go
+  mutate: python3 docs/evidence/test-stability/mutations.py T3
+  check:  gotest '' '^TestSweepRemovesOnlyRootsOfDeadProcessesOfThisPackage$' './internal/testtmp/'
+--------------------------------------------------------------
+  sha256 BEFORE: dff0c3eec24f577b09eb8d8844ad93e6ccb6793e8767e741e4ee31e5919c3a62
+  sha256 AFTER:  8f35a639014f310750d76caf2d0d24286d4742b80933ce14db9e39953c0c3f5a
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+    testtmp_test.go:50: Sweep removed []; want exactly /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/TestSweepRemovesOnlyRootsOfDeadProcessesOfThisPackage1421537528/001/vizra-test-fixtures-16334-123
+--- FAIL: TestSweepRemovesOnlyRootsOfDeadProcessesOfThisPackage (0.01s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/testtmp	0.287s
+FAIL
+go test exit=1
+------------------------------------
+  sha256 RESTORED: dff0c3eec24f577b09eb8d8844ad93e6ccb6793e8767e741e4ee31e5919c3a62
+  restore byte-identical: yes
+  RESULT: T3 Sweep never removes a dead run's root -> exit 1
+
+== after restore ==
+--- PASS: TestSweepRemovesOnlyRootsOfDeadProcessesOfThisPackage (0.01s)
+ok  	github.com/yegamble/vizra-core/internal/testtmp	0.291s
+go test exit=0

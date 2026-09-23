@@ -1,0 +1,26 @@
+# T4 alive() treats a foreign live process as dead
+# host: Darwin arm64  go: go1.27.1  load: 24.21 30.40 34.71
+# tree: d817f339b402c90648f3a678a88547ad6c7b6451  (0 uncommitted path(s) before the run)
+
+==============================================================
+MUTATION: T4 alive() treats a foreign live process as dead
+  file:   internal/testtmp/testtmp.go
+  mutate: python3 docs/evidence/test-stability/mutations.py T4
+  check:  gotest '' '^TestAliveTellsALiveProcessFromADeadOne$' './internal/testtmp/'
+--------------------------------------------------------------
+  sha256 BEFORE: dff0c3eec24f577b09eb8d8844ad93e6ccb6793e8767e741e4ee31e5919c3a62
+  sha256 AFTER:  5d0b802cde085fa29e385dcbc0115a5fd141cf5ad4f453150a1f2fdfb5d08c07
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+FAIL	github.com/yegamble/vizra-core/internal/testtmp [build failed]
+FAIL
+go test exit=1
+------------------------------------
+  sha256 RESTORED: dff0c3eec24f577b09eb8d8844ad93e6ccb6793e8767e741e4ee31e5919c3a62
+  restore byte-identical: yes
+  RESULT: T4 alive() treats a foreign live process as dead -> exit 1
+
+== after restore ==
+--- PASS: TestAliveTellsALiveProcessFromADeadOne (0.00s)
+ok  	github.com/yegamble/vizra-core/internal/testtmp	0.259s
+go test exit=0
