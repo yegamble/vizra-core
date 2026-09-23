@@ -1,221 +1,84 @@
-src: c79c4d2b4a6986cb036e47e336cad60d3f7e4133 (tested tree; the evidence commit adds only files under docs/evidence/m1a-owner-claim)
-# Integration suite, invoked exactly as build-test's direct step (no make), judged by scripts/go-test-report.py
+src: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a (round 4, the limiter fix). The next commit, 2ad370e, changes only scripts/test-floors.json (integration 140->144, min_tests 1147->1150); the same event streams re-judged against it: ok (see the end of 01).
+# Integration suite exactly as build-test's direct step runs it, on BOTH cache images
 
-## Attempt 2 (the one that counts: go test exit 0, report exit 0)
-HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T07:41:38Z  load: 106.45 144.89 206.42
-cache: Valkey 9.1.2   db: PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)
-$ go test -race -count=1 -tags=integration -json ./... > int-events.json; python3 scripts/go-test-report.py --events int-events.json --suite integration --floors scripts/test-floors.json --go-exit-file int-exit.txt
+## valkey
+HEAD: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a  tree-clean: yes  date: 2026-09-23T10:58:40Z  load: 42.67 158.52 170.20
+cache: valkey (Valkey server v=9.1.2 sha=0000)  db: PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)
 go test (integration) exited 0
-go-test-report: suite 'integration' from int-events.json
+go-test-report: suite 'integration' from r4-int-valkey.json
   packages ok:              18
   packages failed:          0
   packages [no test files]: 8
-  tests executed:           1349  (floor: 981)
-    top-level:              337
-    passed:                 1349
+  tests executed:           1353  (floor: 1147)
+    top-level:              341
+    passed:                 1353
     failed:                 0
     skipped:                0
   `go test` exit code:      0
   github.com/yegamble/vizra-core/cmd/api: 1 test(s) (floor: 1)
-  github.com/yegamble/vizra-core/cmd/vizra: 12 test(s) (floor: 8)
+  github.com/yegamble/vizra-core/cmd/vizra: 12 test(s) (floor: 10)
   github.com/yegamble/vizra-core/internal/audit: 17 test(s) (floor: 14)
   github.com/yegamble/vizra-core/internal/authz: 502 test(s) (floor: 427)
   github.com/yegamble/vizra-core/internal/cache: 6 test(s) (floor: 4)
-  github.com/yegamble/vizra-core/internal/config: 101 test(s) (floor: 82)
+  github.com/yegamble/vizra-core/internal/config: 101 test(s) (floor: 86)
   github.com/yegamble/vizra-core/internal/credential: 6 test(s) (floor: 4)
   github.com/yegamble/vizra-core/internal/doctor: 39 test(s) (floor: 33)
   github.com/yegamble/vizra-core/internal/fixtures: 42 test(s) (floor: 36)
   github.com/yegamble/vizra-core/internal/healthcheck: 12 test(s) (floor: 10)
-  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 26)
-  github.com/yegamble/vizra-core/internal/integration: 165 test(s) (floor: 40)
+  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 48)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 140)
   github.com/yegamble/vizra-core/internal/jobs: 30 test(s) (floor: 26)
   github.com/yegamble/vizra-core/internal/obs: 17 test(s) (floor: 14)
   github.com/yegamble/vizra-core/internal/ownerclaim: 19 test(s) (floor: 16)
   github.com/yegamble/vizra-core/internal/search: 129 test(s) (floor: 110)
   github.com/yegamble/vizra-core/internal/site: 6 test(s) (floor: 4)
   github.com/yegamble/vizra-core/scripts: 189 test(s) (floor: 161)
-go-test-report: ok — 1349 test(s) executed across 18 package(s), 0 unexpected skips, floor 981 met
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1147 met
 report exit=0
 
-## Attempt 1 (recorded, not counted): go test exit 1 — internal/fixtures hit the 10-minute default timeout at host load ~300; every other package ok, 0 failed, 0 skipped
-HEAD: c79c4d2b4a6986cb036e47e336cad60d3f7e4133  tree-clean: yes  date: 2026-09-23T06:53:37Z  load: 238.83 302.34 291.59
-go test (integration) exited 1
-  packages ok:              17
-  packages failed:          1
+## redis
+HEAD: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a  tree-clean: yes  date: 2026-09-23T11:02:21Z  load: 20.14 93.32 139.55
+cache: redis (Redis server v=7.2.16 sha=0000)  db: PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)
+go test (integration) exited 0
+go-test-report: suite 'integration' from r4-int-redis.json
+  packages ok:              18
+  packages failed:          0
   packages [no test files]: 8
-  tests executed:           1320  (floor: 981)
+  tests executed:           1353  (floor: 1147)
+    top-level:              341
+    passed:                 1353
     failed:                 0
     skipped:                0
-::error::go-test-report: package github.com/yegamble/vizra-core/internal/fixtures FAILED with no failing test — a build or a panic before the harness ran.
-::error::go-test-report: package github.com/yegamble/vizra-core/internal/fixtures executed 13 test(s); its recorded floor is 36.
-         against a floor of 900, twelve of fourteen packages fit inside the headroom
-report exit=1
+  `go test` exit code:      0
+  github.com/yegamble/vizra-core/cmd/api: 1 test(s) (floor: 1)
+  github.com/yegamble/vizra-core/cmd/vizra: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/audit: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/authz: 502 test(s) (floor: 427)
+  github.com/yegamble/vizra-core/internal/cache: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/config: 101 test(s) (floor: 86)
+  github.com/yegamble/vizra-core/internal/credential: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/internal/doctor: 39 test(s) (floor: 33)
+  github.com/yegamble/vizra-core/internal/fixtures: 42 test(s) (floor: 36)
+  github.com/yegamble/vizra-core/internal/healthcheck: 12 test(s) (floor: 10)
+  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 48)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 140)
+  github.com/yegamble/vizra-core/internal/jobs: 30 test(s) (floor: 26)
+  github.com/yegamble/vizra-core/internal/obs: 17 test(s) (floor: 14)
+  github.com/yegamble/vizra-core/internal/ownerclaim: 19 test(s) (floor: 16)
+  github.com/yegamble/vizra-core/internal/search: 129 test(s) (floor: 110)
+  github.com/yegamble/vizra-core/internal/site: 6 test(s) (floor: 4)
+  github.com/yegamble/vizra-core/scripts: 189 test(s) (floor: 161)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1147 met
+report exit=0
 
-## internal/integration, verbose (-v), from the shuffled run with CI's failing seed on Valkey (08-shuffle-seeds.txt)
-internal/integration: 165 === RUN, 165 PASS, 0 FAIL, 0 SKIP (104 top-level)
---- PASS: TestACorrectButDeadTokenCostsNoDerivation
-    --- PASS: TestACorrectButDeadTokenCostsNoDerivation/expired
-    --- PASS: TestACorrectButDeadTokenCostsNoDerivation/consumed
-    --- PASS: TestACorrectButDeadTokenCostsNoDerivation/superseded
---- PASS: TestABootRaceWithTheFirstAccountReportsClaimedNotDegraded
---- PASS: TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody
---- PASS: TestMigrateIsIdempotent
---- PASS: TestAClaimSucceedsWhileTheCacheIsStopped
---- PASS: TestCacheFlavourAndVersionAreIdentified
---- PASS: TestClaimPlanDoesNotSortTheBacklog
---- PASS: TestRunAfterComesFromTheDatabaseClockNotTheApplicationHost
---- PASS: TestHealthcheckWorkerIsNonZeroWhenTheClaimLoopStallsWhilePostgresIsFine
---- PASS: TestReadinessDegradesWhenTheCacheIsUnreachable
---- PASS: TestAuditEventsRefusesAFullIPAddress
-    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_full_address_is_refused
-    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused
-    --- PASS: TestAuditEventsRefusesAFullIPAddress/uppercase_hex_is_refused
-    --- PASS: TestAuditEventsRefusesAFullIPAddress/a_truncated_prefix_is_accepted
-    --- PASS: TestAuditEventsRefusesAFullIPAddress/null_is_accepted
---- PASS: TestASecondPasswordCredentialForOneUserIsRefused
---- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/plaintext
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/bcrypt
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/scrypt
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/argon2i,_the_wrong_variant
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/sha256_hex
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/empty-ish
-    --- PASS: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/a_near_miss
---- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/short_username
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/leading_hyphen
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/31_characters
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/dotless_email
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/email_over_254_bytes
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/11-character_password
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/257-character_password
-    --- PASS: TestMalformedFieldsYield400AndDoNotConsumeTheToken/1_KiB_of_astral_characters
---- PASS: TestClaimRefusesAnUnknownField
---- PASS: TestEnqueueRefusesAnUnboundedPayload
-    --- PASS: TestEnqueueRefusesAnUnboundedPayload/the_Go_error
-    --- PASS: TestEnqueueRefusesAnUnboundedPayload/a_raw_INSERT_is_rejected_by_the_database
-    --- PASS: TestEnqueueRefusesAnUnboundedPayload/an_oversized_kind_and_correlation_id_are_rejected
-    --- PASS: TestEnqueueRefusesAnUnboundedPayload/a_normal_payload_is_accepted
---- PASS: TestRetryLadderAndTerminalFailure
---- PASS: TestClaimStatusIsBoundedByTheHardCeiling
---- PASS: TestRetryLadderActuallyWalksTheLadder
---- PASS: TestClaimTokenIsStoredOnlyAsASHA256Digest
---- PASS: TestClaimTokenCLIOnAnUnclaimedInstance
---- PASS: TestAWorkerWithAPlainHandlerLogsNoCredentials
---- PASS: TestBootMintsOnlyUnderTheStderrOptIn
---- PASS: TestSitesIsASingleton
---- PASS: TestClaimTokenCLIRemintSupersedesThePrevious
---- PASS: TestTheRedeemStatementRefusesAClaimedInstance
---- PASS: TestClaimTokenCLIRefusesOnAClaimedInstance
---- PASS: TestAClaimAgainstAnOutOfBandOwnerIs409NotFiveHundred
---- PASS: TestClaimTokenCLIRefusesOnAClaimedInstanceAsABinary
---- PASS: TestOwnerClaimRejectsASupersededOrExpiredToken
---- PASS: TestHealthcheckUsageErrorsAreDistinctFromAVerdict
---- PASS: TestClaimRefusesACrossOriginRequest
---- PASS: TestBootSupersedesALeftoverTokenOnAClaimedInstance
---- PASS: TestGoldenPathPassesAfterFlushAll
---- PASS: TestMintTimestampsComeFromTheDatabaseClock
---- PASS: TestUnclaimedInstanceRefusesEveryNonAllowlistedRoute
---- PASS: TestClaimTokenCLIWithAnUnreachableDatabase
---- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation
-    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/read_committed
-    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/repeatable_read
-    --- PASS: TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable
---- PASS: TestAFailedClassificationReadAnswers503AndChargesNothing
---- PASS: TestADatabaseOutageIsDiagnosableFromTheLog
---- PASS: TestEnqueueIdempotency
---- PASS: TestAUserWithAuditRowsCannotBeDeleted
---- PASS: TestTokenSingletonAndTerminalStateChecks
---- PASS: TestClaimRefusesAnEmptyBody
---- PASS: TestOwnerClaimAnswers503WhenTheDatabaseIsDown
---- PASS: TestEmailFoldIsProducedByPostgresOnEveryPath
---- PASS: TestATokenSupersededDuringTheHashIsTheUniform403
---- PASS: TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops
---- PASS: TestClaimStatusRevealsOnlyTheClaimedBit
---- PASS: TestATombstonedOwnerDoesNotPermanentlyBlockOwnership
---- PASS: TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue
---- PASS: TestAMultibyteErrorIsStoredInLastError
---- PASS: TestClaimAcceptsTheConfiguredOrigin
---- PASS: TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed
---- PASS: TestOriginsAreComparedNormalisedNotAsStrings
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/exactly_the_configured_value
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/trailing_slash
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/uppercased
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/trailing_dot_on_the_host
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/a_genuinely_different_host
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/Origin:_null
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/an_origin_that_is_not_an_origin
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/an_origin_carrying_a_path
-    --- PASS: TestOriginsAreComparedNormalisedNotAsStrings/a_different_scheme
---- PASS: TestAClaimFloodDoesNotSilenceTheStatusEndpoint
---- PASS: TestOwnerClaimCreatesExactlyOneOwnerAndConsumesTheToken
---- PASS: TestNoConnectionIsHeldWhileHashing
---- PASS: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409
-    --- PASS: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/not_live_(consumed_by_the_winner)
-    --- PASS: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/digest_mismatch
-    --- PASS: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/malformed_shape
-    --- PASS: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/no_token_row_(never_minted)
---- PASS: TestARestartDoesNotInvalidateALiveToken
---- PASS: TestHealthcheckApiIsNonZeroWhenTheListenerIsAbsent
---- PASS: TestSchemaConstraintsAreEnforced
-    --- PASS: TestSchemaConstraintsAreEnforced/only_one_default_storage_location
-    --- PASS: TestSchemaConstraintsAreEnforced/a_read-only_location_cannot_be_the_default
-    --- PASS: TestSchemaConstraintsAreEnforced/a_job_state_outside_the_enum_is_rejected
-    --- PASS: TestSchemaConstraintsAreEnforced/a_leased_job_must_name_its_holder
-    --- PASS: TestSchemaConstraintsAreEnforced/a_system_audit_event_cannot_claim_a_user
---- PASS: TestClaimBodyLimitAppliesToAChunkedRequest
---- PASS: TestConcurrentClaimsNeverTakeTheSameJob
---- PASS: TestConcurrentBootsMintExactlyOneToken
---- PASS: TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob
---- PASS: TestCaseVariantUsernameAndEmailAreRejectedAsDuplicates
---- PASS: TestAJobWhoseWorkerDiedIsReclaimedAndCompleted
---- PASS: TestOwnerClaimTokenNeverReachesTheStructuredLogOrAResponse
---- PASS: TestOwnerClaimRejectsAReusedToken
---- PASS: TestAClaimRefusesWhenAUserAppearsDuringTheHash
---- PASS: TestTheClaimTransactionPinsReadCommitted
---- PASS: TestAConnectionKilledMidClaimAnswers503NotFiveHundred
---- PASS: TestClaimAcceptsAHeaderlessCLIRequest
---- PASS: TestVizraUsageNamesClaimToken
---- PASS: TestARateLimitedClaimWritesNoAuditRow
---- PASS: TestAuditEventsCannotBeUpdatedOrDeleted
---- PASS: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403
-    --- PASS: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/digest_mismatch
-    --- PASS: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/malformed_shape
-    --- PASS: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/no_token_row_(never_minted)
-    --- PASS: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/not_live_(expired_while_paused)
-    --- PASS: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/superseded_while_paused
---- PASS: TestASecondLiveOwnerIsRefusedByTheDatabase
---- PASS: TestEnqueueIsRolledBackWithItsTransaction
---- PASS: TestOwnerClaimAuditEventsCarryNoSecretMaterial
---- PASS: TestMigrateUpOnEmptyDatabase
---- PASS: TestAuditEventsCannotBeTruncated
---- PASS: TestForwardedHeaderWithoutTrustedProxyYieldsNullIPPrefix
---- PASS: TestOwnerClaimSucceedsFromIPv6Loopback
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::1]:8080
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::]:8080
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/127.0.0.1:8080
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/[::ffff:127.0.0.1]:8080
-    --- PASS: TestOwnerClaimSucceedsFromIPv6Loopback/garbage
---- PASS: TestNoPasswordHashingOccursWithoutAValidToken
---- PASS: TestTheRedeemStatementRefusesADeadToken
-    --- PASS: TestTheRedeemStatementRefusesADeadToken/expired
-    --- PASS: TestTheRedeemStatementRefusesADeadToken/already_consumed
-    --- PASS: TestTheRedeemStatementRefusesADeadToken/superseded
---- PASS: TestAStatusFloodDoesNotStarveTheClaim
---- PASS: TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail
---- PASS: TestSweepReclaimsOnlyElapsedLeases
---- PASS: TestAValidTokenIsNeverRateLimitedByTheFailureLimiter
---- PASS: TestClaimReadsTheClaimedStateBeforeExaminingTheToken
---- PASS: TestMintIsRefusedByTheDatabaseOnAClaimedInstance
---- PASS: TestOwnerIndexNameMatchesTheMapper
---- PASS: TestClaimIndexExcludesTerminalRows
---- PASS: TestHealthcheckWorkerIsZeroWhenTheLoopIsRunningAndNonZeroWhenPostgresStops
---- PASS: TestRateLimiterOnTheConnectedServer
---- PASS: TestUserRoleEnumOrderMatchesAuthzRanking
---- PASS: TestUsersOneOwnerFiresThroughTheHandler
---- PASS: TestClaimRefusesANonJSONContentType
---- PASS: TestClaimWithNoMintedTokenIsIndistinguishableFromAWrongToken
---- PASS: TestHeartbeatRequiresStillHoldingTheLease
---- PASS: TestASupersedingRemintRecordsTheGenerationItKilled
---- PASS: TestWorkerRunsAndCompletesAJob
-ok  	github.com/yegamble/vizra-core/internal/integration	202.831s
+## the same two event streams re-judged against 2ad370e's floors
+go-test-report: suite 'integration' from r4-int-valkey.json
+  tests executed:           1353  (floor: 1150)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 144)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1150 met
+report exit=0
+go-test-report: suite 'integration' from r4-int-redis.json
+  tests executed:           1353  (floor: 1150)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 144)
+go-test-report: ok — 1353 test(s) executed across 18 package(s), 0 unexpected skips, floor 1150 met
+report exit=0
