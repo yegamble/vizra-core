@@ -331,3 +331,38 @@ func TestUnavailableKeepsItsCauseInspectable(t *testing.T) {
 		}
 	}
 }
+
+// verifier NIT-2: invalid UTF-8 is refused by Validate itself. Over HTTP it is
+// unreachable — encoding/json replaces invalid bytes with U+FFFD before the
+// validator sees them — but Validate is the contract, not the transport.
+func TestTheEmailValidatorRefusesInvalidUTF8(t *testing.T) {
+	in := Input{Token: strings.Repeat("a", 64), Username: "owner", Email: "a\xffb@example.org", Password: testPassphrase()}
+	var ve *ValidationError
+	if err := in.Validate(); !errors.As(err, &ve) || ve.Field != "email" {
+		t.Fatalf("an email with an invalid UTF-8 byte validated (err=%v)", err)
+	}
+}
+
+// verifier NIT-3: a malformed email is not told it is too long.
+func TestTheEmailRefusalSaysWhatIsWrong(t *testing.T) {
+	good := Input{Token: strings.Repeat("a", 64), Username: "owner", Email: "owner@example.org", Password: testPassphrase()}
+	for email, want := range map[string]string{
+		"a b@example.org":                         "space",
+		"a\u0001b@example.org":                    "control",
+		"no-at-sign.example.org":                  "name@example.org",
+		strings.Repeat("a", 250) + "@example.org": "254 bytes",
+	} {
+		in := good
+		in.Email = email
+		var ve *ValidationError
+		if err := in.Validate(); !errors.As(err, &ve) || ve.Field != "email" {
+			t.Fatalf("%q validated", email)
+		}
+		if !strings.Contains(ve.Message, want) {
+			t.Errorf("email %q refused with %q, which does not say %q", email, ve.Message, want)
+		}
+		if want != "254 bytes" && strings.Contains(ve.Message, "254") {
+			t.Errorf("email %q (short) refused with a length message: %q", email, ve.Message)
+		}
+	}
+}

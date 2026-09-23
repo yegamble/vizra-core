@@ -160,6 +160,19 @@ func TestClaimErrorMapping(t *testing.T) {
 		// never a 500.
 		{"a value the database encoding cannot hold (22021)", &pgconn.PgError{Code: "22021"},
 			http.StatusBadRequest, "bad_request", "one of the submitted values is not acceptable"},
+		{"a CHECK on the username the validator mirrors",
+			&pgconn.PgError{Code: "23514", ConstraintName: "users_username_shape"},
+			http.StatusBadRequest, "bad_request", "one of the submitted values is not acceptable"},
+		// sentinel PR #14 F-1: a CHECK the caller's input cannot have violated —
+		// an audit-shape or any other server-side invariant — is OUR defect. It
+		// used to be answered 400 "one of the submitted values is not acceptable",
+		// which told the operator their input was wrong.
+		{"a CHECK on something that is not the caller's input",
+			&pgconn.PgError{Code: "23514", ConstraintName: "audit_events_some_server_invariant"},
+			http.StatusInternalServerError, "internal_error", "an internal error occurred"},
+		{"a CHECK violation with no constraint name",
+			&pgconn.PgError{Code: "23514"},
+			http.StatusInternalServerError, "internal_error", "an internal error occurred"},
 		{"hashing capacity exhausted", credentialBusy(), http.StatusServiceUnavailable,
 			"unavailable", "the server is busy; try again shortly"},
 		// F1: a connection failure is NOT a *pgconn.PgError, so without the
@@ -228,10 +241,21 @@ func TestTheHandlerDoesNotDecideBetween409And403(t *testing.T) {
 // endpoint can produce has an answer. An unmapped one is a 500 on the single
 // endpoint an operator cannot skip.
 func TestNoClaimErrorMapsToAnUnhandledFiveHundred(t *testing.T) {
-	for _, code := range []string{"23505", "23514"} {
-		status, _, _ := mapOnly(t, &pgconn.PgError{Code: code, ConstraintName: "users_one_owner"})
+	// The input-shaped database signals this endpoint can produce. A 23514 is
+	// named by its constraint: only the input CHECKs the validator mirrors are
+	// the caller's (sentinel PR #14 F-1) — any other 23514 is deliberately a 500,
+	// asserted in TestClaimErrorMapping. This loop used to pair 23514 with
+	// users_one_owner, a unique index that can never raise it.
+	for _, pe := range []*pgconn.PgError{
+		{Code: "23505", ConstraintName: "users_one_owner"},
+		{Code: "23505", ConstraintName: "users_username_fold_key"},
+		{Code: "23514", ConstraintName: "users_email_shape"},
+		{Code: "23514", ConstraintName: "users_username_shape"},
+		{Code: "22021"},
+	} {
+		status, _, _ := mapOnly(t, pe)
 		if status >= 500 {
-			t.Errorf("PgError %s became %d", code, status)
+			t.Errorf("PgError %s (%s) became %d", pe.Code, pe.ConstraintName, status)
 		}
 	}
 	// 503 is a HANDLED answer, so the property is "nothing falls through to the

@@ -65,10 +65,15 @@ type codedError struct {
 	status  int
 	code    string
 	message string
+	// cause, when set, is what produced this answer. It never reaches the client
+	// (the message does); it is kept so the error handler can tell the request's
+	// own cancellation from a genuine failure with errors.Is.
+	cause error
 }
 
 func (e *codedError) Error() string   { return e.message }
 func (e *codedError) StatusCode() int { return e.status }
+func (e *codedError) Unwrap() error   { return e.cause }
 
 func newCodedError(status int, code, message string) error {
 	return &codedError{status: status, code: code, message: message}
@@ -455,6 +460,14 @@ func (s *Server) checkOrigin(req *http.Request) error {
 	return nil
 }
 
+// inputConstraints are the CHECKs on the caller's own input that the Go
+// validator mirrors (ownerclaim.Input.Validate; TestValidatorsMatchTheMigration).
+// Only these may be answered 400; every other 23514 is a server defect.
+var inputConstraints = map[string]bool{
+	"users_username_shape": true,
+	"users_email_shape":    true,
+}
+
 // mapClaimError is the complete mapping. Every branch is covered by
 // TestClaimErrorMapping over synthetic *pgconn.PgError values, because the SQL
 // guard proves the database behaves and says nothing about what the handler does
@@ -513,14 +526,21 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 			// username_fold / email_fold: a duplicate identifier, never a 500.
 			return newCodedError(http.StatusConflict, "conflict",
 				"that username or email address is already taken")
-		case pgErr.Code == "23514":
-			// Backstop only. The Go validator compiles the same literals the DDL
-			// enforces, so reaching here means the two drifted — which is a 400
-			// for the caller and a defect for us.
+		case pgErr.Code == "23514" && inputConstraints[pgErr.ConstraintName]:
+			// Backstop only, and only for a CHECK on the caller's INPUT that the
+			// Go validator mirrors: reaching here means the two drifted — a 400 for
+			// the caller and a defect for us.
 			s.deps.Logger.Error("http: a CHECK constraint refused a request the validator accepted",
 				"constraint", obs.Redact(pgErr.ConstraintName), "request_id", obs.Redact(requestIDOf(c)))
 			return newCodedError(http.StatusBadRequest, "bad_request",
 				"one of the submitted values is not acceptable")
+		case pgErr.Code == "23514":
+			// Any OTHER CHECK is a server-side invariant the caller's input cannot
+			// have broken — an audit-row shape, a schema newer than this binary
+			// (sentinel PR #14 F-1). Answering 400 "one of the submitted values is
+			// not acceptable" told the operator their input was wrong. It is a 500,
+			// and the shared handler logs the redacted cause with the request id.
+			return err
 		case pgErr.Code == "22021":
 			// A value the database encoding cannot hold — NUL, which `text` can
 			// never store. The validator refuses control characters, so this is a
@@ -538,8 +558,10 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 	}
 
 	if errors.Is(err, ctxDeadline) || errors.Is(err, ctxCanceled) {
-		return newCodedError(http.StatusServiceUnavailable, "unavailable",
-			"the request could not be completed in time")
+		// The cause is kept, so the error handler stays silent only when it is
+		// the request's own cancellation.
+		return &codedError{status: http.StatusServiceUnavailable, code: "unavailable",
+			message: "the request could not be completed in time", cause: err}
 	}
 	return err // 500 via the shared handler, with the cause logged there
 }
@@ -554,18 +576,22 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 // obs.Redact, so a DSN or password embedded in a driver error cannot reach a log
 // line (AGENTS.md) while the operator still gets something to act on.
 //
-// A request whose OWN context has ended is not an outage (sentinel S-0005,
-// RULES R9): the client hung up, the database call was cancelled on its
-// behalf, and logging that at ERROR as "could not reach the database" put false
-// outage lines on the one signal an operator reads to diagnose an unclaimable
+// The request's OWN cancellation is not an outage (sentinel S-0005, RULES R9):
+// the client hung up, the database call was cancelled on its behalf, and
+// logging that at ERROR as "could not reach the database" put false outage
+// lines on the one signal an operator reads to diagnose an unclaimable
 // instance. It is answered 503 — to a client that is no longer there — and not
-// logged. The test is the REQUEST context, deliberately not errors.Is(cause,
-// context.DeadlineExceeded): a pgx connect timeout wraps DeadlineExceeded too,
-// and that one IS an outage.
+// logged, here or by the error handler (the answer wraps the cause).
+//
+// Exactly that and nothing wider (sentinel PR #14 F-4, verifier F-2): the cause
+// must BE context.Canceled AND the request's context must be done. A
+// DeadlineExceeded cause on a live request — a pgx connect timeout — is an
+// outage and is logged; so is any failure that merely coincided with the client
+// leaving.
 func (s *Server) unavailable(c *echo.Context, where string, cause error) error {
-	if c.Request().Context().Err() != nil {
-		return newCodedError(http.StatusServiceUnavailable, "unavailable",
-			"the request could not be completed in time")
+	if isOwnCancellation(c, cause) {
+		return &codedError{status: http.StatusServiceUnavailable, code: "unavailable",
+			message: "the request could not be completed in time", cause: cause}
 	}
 	s.deps.Logger.Error("http: the claim endpoint could not reach the database",
 		"where", obs.Redact(where),
@@ -573,6 +599,13 @@ func (s *Server) unavailable(c *echo.Context, where string, cause error) error {
 		"request_id", obs.Redact(requestIDOf(c)))
 	return newCodedError(http.StatusServiceUnavailable, "unavailable",
 		"the instance state could not be read")
+}
+
+// isOwnCancellation reports whether err is the request's own cancellation: the
+// cause is context.Canceled and the request's context has ended. Anything else
+// that fails while a client is leaving is still a failure, and is logged.
+func isOwnCancellation(c *echo.Context, err error) bool {
+	return c.Request().Context().Err() != nil && errors.Is(err, ctxCanceled)
 }
 
 const claimedMessage = "this instance already has an owner"

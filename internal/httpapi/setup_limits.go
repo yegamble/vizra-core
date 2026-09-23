@@ -97,7 +97,9 @@ func (s *Server) allowSetupRequest(c *echo.Context, bucket string, limit int) bo
 //
 // The marker is per bucket KIND, never per origin: a marker per source prefix
 // would let anyone with many /64s write one row each, which is the unbounded
-// writer the marker exists to prevent. So at most four rows per window.
+// writer the marker exists to prevent. So at most four rows per window WITH A
+// SHARED CACHE; while the limiter runs on its in-process fallback the marker is
+// per process, so at most four per window per api process.
 const (
 	bucketCeilingClaim  = "ceiling.claim"
 	bucketCeilingStatus = "ceiling.status"

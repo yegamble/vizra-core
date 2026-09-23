@@ -74,27 +74,47 @@ var tokenShape = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // The same LITERAL is not the same LANGUAGE for the email (sentinel S-0003,
 // RULES R17). Go's [:space:] is ASCII-only; PostgreSQL's follows the libc
 // locale, so under en_US.utf8 it also matches U+2003 and U+3000 — and `text`
-// cannot hold NUL at all (22021). So emailAcceptable also refuses every Unicode
-// space and every control character: strictly MORE than any locale's
-// [:space:], which is the direction that keeps a request out of the database's
-// refusal paths. TestEveryEmailTheValidatorAcceptsTheDatabaseAccepts runs one
-// corpus through both.
+// cannot hold NUL at all (22021). So emailProblem also refuses every Unicode
+// space and every control character: a superset of PostgreSQL's
+// [:space:] under en_US.utf8, which is MEASURED exhaustively on every CI run
+// (TestEveryCodePointThisServerCallsSpaceIsRefusedByTheValidator), and the
+// direction that keeps a request out of the database's refusal paths. For other
+// libc or ICU locales it is an argument, not a measurement: one that classed a
+// code point Go does not refuse (a Cf such as U+180E or U+200B) as space would
+// reach the 23514 backstop — a 400, never a 5xx.
+// TestEveryEmailTheValidatorAcceptsTheDatabaseAccepts runs one corpus through
+// both.
 var (
 	usernameShape = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{2,29}$`)
 	emailShape    = regexp.MustCompile(`^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$`)
 )
 
-// emailAcceptable is emailShape plus the locale-independent refusals above.
-func emailAcceptable(email string) bool {
-	if len(email) > MaxEmailBytes || !utf8.ValidString(email) || !emailShape.MatchString(email) {
-		return false
+// emailProblem is emailShape plus the locale-independent refusals above. It
+// returns "" for an acceptable address, or the message that says what is wrong
+// with it — a malformed address used to be told it was too long.
+//
+// Invalid UTF-8 is refused here, but over HTTP it cannot arrive: encoding/json
+// replaces invalid bytes with U+FFFD before Validate sees the value. Validate is
+// the contract, not the transport, so the check stays (and is tested directly).
+func emailProblem(email string) string {
+	if len(email) > MaxEmailBytes {
+		return fmt.Sprintf("enter an email address of at most %d bytes", MaxEmailBytes)
+	}
+	if !utf8.ValidString(email) {
+		return "enter the email address as valid UTF-8 text"
 	}
 	for _, r := range email {
-		if unicode.IsSpace(r) || unicode.IsControl(r) {
-			return false
+		if unicode.IsSpace(r) {
+			return "enter an email address with no spaces"
+		}
+		if unicode.IsControl(r) {
+			return "enter an email address with no control characters"
 		}
 	}
-	return true
+	if !emailShape.MatchString(email) {
+		return "enter an email address such as name@example.org"
+	}
+	return ""
 }
 
 // MaxEmailBytes mirrors users_email_shape's octet_length bound. The bound is in
@@ -228,9 +248,8 @@ func (in Input) Validate() error {
 		return &ValidationError{Field: "username",
 			Message: "use 3 to 30 characters: letters, numbers, hyphen or underscore, starting with a letter or number"}
 	}
-	if !emailAcceptable(in.Email) {
-		return &ValidationError{Field: "email",
-			Message: fmt.Sprintf("enter an email address of at most %d bytes", MaxEmailBytes)}
+	if msg := emailProblem(in.Email); msg != "" {
+		return &ValidationError{Field: "email", Message: msg}
 	}
 	switch n := len([]rune(in.Password)); {
 	case n < credential.MinPasswordRunes:
@@ -542,8 +561,10 @@ func Claim(ctx context.Context, pool *pgxpool.Pool, hasher credential.Hasher, in
 		// username only — never the email. See the package doc and 0005's header.
 		// token_generation: 0005 promises a claim is traceable to the generation
 		// it redeemed with no secret material anywhere, and the token row itself
-		// is mutable, so the append-only trail has to carry it (sentinel S-0007;
-		// migration 0006 makes the database refuse a row without it).
+		// is mutable, so the append-only trail has to carry it (sentinel S-0007).
+		// The schema does NOT require it yet: that CHECK is queued for a later
+		// migration, once no binary that omits the key can be serving (the
+		// previous binary still claims during a rolling deploy; RULES R22).
 		After: map[string]any{
 			"username":         created.Username,
 			"role":             string(created.Role),

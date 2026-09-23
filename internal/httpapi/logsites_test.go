@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -523,5 +524,51 @@ func TestTheErrorHandlerRedactsEveryCredentialFormInA500(t *testing.T) {
 				t.Errorf("nothing was marked redacted:\n%s", logged)
 			}
 		})
+	}
+}
+
+// sentinel PR #14 F-4 / verifier F-2: the error handler stays silent ONLY for
+// the request's own cancellation. A genuine 5xx whose client happened to leave
+// — a reverse proxy timing out on a real defect cancels the Go request context
+// too — must still be logged.
+func TestAFiveHundredIsLoggedEvenWhenTheClientHasGone(t *testing.T) {
+	for name, cause := range map[string]error{
+		"an unmapped defect":                   errors.New("unmapped defect: invariant violated"),
+		"a deadline, not the client's cancel":  fmt.Errorf("dial: %w", context.DeadlineExceeded),
+		"a coded 503 that is not cancellation": newCodedError(http.StatusServiceUnavailable, "unavailable", "the instance state could not be read"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/anything", nil).WithContext(ctx)
+			rec := httptest.NewRecorder()
+			errorHandler(slog.New(slog.NewJSONHandler(&buf, nil)))(echo.New().NewContext(req, rec), cause)
+			if !strings.Contains(buf.String(), "http: request failed") {
+				t.Fatalf("a %d whose cause is not the request's own cancellation was not logged because the "+
+					"client had gone; log=%q", rec.Code, buf.String())
+			}
+		})
+	}
+}
+
+// ...and the request's own cancellation is the one thing it does not log.
+func TestTheRequestsOwnCancellationIsNotLoggedAsAFailure(t *testing.T) {
+	var buf bytes.Buffer
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/anything", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	cause := fmt.Errorf("ownerclaim: checking claimed state: %w", context.Canceled)
+	errorHandler(slog.New(slog.NewJSONHandler(&buf, nil)))(echo.New().NewContext(req, rec), cause)
+	if buf.Len() != 0 {
+		t.Fatalf("the request's own cancellation was logged as a failure: %s", buf.String())
+	}
+	// Control: the same cause on a LIVE request is not the client's doing.
+	buf.Reset()
+	live := httptest.NewRequest(http.MethodGet, "/api/v1/anything", nil)
+	errorHandler(slog.New(slog.NewJSONHandler(&buf, nil)))(echo.New().NewContext(live, httptest.NewRecorder()), cause)
+	if !strings.Contains(buf.String(), "http: request failed") {
+		t.Fatalf("a context.Canceled cause on a LIVE request was not logged: %q", buf.String())
 	}
 }

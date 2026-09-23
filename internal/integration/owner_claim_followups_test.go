@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -214,6 +215,45 @@ func TestEveryEmailTheValidatorAcceptsTheDatabaseAccepts(t *testing.T) {
 				"reaches the CHECK (or the encoder) and becomes a 23514/22021 instead of a clean 400", email, err)
 		}
 	}
+}
+
+// Exhaustive, for THIS server's locale: every code point PostgreSQL's
+// [[:space:]] matches is refused by the Go validator (verifier NIT-2 measured it
+// once; this keeps it measured on every CI run). Other locales are the stated
+// residual: a libc or ICU locale that classes a code point Go does not refuse as
+// space would reach the 23514 backstop, which is a 400, never a 5xx.
+func TestEveryCodePointThisServerCallsSpaceIsRefusedByTheValidator(t *testing.T) {
+	_, _, pool := freshDatabase(t)
+	var collate string
+	if err := pool.QueryRow(t.Context(), `SELECT datctype FROM pg_database WHERE datname = current_database()`).Scan(&collate); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := pool.Query(t.Context(), `SELECT cp FROM generate_series(1, 1114111) AS cp
+	  WHERE cp NOT BETWEEN 55296 AND 57343 AND chr(cp) ~ '[[:space:]]'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var cp int32
+		if err := rows.Scan(&cp); err != nil {
+			t.Fatal(err)
+		}
+		n++
+		in := ownerclaim.Input{Token: strings.Repeat("a", 64), Username: "owner",
+			Email: "a" + string(rune(cp)) + "b@example.org", Password: testPassphrase()}
+		if in.Validate() == nil {
+			t.Errorf("U+%04X is [[:space:]] to PostgreSQL (LC_CTYPE %s) but the validator accepts it", cp, collate)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if n < 6 {
+		t.Fatalf("PostgreSQL reported only %d space code points; the query is not measuring what it claims", n)
+	}
+	t.Logf("%d code points are [[:space:]] under LC_CTYPE %s; the validator refuses every one", n, collate)
 }
 
 func TestAnEmailTheDatabaseCannotHoldIsA400NotA500(t *testing.T) {
@@ -458,6 +498,13 @@ func TestEverySetup503LogsItsCause(t *testing.T) {
 		want                     string
 	}{
 		{"GET claim-status", http.MethodGet, "/api/v1/setup/claim-status", "", true, failing, "connection refused"},
+		// A connect timeout wraps context.DeadlineExceeded, on a request whose
+		// client is still waiting: an OUTAGE, and it must be logged as one
+		// (verifier F-2, mutation V1).
+		{"GET claim-status, connect timeout on a live request", http.MethodGet, "/api/v1/setup/claim-status", "", true,
+			func(context.Context) (bool, error) {
+				return false, fmt.Errorf("failed to connect to `host=db`: dial tcp: %w", context.DeadlineExceeded)
+			}, "could not reach the database"},
 		{"the unclaimed guard", http.MethodGet, "/api/v1/no-such-route", "", true, failing, "connection refused"},
 		{"POST claim-owner with no pool for the site", http.MethodPost, "/api/v1/setup/claim-owner",
 			`{"token":"` + strings.Repeat("a", 64) + `","username":"owner","email":"owner@example.org","password":"` + testPassphrase() + `"}`,
@@ -476,8 +523,8 @@ func TestEverySetup503LogsItsCause(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// S-0007: the `succeeded` row names the generation it consumed, and the
-// database refuses one that does not (migration 0006).
+// S-0007: the `succeeded` row names the generation it consumed. The schema does
+// not yet require it (expand/contract, below).
 // ---------------------------------------------------------------------------
 
 func TestTheSucceededRowNamesTheConsumedGeneration(t *testing.T) {
@@ -496,21 +543,47 @@ func TestTheSucceededRowNamesTheConsumedGeneration(t *testing.T) {
 	}
 }
 
-func TestTheDatabaseRefusesASucceededRowWithoutAGeneration(t *testing.T) {
+// Expand/contract (sentinel PR #14 F-1, RULES R22): this release WRITES
+// token_generation but the schema must not yet REQUIRE it, because during a
+// deploy the previous binary — which writes {username, role} only — is still
+// claiming against the new schema. A CHECK that refuses that shape comes in a
+// later migration, once no binary that omits the key can be serving.
+func TestTheSchemaStillAcceptsThePreviousBinarysSucceededRow(t *testing.T) {
 	_, _, pool := freshDatabase(t)
-	insert := func(after string) error {
-		_, err := pool.Exec(t.Context(), `INSERT INTO audit_events
-		  (id, actor_kind, action, subject_type, after)
-		  VALUES (gen_random_uuid(), 'system', 'setup.owner_claim.succeeded', 'user', $1::jsonb)`, after)
-		return err
+	if _, err := pool.Exec(t.Context(), `INSERT INTO audit_events
+	  (id, actor_kind, action, subject_type, after)
+	  VALUES (gen_random_uuid(), 'system', 'setup.owner_claim.succeeded', 'user', '{"username":"owner","role":"owner"}'::jsonb)`); err != nil {
+		t.Fatalf("the schema refuses the succeeded row the previous binary writes, so a claim it serves "+
+			"during a rolling deploy fails: %v", err)
 	}
-	for _, after := range []string{`{"username":"owner","role":"owner"}`, `{"token_generation":"1"}`, `null`} {
-		if err := insert(after); err == nil {
-			t.Errorf("the database accepted a succeeded row with after=%s; it must name a numeric token_generation", after)
-		}
+}
+
+// A CHECK violation that the caller's input cannot have caused is a SERVER
+// defect: 500 and logged, never 400 "one of the submitted values is not
+// acceptable" (sentinel PR #14 F-1). The violation is synthetic: a constraint
+// that exists only in this test's database refuses the claim's own `succeeded`
+// row, which is exactly the shape a schema/binary skew produces.
+func TestANonInputCheckViolationIsAServerErrorNotA400(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+	if _, err := e.pool.Exec(t.Context(), `ALTER TABLE audit_events ADD CONSTRAINT test_refuses_claim_success
+	  CHECK (action <> 'setup.owner_claim.succeeded') NOT VALID`); err != nil {
+		t.Fatal(err)
 	}
-	if err := insert(`{"username":"owner","role":"owner","token_generation":1}`); err != nil {
-		t.Errorf("the database refused a well-formed succeeded row: %v", err)
+	code, body := e.post(t, validBody(token), nil)
+	if code == http.StatusBadRequest {
+		t.Fatalf("a violation of a server-side constraint was answered 400 %s: that tells the operator their "+
+			"input is wrong", bodyCode(body))
+	}
+	if code != http.StatusInternalServerError {
+		t.Fatalf("-> %d %s, want 500", code, bodyCode(body))
+	}
+	logs := e.logs.String()
+	if !strings.Contains(logs, "http: request failed") || !strings.Contains(logs, "test_refuses_claim_success") {
+		t.Errorf("the server defect was not logged with its cause:\n%s", logs)
+	}
+	if n := e.count(t, `SELECT count(*) FROM users`); n != 0 {
+		t.Errorf("users = %d, want 0: the claim transaction must roll back whole", n)
 	}
 }
 

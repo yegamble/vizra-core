@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -163,11 +164,15 @@ func errorHandler(log *slog.Logger) echo.HTTPErrorHandler {
 		}
 
 		reqID, _ := c.Get(string(headerRequestID)).(string)
-		// A request whose own context has ENDED — the client hung up — is not a
-		// server failure, and an ERROR line for it is noise on the signal an
-		// operator reads during a real outage (sentinel S-0005, RULES R9). It is
-		// still answered; it is not logged.
-		if status >= 500 && c.Request().Context().Err() == nil {
+		// The request's OWN cancellation — the client hung up and the work was
+		// cancelled on its behalf — is not a server failure, and an ERROR line for
+		// it is noise on the signal an operator reads during a real outage
+		// (sentinel S-0005, RULES R9). Only that is skipped: the cause must be
+		// context.Canceled AND the request's context done. A genuine 5xx whose
+		// client happened to leave (a reverse proxy timing out on a real defect
+		// cancels the request context too) is logged (sentinel PR #14 F-4).
+		ownCancellation := c.Request().Context().Err() != nil && errors.Is(err, context.Canceled)
+		if status >= 500 && !ownCancellation {
 			// Every value is redacted HERE, not left to the handler: Deps.Logger
 			// falls back to slog.Default(), which redacts nothing unless the
 			// process installed obs.NewLogger. An unmapped error is exactly where
