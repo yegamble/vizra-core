@@ -12,6 +12,16 @@ import (
 
 type Querier interface {
 	AdvisoryUnlock(ctx context.Context, arg AdvisoryUnlockParams) (bool, error)
+	// Owner claim (VZ-INSTALL-003, migration 0005).
+	//
+	// The raw token never appears here: the service hashes the presented value and
+	// compares the digest in constant time in Go, then passes THE ROW'S OWN digest to
+	// ClaimOwner. Attacker-controlled bytes never reach SQL, so no index probe can
+	// become a timing oracle.
+	// The claim gate. "Unclaimed" is "no user rows at all", not "no owner row", so an
+	// instance that already has users is implicitly claimed and never mints again —
+	// and tombstoning the owner does not reopen the claim endpoint.
+	AnyUserExists(ctx context.Context) (bool, error)
 	// FOR UPDATE SKIP LOCKED: two workers never claim the same row, and a locked
 	// row never blocks the other worker's scan.
 	//
@@ -31,6 +41,18 @@ type Querier interface {
 	// dead-letters such rows, so this predicate is the second half of that fix,
 	// not a way of hiding them.
 	ClaimJob(ctx context.Context, arg ClaimJobParams) (ClaimJobRow, error)
+	// Redeem the token and create THE owner plus its password credential, atomically.
+	//
+	// The guarded UPDATE must be the CTE the INSERT selects from. A data-modifying
+	// CTE always executes, so if the insert came first and the guarded update matched
+	// nothing, the owner row would still be written. `owner` selecting FROM consumed
+	// forces the redeem to produce a row before any user exists.
+	//
+	// Under READ COMMITTED (pinned explicitly on the transaction, never inherited
+	// from the server GUC) a losing concurrent claimer blocks on the row lock,
+	// re-evaluates `consumed_at IS NULL` against the committed row, matches nothing
+	// and returns no row. `users_one_owner` is the second, independent enforcer.
+	ClaimOwner(ctx context.Context, arg ClaimOwnerParams) (ClaimOwnerRow, error)
 	CompleteJob(ctx context.Context, arg CompleteJobParams) (int64, error)
 	CountAuditEvents(ctx context.Context) (int64, error)
 	CountSites(ctx context.Context) (int64, error)
@@ -72,6 +94,10 @@ type Querier interface {
 	GetDefaultStorageLocation(ctx context.Context) (StorageLocation, error)
 	GetJob(ctx context.Context, id uuid.UUID) (Job, error)
 	GetLiveJobByIdempotencyKey(ctx context.Context, arg GetLiveJobByIdempotencyKeyParams) (GetLiveJobByIdempotencyKeyRow, error)
+	// The single token row, if any. A plain fetch, never a lookup keyed by the
+	// presented value. `live` is computed with the DATABASE clock (ADR-004), so
+	// expiry is never decided by the application host.
+	GetOwnerClaimToken(ctx context.Context) (GetOwnerClaimTokenRow, error)
 	GetSiteByHandle(ctx context.Context, handle string) (Site, error)
 	// Renewal is conditional on still holding the lease. A worker whose lease was
 	// swept must not be able to extend it and resume writing.
@@ -79,12 +105,30 @@ type Querier interface {
 	InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) (InsertAuditEventRow, error)
 	JobDepthByKindState(ctx context.Context) ([]JobDepthByKindStateRow, error)
 	ListStorageLocations(ctx context.Context) ([]StorageLocation, error)
+	// Mint or re-mint the single token row. Re-minting bumps the generation and
+	// overwrites the digest IN PLACE, so invalidation of the previous token is
+	// atomic and total: the old digest ceases to exist at commit, and no second copy
+	// of a credential verifier is retained at rest. Timestamps come from the
+	// database clock.
+	//
+	// WHERE NOT EXISTS (SELECT 1 FROM users) makes "never mint on a claimed
+	// instance" a property of the STATEMENT rather than of the callers that happen
+	// to check first. Both current callers do check — the CLI under the advisory
+	// lock, boot by branching earlier — so there is no live defect; but this slice's
+	// thesis is that an invariant of this class belongs in the database, and a
+	// future owner-transfer or re-claim route is exactly where a Go-only guard
+	// breaks. Zero rows -> pgx.ErrNoRows -> the caller's existing ErrHasUsers.
+	MintOwnerClaimToken(ctx context.Context, arg MintOwnerClaimTokenParams) (MintOwnerClaimTokenRow, error)
 	// Feeds vizra_jobs_oldest_queued_age_seconds, which readiness and doctor read
 	// against the Q-028 threshold.
 	OldestQueuedAgeByKind(ctx context.Context) ([]OldestQueuedAgeByKindRow, error)
 	// A retryable failure with attempts left: back to queued, moved out along the
 	// ladder.
 	RetryJob(ctx context.Context, arg RetryJobParams) (int64, error)
+	// Retire a live token without consuming it: used by `vizra claim-token` before it
+	// mints, and by boot when users already exist (an implicitly claimed instance
+	// must never hold a live owner-creating credential).
+	SupersedeLiveOwnerClaimToken(ctx context.Context) (int64, error)
 	// Reclaims rows whose lease has actually elapsed. There is no boot blanket
 	// requeue (ADR-004): this sweep, leader-gated, is the whole recovery mechanism.
 	//

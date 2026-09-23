@@ -140,7 +140,18 @@ func errorHandler(log *slog.Logger) echo.HTTPErrorHandler {
 		}
 		code := httpCodeName(status)
 		message := "an internal error occurred"
-		if status < 500 {
+		// A codedError carries an APPLICATION code distinct from the one the
+		// status implies, so "this 403 is a misconfigured public origin" can be
+		// told apart from "this 403 is a rejected claim token" by a client and by
+		// an operator reading a support report. The status-derived code stays the
+		// default for everything else.
+		var ce *codedError
+		if errors.As(err, &ce) {
+			code = ce.code
+			if status < 500 {
+				message = ce.message
+			}
+		} else if status < 500 {
 			// 4xx messages are written by us and are safe to return. A 5xx
 			// message never is: it can carry an internal detail.
 			message = httpCodeName(status)
@@ -171,8 +182,12 @@ func httpCodeName(status int) string {
 		return "not_found"
 	case http.StatusMethodNotAllowed:
 		return "method_not_allowed"
+	case http.StatusConflict:
+		return "conflict"
 	case http.StatusRequestEntityTooLarge:
 		return "payload_too_large"
+	case http.StatusUnsupportedMediaType:
+		return "unsupported_media_type"
 	case http.StatusTooManyRequests:
 		return "rate_limited"
 	case http.StatusServiceUnavailable:

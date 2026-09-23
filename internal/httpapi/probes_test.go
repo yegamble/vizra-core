@@ -35,6 +35,12 @@ func newProbeServer(t *testing.T, mutate func(*Deps)) *Server {
 		EmbeddedSchemaVersion: 4,
 		PingDatabase:          func(context.Context) error { return nil },
 		PingCache:             func(context.Context) error { return nil },
+		// These tests exercise routing and probe behaviour on a CLAIMED
+		// instance. The unclaimed guard is structural and would otherwise refuse
+		// every non-allowlisted route, including the 404 path, which is its
+		// job — TestUnclaimedInstanceRefusesANonAllowlistedRoute covers that
+		// side deliberately.
+		InstanceClaimed: func(context.Context) (bool, error) { return true, nil },
 	}
 	if mutate != nil {
 		mutate(&deps)

@@ -62,12 +62,34 @@ type Config struct {
 	CORSAllowedOrigins  []string
 	AllowInsecureOrigin bool
 
+	OwnerClaimAnnounce OwnerClaimAnnounce
+	OwnerClaimTTL      time.Duration
+
 	QueueAgeThreshold time.Duration
 	WorkerConcurrency int
 	JobLease          time.Duration
 	JobTimeout        time.Duration
 	ShutdownGrace     time.Duration
 }
+
+// OwnerClaimAnnounce says where an unclaimed instance announces its claim token.
+//
+// The default is deliberately Off. A token printed to stderr is captured by
+// every Docker log driver, shipped to whatever aggregator the operator runs,
+// retained for that pipeline's retention period, and pasted into issue trackers
+// along with the rest of `docker compose logs`. VZ-INSTALL-003's privacy case —
+// "Token never appears in HTTP responses or non-local logs" — is an acceptance
+// bullet, so the safe default wins over the more discoverable one, and the
+// aggregation-safe path (`vizra claim-token`, whose output goes to the
+// operator's terminal rather than the container's log stream) is the primary.
+type OwnerClaimAnnounce string
+
+const (
+	// OwnerClaimAnnounceOff prints only the command that mints a token.
+	OwnerClaimAnnounceOff OwnerClaimAnnounce = "off"
+	// OwnerClaimAnnounceStderr prints the token itself, once, on stderr.
+	OwnerClaimAnnounceStderr OwnerClaimAnnounce = "stderr"
+)
 
 // Lookup is os.LookupEnv, or any equivalent over a candidate env file.
 type Lookup func(string) (string, bool)
@@ -235,6 +257,13 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 	c.JobLease = mustDuration(get, bad, "VIZRA_JOB_LEASE")
 	c.JobTimeout = mustDuration(get, bad, "VIZRA_JOB_TIMEOUT")
 	c.ShutdownGrace = mustDuration(get, bad, "VIZRA_SHUTDOWN_GRACE")
+	c.OwnerClaimTTL = mustDuration(get, bad, "VIZRA_OWNER_CLAIM_TTL")
+	c.OwnerClaimAnnounce = OwnerClaimAnnounce(strings.ToLower(get("VIZRA_OWNER_CLAIM_ANNOUNCE")))
+	switch c.OwnerClaimAnnounce {
+	case OwnerClaimAnnounceOff, OwnerClaimAnnounceStderr:
+	default:
+		bad("VIZRA_OWNER_CLAIM_ANNOUNCE", "must be 'off' or 'stderr'")
+	}
 	c.WorkerConcurrency = int(mustInt64(get, bad, "VIZRA_WORKER_CONCURRENCY"))
 
 	if c.WorkerConcurrency < 1 {
@@ -262,6 +291,17 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		bad("VIZRA_PUBLIC_ORIGIN", "must not carry a path")
 	} else if production && u.Scheme == "http" && !c.AllowInsecureOrigin {
 		bad("VIZRA_PUBLIC_ORIGIN", "production refuses a plain-http origin; set VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN=true only behind a trusted TLS terminator")
+	} else if n := NormalizeOrigin(c.PublicOrigin); n == "" {
+		// Reached only for a shape url.Parse accepted but that cannot be compared
+		// with a browser's Origin — in practice a non-ASCII host.
+		bad("VIZRA_PUBLIC_ORIGIN", "must be comparable with a browser Origin header; write an internationalised host in its A-label (punycode) form, for example https://xn--80ak6aa92e.example")
+	} else {
+		// Store the NORMALISED origin: lowercased scheme and host, default port
+		// elided, trailing slash and trailing dot stripped. The Origin check is a
+		// value comparison, and normalising once at boot is what keeps a single
+		// trailing slash in .env from 403-ing every browser claim while curl
+		// still works.
+		c.PublicOrigin = n
 	}
 
 	// DSN and cache URL.

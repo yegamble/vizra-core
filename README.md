@@ -95,6 +95,34 @@ direct suite fail by name.
 runs; it reads `$DOCKER`, so `scripts/testdata/fakedocker/` can drive it with no
 daemon.
 
+## Claiming a new instance
+
+A fresh instance has no owner, and **every route except the four probes and the
+two setup operations answers 403 until it does** — so the first thing an
+operator does is claim it.
+
+```sh
+docker compose exec api vizra claim-token   # prints a one-time token to YOUR terminal
+```
+
+Then open `/setup/claim`, paste the token, and create the owner account. The
+token is 64 hexadecimal characters, works exactly once, and expires after
+`VIZRA_OWNER_CLAIM_TTL` (default 1h). Running the command again mints a new
+token and invalidates the previous one. Once the instance has any account it is
+claimed for good: `vizra claim-token` then refuses, because minting on a claimed
+instance would manufacture a live owner-creating credential on a running system.
+
+**Why a command rather than a line in the log.** Only the SHA-256 digest of the
+token is ever stored, so it cannot be read back — it can only be re-minted. More
+importantly, `docker compose exec` writes to your terminal, not to the api
+container's log stream, so no log driver captures it, no aggregator indexes it
+and no retention policy keeps it. `VIZRA_OWNER_CLAIM_ANNOUNCE=stderr` will print
+the token at boot instead, which is convenient on a single host with no log
+shipping and a credential leak anywhere else — the default is `off`, and the
+boot line names this command instead.
+
+`vizra doctor` reports whether the instance is claimed and what to run if not.
+
 ## Contributing
 
 `AGENTS.md` is the engineering contract: what the gate checks, which rules are

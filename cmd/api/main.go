@@ -25,6 +25,7 @@ import (
 	"github.com/yegamble/vizra-core/internal/jobs"
 	"github.com/yegamble/vizra-core/internal/migrate"
 	"github.com/yegamble/vizra-core/internal/obs"
+	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/search"
 	"github.com/yegamble/vizra-core/internal/site"
 )
@@ -108,6 +109,22 @@ func run() error {
 	registry := prometheus.NewRegistry()
 	jobMetrics := jobs.NewMetrics(registry)
 
+	// First-run owner bootstrap (VZ-INSTALL-003). Deliberately NOT fatal: an
+	// unreachable database or a schema still behind 0005 is a start-order
+	// problem an operator diagnoses, and crash-looping the api over it would
+	// make that diagnosis harder, not easier. The failure is logged (redacted),
+	// readiness reports degraded, and `vizra doctor` says what to do.
+	//
+	// The announcement is written to stderr directly, never through `log`: the
+	// structured logger redacts a value under a key named "token", and any key
+	// that survived redaction would ship the credential to a log aggregator.
+	claimBoot, claimErr := ownerclaim.Boot(ctx, pools.Default(),
+		string(cfg.OwnerClaimAnnounce), cfg.OwnerClaimTTL, os.Stderr)
+	if claimErr != nil {
+		log.Error("api: owner-claim bootstrap did not complete; run `vizra doctor`",
+			"error", obs.Redact(claimErr.Error()))
+	}
+
 	srv := httpapi.New(httpapi.Deps{
 		Config:                cfg,
 		Resolver:              resolver,
@@ -120,6 +137,7 @@ func run() error {
 		QueueSnapshot: func(ctx context.Context) (jobs.Snapshot, error) {
 			return jobs.Collect(ctx, pools.Default(), jobMetrics)
 		},
+		OwnerClaimDegraded: claimBoot.Degraded || claimErr != nil,
 	})
 
 	// Metrics listen on their OWN address, never on the public API server.
