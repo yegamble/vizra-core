@@ -320,10 +320,17 @@ func TestMakefileDigestMutations(t *testing.T) {
 	cases := []struct {
 		name string
 		// setup arranges the tree BEFORE the control run. Whatever it builds must
-		// be green, or the red that follows proves nothing.
+		// be green, or the red that follows proves nothing — unless
+		// controlRefused names the grammar refusal that tree now meets.
 		setup    func(dir string) error
 		mutate   func(dir string) error
 		wantText string
+		// Queue 2p (core B5d): `include` is outside the allowlist grammar, so a
+		// tree with a pinned include is refused BEFORE make even unmutated. The
+		// include cases keep their point — the digest of an INCLUDED file and
+		// its pin entry are still checked and named — with the control
+		// asserting that grammar refusal (make not started) instead of green.
+		controlRefused string
 	}{
 		{
 			name: "one byte of the Makefile",
@@ -356,7 +363,8 @@ func TestMakefileDigestMutations(t *testing.T) {
 			wantText: "make would read extra.mk, which has no entry in .github/pinned-makefiles.yml",
 		},
 		{
-			name: "an included file's bytes",
+			name:           "an included file's bytes",
+			controlRefused: "the `include` directive",
 			setup: func(dir string) error {
 				if err := os.WriteFile(filepath.Join(dir, "inc.mk"), []byte("# inc.mk: pinned\nINC_VALUE := 1\n"), 0o644); err != nil {
 					return err
@@ -388,7 +396,8 @@ func TestMakefileDigestMutations(t *testing.T) {
 			wantText: "pins no file",
 		},
 		{
-			name: "a pin entry deleted (an included file's)",
+			name:           "a pin entry deleted (an included file's)",
+			controlRefused: "the `include` directive",
 			setup: func(dir string) error {
 				if err := os.WriteFile(filepath.Join(dir, "inc.mk"), []byte("# inc.mk: pinned\n"), 0o644); err != nil {
 					return err
@@ -423,7 +432,11 @@ func TestMakefileDigestMutations(t *testing.T) {
 				}
 			}
 			out, rec := runRecorded(t, dir, true)
-			assertGreen(t, "control (pinned bytes, --workflow)", out, rec)
+			if tc.controlRefused != "" {
+				assertRefusedBeforeMake(t, "control (pinned bytes, --workflow; refused by the grammar)", out, rec, tc.controlRefused)
+			} else {
+				assertGreen(t, "control (pinned bytes, --workflow)", out, rec)
+			}
 
 			snap := takeSnapshot(t, dir)
 			original := treeDigest(t, dir)
@@ -452,7 +465,11 @@ func TestMakefileDigestMutations(t *testing.T) {
 			restore(t, dir, snap, original)
 			t.Logf("restored: every file byte-identical to the control tree (%d file(s))", len(original))
 			out, rec = runRecorded(t, dir, true)
-			assertGreen(t, "restored (--workflow)", out, rec)
+			if tc.controlRefused != "" {
+				assertRefusedBeforeMake(t, "restored (--workflow; refused by the grammar)", out, rec, tc.controlRefused)
+			} else {
+				assertGreen(t, "restored (--workflow)", out, rec)
+			}
 		})
 	}
 }
@@ -623,6 +640,12 @@ func TestCIRequiredGuardMakefilePin(t *testing.T) {
 		{pin: "include-computed", wantFail: true, wantText: "names a file make COMPUTES"},
 		// Fix round 2 NIT: a directory where the pin should be is named as one.
 		{pin: "pin-is-directory", wantFail: true, wantText: "is a directory, not a file"},
+		// Queue 2p (core B5d): check 11 runs the anchor's allowlist grammar
+		// (verify_pin), so a line outside it is refused here too — by line
+		// number, with every digest matching. An `include` of a PINNED file
+		// was accepted by check 11 before this slice.
+		{pin: "grammar-conditional", wantFail: true, wantText: "Makefile:4 is outside the Makefile grammar this anchor allows (a conditional directive)"},
+		{pin: "grammar-include-pinned", wantFail: true, wantText: "Makefile:4 is outside the Makefile grammar this anchor allows (the `include` directive)"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.pin, func(t *testing.T) {
@@ -701,6 +724,12 @@ func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
 		setup  func(dir string) error // arranges a tree whose pin lists every file make reads
 		target string                 // the pinned makefile that gets a newer sibling
 		pinned []string               // every pinned makefile, in the order make reads them
+		// Queue 2p (core B5d): the include tree is outside the allowlist grammar,
+		// so it is refused BEFORE make — with or without the sibling, and no make
+		// process at all, not even `make -q`. That the probe names every pinned
+		// makefile in ONE `make -q` stays covered in-process (db-scan-probe.py,
+		// "remake probe: ONE make -q naming every pinned makefile").
+		grammarRefused string
 	}{
 		{name: "the Makefile", target: "Makefile", pinned: []string{"Makefile"}},
 		{
@@ -717,8 +746,9 @@ func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
 				}
 				return repin(dir, "Makefile", "a.mk", "b.mk")
 			},
-			target: "a.mk",
-			pinned: []string{"Makefile", "a.mk", "b.mk"},
+			target:         "a.mk",
+			pinned:         []string{"Makefile", "a.mk", "b.mk"},
+			grammarRefused: "the `include` directive",
 		},
 	}
 	for _, tc := range cases {
@@ -731,7 +761,11 @@ func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
 				}
 			}
 			out, rec := runRecorded(t, dir, true)
-			assertGreen(t, "control (no sibling)", out, rec)
+			if tc.grammarRefused != "" {
+				assertRefusedBeforeMake(t, "control (no sibling; refused by the grammar)", out, rec, tc.grammarRefused)
+			} else {
+				assertGreen(t, "control (no sibling)", out, rec)
+			}
 
 			before := map[string]string{}
 			for _, f := range tc.pinned {
@@ -758,6 +792,15 @@ func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
 			want := append([]string{"make", "-q"}, tc.pinned...)
 			for _, workflow := range []bool{true, false} {
 				out, rec := runRecorded(t, dir, workflow)
+				if tc.grammarRefused != "" {
+					assertRefusedBeforeMake(t, fmt.Sprintf("workflow=%v, sibling present", workflow), out, rec, tc.grammarRefused)
+					for _, f := range tc.pinned {
+						if got := sha256File(t, filepath.Join(dir, f)); got != before[f] {
+							t.Fatalf("workflow=%v: %s was REWRITTEN (%s -> %s):\n%s", workflow, f, before[f], got, out)
+						}
+					}
+					continue
+				}
 				if rec.Exit != 1 || !strings.Contains(out, "make would REMAKE one of "+strings.Join(tc.pinned, ", ")) {
 					t.Fatalf("workflow=%v: exit %d; want the remake refused by name:\n%s", workflow, rec.Exit, out)
 				}
@@ -786,7 +829,11 @@ func TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe(t *testing.T) {
 				t.Fatal(err)
 			}
 			out, rec = runRecorded(t, dir, true)
-			assertGreen(t, "sibling removed", out, rec)
+			if tc.grammarRefused != "" {
+				assertRefusedBeforeMake(t, "sibling removed (refused by the grammar)", out, rec, tc.grammarRefused)
+			} else {
+				assertGreen(t, "sibling removed", out, rec)
+			}
 		})
 	}
 }
@@ -914,7 +961,12 @@ func TestEveryRefusedSpellingIsRefusedBeforeMake(t *testing.T) {
 		{"computed target, braces, double colon", "G := ci\n${G}::\n\t@true\n", "is a rule whose TARGET make computes", nil},
 		{"computed target, target-specific", "G := ci\n$(G): FOO := bar\n", "is a rule whose TARGET make computes", nil},
 		{"control: .DEFAULT_GOAL", ".DEFAULT_GOAL := ci\n", "", nil},
-		{"control: pattern-specific ordinary variable", "%: FOO := bar\n", "", nil},
+		// Queue 2p (core B5d): a pattern-specific assignment of an ordinary
+		// variable was a control here (the by-name check lets it pass); the
+		// allowlist grammar refuses every pattern-specific line. An ordinary
+		// assignment is the control now.
+		{"pattern-specific ordinary variable", "%: FOO := bar\n", "is outside the Makefile grammar this anchor allows (not one of the allowed shapes)", nil},
+		{"control: an ordinary assignment", "INERT_ORDINARY := bar\n", "", nil},
 		{"control: nothing added", "", "", nil},
 	}
 	for _, tc := range cases {
@@ -952,32 +1004,26 @@ func TestAnUnreadablePinnedFileIsRefusedByName(t *testing.T) {
 		// root reads a mode-000 file anyway, so the case cannot be constructed.
 		t.Fatal("this test must not run as root: chmod 000 would not make the file unreadable")
 	}
+	// Queue 2p (core B5d): the pinned file made unreadable is the Makefile
+	// itself — a pinned include, which this test used before, is now refused
+	// by the grammar before make whatever its mode.
 	dir := copyRealTree(t)
-	inc := filepath.Join(dir, "inc.mk")
-	if err := os.WriteFile(inc, []byte("# inc.mk: pinned\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := appendBytes(filepath.Join(dir, "Makefile"), "include inc.mk\n"); err != nil {
-		t.Fatal(err)
-	}
-	if err := repin(dir, "Makefile", "inc.mk"); err != nil {
-		t.Fatal(err)
-	}
+	mk := filepath.Join(dir, "Makefile")
 	out, rec := runRecorded(t, dir, true)
 	assertGreen(t, "control (readable)", out, rec)
-	if err := os.Chmod(inc, 0); err != nil {
+	if err := os.Chmod(mk, 0); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(inc, 0o644) })
+	t.Cleanup(func() { _ = os.Chmod(mk, 0o644) })
 
 	out, rec = runRecorded(t, dir, true)
-	assertRefusedBeforeMake(t, "anchor, inc.mk mode 000", out, rec, "inc.mk is pinned but cannot be read")
+	assertRefusedBeforeMake(t, "anchor, Makefile mode 000", out, rec, "Makefile is pinned but cannot be read")
 	if strings.Contains(out, "Traceback") {
 		t.Fatalf("the anchor refused with a traceback, not by name:\n%s", out)
 	}
 	gout, code := run(t, "ci-required-guard.sh", "--makefile-pins", filepath.Join(dir, ".github", "pinned-makefiles.yml"))
-	if code != 1 || !strings.Contains(gout, "inc.mk is pinned but cannot be read") || strings.Contains(gout, "Traceback") {
-		t.Fatalf("check 11: exit %d; want exit 1 naming inc.mk, no traceback:\n%s", code, gout)
+	if code != 1 || !strings.Contains(gout, "Makefile is pinned but cannot be read") || strings.Contains(gout, "Traceback") {
+		t.Fatalf("check 11: exit %d; want exit 1 naming the Makefile, no traceback:\n%s", code, gout)
 	}
 }
 
@@ -992,7 +1038,7 @@ func TestTheDatabaseChecksFailClosed(t *testing.T) {
 	cmd := exec.Command("python3", filepath.Join(repoRoot(t), "scripts", "testdata", "db-scan-probe.py"))
 	cmd.Env = guardEnv()
 	out, err := cmd.CombinedOutput()
-	if err != nil || !strings.Contains(string(out), "PROBE: all 15 rows as expected") {
+	if err != nil || !strings.Contains(string(out), "PROBE: all 26 rows as expected") {
 		t.Fatalf("db-scan-probe: %v\n%s", err, out)
 	}
 	t.Logf("%s", out)

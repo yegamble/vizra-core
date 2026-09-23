@@ -338,7 +338,11 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// pattern rule or `.DEFAULT`. The resolver's own failure path keeps its
 		// red case in `resolver-cannot-resolve`.
 		{dir: "missing-prerequisite", wantFail: true, notInvoked: true, wantText: "has no explicit rule in the pinned bytes"},
-		{dir: "resolver-cannot-resolve", wantFail: true, wantText: "could not be established"},
+		// Queue 2p (core B5d): the allowlist grammar now refuses this line — an
+		// expansion outside an assignment value or a recipe — BEFORE make. The
+		// resolver's own `make -pn` failure path keeps its red case in-process
+		// (scripts/testdata/db-scan-probe.py, TestTheDatabaseChecksFailClosed).
+		{dir: "resolver-cannot-resolve", wantFail: true, notInvoked: true, wantText: "an expansion outside an assignment value or a recipe"},
 
 		// Sweep B5 — THE DIGEST PIN (chair ruling, tick 132, on the 2026-09-23 desk
 		// review, FINDING 4). make EVALUATES a makefile while reading it, so every
@@ -360,7 +364,12 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "makefile-symlink", wantFail: true, notInvoked: true, wantText: "is not a regular file"},
 		// The positive control for includes: pinned includes are read, and make's
 		// own MAKEFILE_LIST is corroborated against the static reading.
-		{dir: "include-pinned-good", wantFail: false, wantText: "MAKEFILE_LIST ['Makefile', 'a.mk', 'b.mk'] is exactly the pinned set"},
+		// Queue 2p (core B5d): `include` is outside the allowlist grammar, so a
+		// pinned include is refused before make. (It was the positive control for
+		// includes; the include handling — static read set, digests of included
+		// files, the one `make -q` over every pinned file — stays as defence in
+		// depth, exercised by TestMakefileDigestMutations and db-scan-probe.py.)
+		{dir: "include-pinned-good", wantFail: true, notInvoked: true, wantText: "the `include` directive"},
 
 		// Fix round 2 (PR#10 re-verification, R1-F1): `.RECIPEPREFIX` moved every
 		// recipe off the TAB the recipe checks key on, and on GNU Make 4.3 the
@@ -378,9 +387,12 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// by name after make has run on the pinned bytes. These are the only
 		// fixtures whose refusal comes from check_resolved, so each post-make
 		// branch has a red case of its own.
-		{dir: "resolver-computed-shell", wantFail: true, wantText: "make resolves SHELL to '/usr/bin/true'"},
-		{dir: "resolver-computed-makeflags", wantFail: true, wantText: "make resolves MAKEFLAGS to"},
-		{dir: "resolver-computed-recipeprefix", wantFail: true, wantText: "make resolves .RECIPEPREFIX to '>'"},
+		// Queue 2p (core B5d): a variable NAME make computes is outside the
+		// allowlist grammar, so these are refused BEFORE make now. The resolver
+		// branches they reached keep red cases in-process (db-scan-probe.py).
+		{dir: "resolver-computed-shell", wantFail: true, notInvoked: true, wantText: "an expansion outside an assignment value or a recipe"},
+		{dir: "resolver-computed-makeflags", wantFail: true, notInvoked: true, wantText: "an expansion outside an assignment value or a recipe"},
+		{dir: "resolver-computed-recipeprefix", wantFail: true, notInvoked: true, wantText: "an expansion outside an assignment value or a recipe"},
 		{dir: "resolver-computed-secondexpansion", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
 		// Found while fixing R1-F1: make applies `-`/`+` AFTER expansion, so a
 		// prefix a VARIABLE produces ignored a failing gate with the anchor green
@@ -388,8 +400,11 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// own database; one whose value cannot be determined that way is refused.
 		{dir: "prefix-from-variable", wantFail: true, wantText: "expands to a recipe line prefixed `-`"},
 		{dir: "prefix-from-chained-variable", wantFail: true, wantText: "expands to a recipe line prefixed `@-`"},
-		{dir: "prefix-from-function", wantFail: true, wantText: "starts with a make function"},
-		{dir: "prefix-from-pattern-specific", wantFail: true, wantText: "which a target- or pattern-specific assignment sets"},
+		// Queue 2p (core B5d): a function in a recipe, and a pattern-specific
+		// assignment, are outside the grammar — refused before make; the
+		// post-make expanded-prefix branches keep red cases in db-scan-probe.py.
+		{dir: "prefix-from-function", wantFail: true, notInvoked: true, wantText: "a recipe line using `$(if yes,-)`"},
+		{dir: "prefix-from-pattern-specific", wantFail: true, notInvoked: true, wantText: "not one of the allowed shapes"},
 		// ... and a swallowing SUFFIX a variable produces is read from make's own
 		// dry run, which prints the expanded command.
 		{dir: "suffix-from-variable", wantFail: true, wantText: "make's own dry run prints command(s) whose exit status is discarded"},
@@ -408,7 +423,7 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		// in scripts/testdata/db-scan-probe.py (TestTheDatabaseChecksFailClosed).
 		{dir: "resolver-computed-ignore", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
 		{dir: "resolver-computed-default", wantFail: true, notInvoked: true, wantText: "is a rule whose TARGET make computes"},
-		{dir: "resolver-computed-extra-prereqs", wantFail: true, wantText: "make resolves .EXTRA_PREREQS to 'Makefile'"},
+		{dir: "resolver-computed-extra-prereqs", wantFail: true, notInvoked: true, wantText: "an expansion outside an assignment value or a recipe"},
 		// Slice B5b (R2-F2): no recipe the gate closure reaches may come from
 		// anywhere but an explicit rule the text reading scans.
 		{dir: "pattern-rule", wantFail: true, notInvoked: true, wantText: "is a PATTERN rule"},
@@ -426,7 +441,20 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 		{dir: "computed-prerequisite", wantFail: true, notInvoked: true, wantText: "has a prerequisite make COMPUTES: $(LANE)"},
 		{dir: "posix", wantFail: true, notInvoked: true, wantText: "names `.POSIX`"},
 		// NIT: `make -q` exit 2 is make failing, not "would remake".
-		{dir: "make-q-parse-error", wantFail: true, wantText: "failed (exit 2): make reported an ERROR"},
+		// Queue 2p: a line make cannot parse is outside the grammar, so it is
+		// refused before `make -q` runs; the "-q exit 2" wording keeps its red
+		// case in db-scan-probe.py.
+		{dir: "make-q-parse-error", wantFail: true, notInvoked: true, wantText: "not one of the allowed shapes"},
+		// Queue 2p (core B5d): GRAMMAR-ONLY fixtures. No by-name check refuses
+		// any of these lines — only the allowlist grammar does, before make.
+		// With the grammar removed the anchor passes each one (C-rows in
+		// docs/evidence/hardening-b5/b5d/). Inert: the `good` Makefile plus
+		// lines that assign or declare nothing the gate uses.
+		{dir: "grammar-conditional", wantFail: true, notInvoked: true, wantText: "Makefile:9 is outside the Makefile grammar this anchor allows (a conditional directive)"},
+		{dir: "grammar-export", wantFail: true, notInvoked: true, wantText: "Makefile:9 is outside the Makefile grammar this anchor allows (the `export` directive)"},
+		{dir: "grammar-continued-comment", wantFail: true, notInvoked: true, wantText: "Makefile:9 is outside the Makefile grammar this anchor allows (a comment continued onto the next line"},
+		{dir: "grammar-vpath", wantFail: true, notInvoked: true, wantText: "Makefile:9 is outside the Makefile grammar this anchor allows (the `vpath` directive)"},
+		{dir: "grammar-substitution-reference", wantFail: true, notInvoked: true, wantText: "Makefile:10 is outside the Makefile grammar this anchor allows (an assignment value using `$(INERT_LIST:a=b)`"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {

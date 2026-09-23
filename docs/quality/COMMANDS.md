@@ -65,7 +65,48 @@ advisory. Changing the Makefile:
 shasum -a 256 Makefile      # paste into .github/pinned-makefiles.yml, same diff
 ```
 
-Before make, on the pinned text, it refuses: a `SHELL` / `.SHELLFLAGS` /
+**The allowlist grammar is the primary pre-make control** (queue 2p, core
+B5d; ported from vizra-search `scripts/makegate.py` at `4810048`). Before make,
+in both modes and in `ci-required-guard` check 11 (both call
+`scripts/makefile_pin.py` `verify_pin`), every logical line of every pinned
+makefile must be one of five shapes, or it is refused by file and line number
+with make not started:
+
+- empty, or a `#` comment in column 0 (a comment continued by a trailing
+  backslash is refused);
+- a column-0 literal assignment `NAME :=` / `?=` / `=` whose NAME is not a
+  directive keyword and whose value uses only `$$`, `$(NAME)` / `${NAME}` and a
+  `$(shell …)` (listed on the ok line as a reviewed parse-time call);
+- `.PHONY: names`;
+- a rule with ONE literal target and literal prerequisites, on one physical
+  line;
+- a TAB recipe line of such a rule, using only `$$` and `$(NAME)` / `${NAME}`.
+
+Plus byte refusals anywhere: a carriage return, NUL, any other control
+character, an invisible format (Cf) character, and non-ASCII whitespace.
+Everything else — `include` and every other directive, conditionals, `define`,
+`export`, `override`, target- and pattern-specific assignments, `+=` / `!=`,
+special targets other than `.PHONY`, functions and substitution references,
+inline `;` recipes, multi-target, double-colon and pattern rules, and every
+character above — is outside the grammar. The real Makefile fits it unchanged
+(56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe lines; the
+anchor's ok line prints the counts). Because `include` is refused, the pinned
+read set is the root `Makefile` alone; the include reading and the post-make
+checks below remain as defence in depth.
+
+Every text reading of a makefile — the grammar, the static read set, the
+parse-time sites, the anchor's closure, recipe, assignment and definition
+readings, and `ci-required-guard`'s env-name and PKGS / test-race readings —
+consumes ONE line sequence, `makefile_pin.makefile_lines`, so no two readers
+can disagree on where a line or a recipe ends.
+`scripts/testdata/one-reader-probe.py` proves it three ways (POISON: rewriting
+the text inside `makefile_lines` changes every reader's verdict; SOURCE: no
+reader splits or decodes text itself, and every such spelling in the three
+files is a named read of a non-makefile input; IDENTITY: every reader of one
+text gets the same sequence object).
+
+Then, as the SECOND diagnosis on the same text (the gate has already failed),
+it refuses by name: a `SHELL` / `.SHELLFLAGS` /
 `MAKEFLAGS` / `GNUMAKEFLAGS` / `MFLAGS` assignment in any form (global with any
 modifier, `define`, target- or pattern-specific) other than the two approved
 global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`,
@@ -97,7 +138,13 @@ recipe, a closure target missing from make's own `.PHONY` list, a `-`/`+`
 prefix a leading variable expands to (a
 leading function or target-specific variable is refused as undeterminable), a
 `|| true` suffix in the expanded dry-run command, and a `MAKEFILE_LIST` that is
-not the pinned set. The value of any OTHER variable (`GO`, `PKGS`, …) in the
+not the pinned set. Since the grammar, every committed route to these
+post-make branches is refused before make, so their refusals are exercised
+in-process by `scripts/testdata/db-scan-probe.py` (26 rows). **What the grammar
+does not see:** make's BUILT-IN implicit rules and variables — no makefile line
+names them. They are answered by the one `make -q` (a pinned makefile make
+would remake) and by the rule that every gate closure target is an explicit
+`.PHONY` rule, not by the grammar. The value of any OTHER variable (`GO`, `PKGS`, …) in the
 pinned bytes is not checked here: review is the control for that.
 
 `ci-required-guard` runs its checks over `set(FLOOR_LANES) | set(required)`.
@@ -305,3 +352,22 @@ Same host (GNU Make 3.81, go1.27.1). Not pushed at the time of measurement (the 
 | `./scripts/ci-required-guard.sh` | 0 | |
 | `python3 scripts/testdata/db-scan-probe.py` | 0 | 15 rows as expected |
 | `b5b/demo.sh` on 3.81 | 0 | 13 D rows HELD + probe; all 21 C rows red, green after restore (`b5b/on-main-36a72df/`) |
+
+### Queue 2p (core B5d: the allowlist grammar, one line reader), measured on scripts/ tree `925bdc1c…` (tree `c6170f0`)
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | 0 | all 10 lanes; `test-race` 19 ok, 8 `[no test files]`, 0 FAIL (`internal/fixtures` 534.8s) |
+| direct unit step + `go-test-report.py` | **1 — FAIL, not a pass** | 1459 executed, 0 failed, 0 skipped, floor 1006; `scripts` 493. `internal/fixtures` hit `panic: test timed out after 10m0s` (host load average ~315 from other agents' work) and so ran 13 of its floor of 36 tests. No code under `internal/` changed in this slice. Re-run alone: `go test -race -count=1 -timeout 30m ./internal/fixtures/` exit 0 (1015.9s). CI (ubuntu-24.04) is the clean target for this lane |
+| `go test -race -count=1 -v ./scripts/` | 0 | 39 top-level tests, 493 PASS lines with subtests, 0 FAIL, 0 SKIP |
+| `./scripts/make-integrity-guard.sh --workflow` / no flag | 0 / 0 | the grammar ok line: 56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe; 8 gate targets, 17 closure targets, 62 recipe lines equal |
+| `./scripts/ci-required-guard.sh` | 0 | check 11: "every line of which fits the allowlist grammar" |
+| `python3 scripts/testdata/db-scan-probe.py` | 0 | 26 rows as expected |
+| `b5d/demo.sh` on 3.81 | 0 | D rows held (rows.py 84/84, 80 refusals + 4 controls); C33–C41 red, green after byte-identical restore; T0: the new tests red against `96d19b3` without the implementation (11 top-level tests FAIL) |
+| GNU Make 4.3 (`ubuntu:24.04` container): `inside-4.3.sh` | as expected | D rows held, rows.py 84/84, C33–C37 and C41 red then green, both anchors 0, ci-required-guard 0, makeguard fixtures 66 refused / 1 green (`good`) |
+
+The include-based rows of the earlier B5 demonstrations (D3, D6, C7 in
+`hardening-b5/`) now meet the grammar's `include` refusal before they reach
+the checks they were written for. Those checks stay in the code as defence in
+depth; `db-scan-probe.py` and `TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe`
+cover them.

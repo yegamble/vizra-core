@@ -148,7 +148,33 @@ chair ruled the control is the **bytes** (tick 132):
   reading is sound **only because the bytes containing those directives are
   themselves digest-pinned** — it reads REVIEWED text; a changed byte never
   reaches it. It is not a defence against hostile text, and does not need to be.
-- Every TEXT check runs on the pinned read set **before make is invoked**:
+- **The allowlist grammar is the PRIMARY pre-make control** (queue 2p, core
+  B5d; the code is vizra-search's `scripts/makegate.py` at `4810048`, ported
+  into `scripts/makefile_pin.py`). A list of refused names is a blacklist, and
+  search's closing re-verification found lines two readers split differently
+  and spellings no name covered. So, DEFAULT-DENY per line: every logical line
+  of every pinned makefile must be empty or a column-0 `#` comment (not
+  continued by a backslash); a column-0 literal assignment `NAME := | ?= | =`
+  whose NAME is not a directive keyword and whose value uses only `$$`,
+  `$(NAME)`/`${NAME}` and `$(shell …)`; `.PHONY: names`; a rule with ONE
+  literal target and literal prerequisites, on one physical line; or a TAB
+  recipe line of such a rule using only `$$` and `$(NAME)`/`${NAME}` — with a
+  CR, NUL, other control character, invisible format (Cf) character or
+  non-ASCII whitespace refused anywhere. Anything else is refused by file and
+  line number with make NOT invoked, in both anchor modes and in check 11
+  (`verify_pin` computes it for both). `include` is outside the grammar, so
+  the pinned read set is the root `Makefile` alone; the include reading below
+  stays as defence in depth. The real Makefile fits unchanged (its `LDFLAGS`
+  value is backslash-continued, which the assignment shape allows); the
+  anchor's ok line prints the per-shape counts. **ONE line reader:** every
+  text reading of a makefile in the anchor, check 11 and `ci-required-guard`
+  consumes `makefile_pin.makefile_lines` — `scripts/testdata/one-reader-probe.py`
+  proves it (POISON, SOURCE by AST over the three files, IDENTITY).
+  `TestEveryOutOfGrammarLineIsRefusedBeforeMake` carries a row for every
+  out-of-grammar form search's table covers.
+- Every by-name TEXT check below still runs on the pinned read set **before
+  make is invoked**, now as the SECOND diagnosis (the grammar has already
+  failed the lane on anything it names):
   SHELL / .SHELLFLAGS / MAKEFLAGS / GNUMAKEFLAGS / MFLAGS assignments in every
   form (global with any modifier, `define`, target- and pattern-specific —
   `%: SHELL := /usr/bin/true` passed the anchor and neutered `make ci` before
@@ -178,7 +204,9 @@ chair ruled the control is the **bytes** (tick 132):
   recipe as make holds it must EQUAL the pinned rule's TAB lines and pass the
   same literal checks — so every recipe of every target make reaches is one
   the text reading scanned (#11 fix round 2, R1-1; in-process rows in
-  `scripts/testdata/db-scan-probe.py`); a `-`/`+` prefix a LEADING variable
+  `scripts/testdata/db-scan-probe.py`; since the grammar every committed route
+  to these branches is refused before make, so the probe's 26 in-process rows
+  are their coverage); a `-`/`+` prefix a LEADING variable
   expands to (make applies the
   prefixes after expansion — `$(IGN)./run` with `IGN := -` ignored a failing
   gate with the anchor green, measured on 3.81), a leading function or
@@ -254,6 +282,12 @@ What they **cannot** do:
   `GO := true`, a narrower `PKGS`, a recipe that simply does less — the anchor
   names the constructs above; everything else a reviewed Makefile says is
   review's to catch.
+- **The grammar reads makefile LINES; make's BUILT-IN implicit rules and
+  variables have none.** A newer `Makefile.sh` beside the Makefile, or a
+  built-in rule reaching a real file, is not a line the grammar can refuse. The
+  one `make -q` over the pinned makefiles and the rule that every gate closure
+  target is an explicit `.PHONY` rule (for which make searches no implicit
+  rule) answer those; the grammar does not.
 - **The Makefile pin is only as good as the review of the pinned bytes.** It
   moves the question from "can the anchor parse make?" to "did a human approve
   these bytes?" and does not answer the second. The reviewed `$(shell …)` calls
@@ -290,9 +324,11 @@ What they **cannot** do:
 
 Every remaining claim above maps to a fixture or a table case that goes red:
 `scripts/testdata/guard/` (75), `scripts/testdata/gotest/` (12),
-`scripts/testdata/fakedocker/` (6), `scripts/testdata/makeguard/` (62, each with
-its own pin), `scripts/testdata/makefilepin/` (13, check 11), every refused
-spelling in `TestEveryRefusedSpellingIsRefusedBeforeMake`, the byte mutations
+`scripts/testdata/fakedocker/` (6), `scripts/testdata/makeguard/` (67, each with
+its own pin), `scripts/testdata/makefilepin/` (15, check 11), every refused
+spelling in `TestEveryRefusedSpellingIsRefusedBeforeMake`, every
+out-of-grammar row in `TestEveryOutOfGrammarLineIsRefusedBeforeMake` and the
+one-reader probe in `TestEveryMakefileReaderConsumesTheOneLineReader`, the byte mutations
 of the real tree in `scripts/makefiledigest_test.go`, and the anchor's own
 environment in `TestMakeIntegrityGuardEnvironment` (both modes, one row per
 variable class) — all driven from the required `scripts` package. The
@@ -363,7 +399,7 @@ decision it protects.
 | Default-deny authorization over the frozen ADR-007 matrix | `internal/authz`, `TestFrozenMatrix` (315 cases) |
 | A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
 | A lane that is REQUIRED but not on the FLOOR is checked like any other — trigger, continue-on-error, anchor adjacency, pinned make steps, required invocations, provenance | `ci-required-guard.py` runs checks 3, 4, 8, 8b, 8c and 10 over `set(FLOOR_LANES) \| set(required)`; fixture `scripts/testdata/guard/required-not-floor/` |
-| A one-line edit to the **Makefile or its includes** cannot turn a required lane into a no-op **through the constructs the anchor names**, and an edit to a workflow's own make line cannot either | DEFAULT-DENY on the step's SHAPE, not a blacklist of shell spellings. The anchor, `./scripts/make-integrity-guard.sh --workflow`, is **pinned byte-equal** and must be the step IMMEDIATELY before every make step. **On the Makefile** (sweep B5/B5b) it runs make only on bytes matching `.github/pinned-makefiles.yml`, and refuses by name — BEFORE make, on the pinned text — a SHELL/.SHELLFLAGS/MAKEFLAGS/GNUMAKEFLAGS/MFLAGS assignment in any form but the two approved global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`, `.IGNORE`, `.DEFAULT`, `.EXTRA_PREREQS` or `.POSIX`; a pattern rule, an inline `;` recipe, a multi-target rule line, a rule whose TARGET make computes, and a `$`-named prerequisite on a gate closure rule; a literal `-`/`+` prefix, `|| true`-family suffix or `$(MAKE)` on a gate recipe line; a duplicate or conditional gate target; and a gate closure target with no explicit rule or not declared `.PHONY` (make then searches no implicit, pattern or `.DEFAULT` rule for it). AFTER make has run on the pinned bytes it refuses what only make resolves: a computed name that sets SHELL/MAKEFLAGS/`.RECIPEPREFIX`/`.EXTRA_PREREQS` or declares `.SECONDEXPANSION`/`.IGNORE`/a `.DEFAULT` recipe, a `-`/`+` prefix a leading variable expands to, a `|| true` suffix in the expanded dry run, a closure target missing from make's own `.PHONY` list, and — failing closed — a closure make reports that differs from the text closure, a closure target with no, a second, or an unreadable database entry, a closure recipe as make holds it that differs from the pinned rule's or carries a `-`/`+` prefix, sub-make or swallowing suffix, and a `MAKEFILE_LIST` that is not the pinned set. **In its own process** (strict `--workflow` mode) it refuses a set MAKEFLAGS family, any make recipe variable (MAKELEVEL, …), any variable the makefiles take from the environment (`GO`, `GOFLAGS`, …), MAKEFILES/BASH_ENV/ENV, and a `make` that is not a file named make in a system directory. `ci-required-guard.py` check **8b** requires each make step's `run:` to be **byte-equal** to a literal in `.github/pinned-steps.yml` with no key but name/run/id, refuses a look-alike anchor and a duplicate YAML key, check **8c** requires the lane to actually RUN its recorded invocations, and check **11** holds the Makefile pin. 75 fixtures under `scripts/testdata/guard/`, `TestMakeIntegrityGuardEnvironment`, `scripts/testdata/makeguard/` (each with its own pin), `scripts/testdata/makefilepin/`, `TestEveryRefusedSpellingIsRefusedBeforeMake`. **Residual (review-only): everything else a reviewed Makefile says — the value of any other variable (`GO := true`, a narrower `PKGS`), a recipe that simply does less or calls `make` by name — is review's to catch, and CODEOWNERS is advisory; and what another step does to the machine — a wrapper script, a forwarding `make` binary, a variable outside the anchor's list** |
+| A one-line edit to the **Makefile or its includes** cannot turn a required lane into a no-op **through the constructs the anchor names**, and an edit to a workflow's own make line cannot either | DEFAULT-DENY on the step's SHAPE, not a blacklist of shell spellings. The anchor, `./scripts/make-integrity-guard.sh --workflow`, is **pinned byte-equal** and must be the step IMMEDIATELY before every make step. **On the Makefile** (sweep B5/B5b) it runs make only on bytes matching `.github/pinned-makefiles.yml`; FIRST, the allowlist grammar (queue 2p) refuses by line number, BEFORE make, every line that is not empty/a column-0 comment, a column-0 literal assignment, `.PHONY:`, a single-literal-target rule with literal prerequisites, or a TAB recipe line using only `$$`/`$(NAME)` (plus CR, NUL, control, Cf and non-ASCII-whitespace bytes anywhere), every makefile text reading consuming ONE line reader; then, as the second diagnosis, it refuses by name — BEFORE make, on the pinned text — a SHELL/.SHELLFLAGS/MAKEFLAGS/GNUMAKEFLAGS/MFLAGS assignment in any form but the two approved global ones; `.ONESHELL`; any mention of `.RECIPEPREFIX`, `.SECONDEXPANSION`, `.IGNORE`, `.DEFAULT`, `.EXTRA_PREREQS` or `.POSIX`; a pattern rule, an inline `;` recipe, a multi-target rule line, a rule whose TARGET make computes, and a `$`-named prerequisite on a gate closure rule; a literal `-`/`+` prefix, `|| true`-family suffix or `$(MAKE)` on a gate recipe line; a duplicate or conditional gate target; and a gate closure target with no explicit rule or not declared `.PHONY` (make then searches no implicit, pattern or `.DEFAULT` rule for it). AFTER make has run on the pinned bytes it refuses what only make resolves: a computed name that sets SHELL/MAKEFLAGS/`.RECIPEPREFIX`/`.EXTRA_PREREQS` or declares `.SECONDEXPANSION`/`.IGNORE`/a `.DEFAULT` recipe, a `-`/`+` prefix a leading variable expands to, a `|| true` suffix in the expanded dry run, a closure target missing from make's own `.PHONY` list, and — failing closed — a closure make reports that differs from the text closure, a closure target with no, a second, or an unreadable database entry, a closure recipe as make holds it that differs from the pinned rule's or carries a `-`/`+` prefix, sub-make or swallowing suffix, and a `MAKEFILE_LIST` that is not the pinned set. **In its own process** (strict `--workflow` mode) it refuses a set MAKEFLAGS family, any make recipe variable (MAKELEVEL, …), any variable the makefiles take from the environment (`GO`, `GOFLAGS`, …), MAKEFILES/BASH_ENV/ENV, and a `make` that is not a file named make in a system directory. `ci-required-guard.py` check **8b** requires each make step's `run:` to be **byte-equal** to a literal in `.github/pinned-steps.yml` with no key but name/run/id, refuses a look-alike anchor and a duplicate YAML key, check **8c** requires the lane to actually RUN its recorded invocations, and check **11** holds the Makefile pin. 75 fixtures under `scripts/testdata/guard/`, `TestMakeIntegrityGuardEnvironment`, `scripts/testdata/makeguard/` (each with its own pin), `scripts/testdata/makefilepin/`, `TestEveryRefusedSpellingIsRefusedBeforeMake`, `TestEveryOutOfGrammarLineIsRefusedBeforeMake`, `TestEveryMakefileReaderConsumesTheOneLineReader`. **Residual (review-only): make's built-in implicit rules (no makefile line to refuse; answered by `make -q` and the explicit-`.PHONY` closure rule, not by the grammar); everything else a reviewed Makefile says — the value of any other variable (`GO := true`, a narrower `PKGS`), a recipe that simply does less or calls `make` by name — is review's to catch, and CODEOWNERS is advisory; and what another step does to the machine — a wrapper script, a forwarding `make` binary, a variable outside the anchor's list** |
 | make runs only on REVIEWED Makefile bytes: the anchor never evaluates a makefile (whose `$(shell …)` and friends run while make reads it) whose bytes do not match `.github/pinned-makefiles.yml`; before make it refuses a read set that names an unpinned file, and after ONE `make -q` naming every pinned makefile it refuses a tree where make would remake one, so make reads only the pinned files and remakes none of them except through a `+`/`$(MAKE)` line in the pinned bytes. A file swapped by a concurrent process between the digest and make's read is the review-only residual below | `scripts/makefile_pin.py` `verify_pin` (digests and the static read set, shared with check 11), `scripts/make-integrity-guard.py` `check_makefile_pin` (before any make), `check_no_pinned_makefile_would_be_remade` (one `make -q`), the MAKEFILE_LIST corroboration and post-make re-hash; `clean_env` drops the runner command-file variables. `ci-required-guard.py` check 11. Fixtures `scripts/testdata/makeguard/` and `makefilepin/`; `TestMakefileDigestMutations` (one Makefile byte, an extra include, an included file's bytes, a deleted pin entry — each red with make not started, recorded), `TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe`, `TestTheAnchorsSubprocessesCannotSeeTheRunnerCommandFiles`, `TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake`. **Residual (review-only): a reviewer approving a malicious Makefile together with its pin update; CODEOWNERS is advisory** |
 | Whatever make did, a real failing test — UNIT **or INTEGRATION** — still fails a required lane | `ci-required-guard.py` check 9 requires a make-free unit AND integration `go test ./...` in a required lane, each **byte-equal to a pinned body**: the exit handling (`\|\| exit 1` on the report, `exit "$rc"` last) is what makes a failing test fail the step, and a substring check could not see it removed (PR#9 VERIFY, FINDING 6). Fixtures `no-direct-test-lane/`, `no-direct-integration-lane/`, `direct-lane-without-report/`, `direct-lane-without-exit-rc/` |
 | A test lane cannot pass having run NOTHING, one package cannot disappear inside the headroom, and its skip count is readable from the job log | the direct steps emit `go test -json`; `scripts/go-test-report.py` judges `go test`'s own exit code, names every failure and skip, fails on any skip not allowlisted by test name with a reason, and holds the count to committed floors in `scripts/test-floors.json` — whole-suite **and one per package, for every package in both suites** (PR#9 VERIFY, FINDING 7). 12 fixtures under `scripts/testdata/gotest/` |

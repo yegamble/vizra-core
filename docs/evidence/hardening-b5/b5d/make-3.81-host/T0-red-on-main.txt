@@ -1,0 +1,158 @@
+# T0: the new B5d tests and fixtures overlaid on origin/main 96d19b3 (implementation NOT applied)
+# host: Darwin arm64 make: GNU Make 3.81 python3: Python 3.9.6 go: go1.27.1
+# overlaid from 57a9b3965ff45ddb9431cb72ad87c0101edc6f10: scripts/grammar_test.go and:
+#   scripts/makefiledigest_test.go
+#   scripts/scripts_test.go
+#   scripts/testdata/db-scan-probe.py
+#   scripts/testdata/makefilepin/grammar-conditional/.github/pinned-makefiles.yml
+#   scripts/testdata/makefilepin/grammar-conditional/Makefile
+#   scripts/testdata/makefilepin/grammar-include-pinned/.github/pinned-makefiles.yml
+#   scripts/testdata/makefilepin/grammar-include-pinned/Makefile
+#   scripts/testdata/makefilepin/grammar-include-pinned/inc.mk
+#   scripts/testdata/makeguard/grammar-conditional/.github/pinned-makefiles.yml
+#   scripts/testdata/makeguard/grammar-conditional/Makefile
+#   scripts/testdata/makeguard/grammar-continued-comment/.github/pinned-makefiles.yml
+#   scripts/testdata/makeguard/grammar-continued-comment/Makefile
+#   scripts/testdata/makeguard/grammar-export/.github/pinned-makefiles.yml
+#   scripts/testdata/makeguard/grammar-export/Makefile
+#   scripts/testdata/makeguard/grammar-substitution-reference/.github/pinned-makefiles.yml
+#   scripts/testdata/makeguard/grammar-substitution-reference/Makefile
+#   scripts/testdata/makeguard/grammar-vpath/.github/pinned-makefiles.yml
+#   scripts/testdata/makeguard/grammar-vpath/Makefile
+#   scripts/testdata/one-reader-probe.py
+# status:  M scripts/makefiledigest_test.go
+# status:  M scripts/scripts_test.go
+# status:  M scripts/testdata/db-scan-probe.py
+# status: ?? scripts/grammar_test.go
+# status: ?? scripts/testdata/makefilepin/grammar-conditional/
+# status: ?? scripts/testdata/makefilepin/grammar-include-pinned/
+# status: ?? scripts/testdata/makeguard/grammar-conditional/
+# status: ?? scripts/testdata/makeguard/grammar-continued-comment/
+# status: ?? scripts/testdata/makeguard/grammar-export/
+# status: ?? scripts/testdata/makeguard/grammar-substitution-reference/
+# status: ?? scripts/testdata/makeguard/grammar-vpath/
+# status: ?? scripts/testdata/one-reader-probe.py
+
+--- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake (0.00s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/inline_recipe_holding_=_(-run=Foo) (2.18s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$X_in_a_recipe (2.91s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$(value_V)_in_a_value (3.02s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$(origin_V)_in_a_value (3.11s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$@_at_the_start_of_a_recipe (3.15s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_substitution_reference_in_a_value (3.17s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$V_in_a_value (3.21s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/ifdef (3.31s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_special_target_(.SILENT) (2.73s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_#_inside_$(shell_…) (2.16s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_TAB_line_outside_a_rule (2.15s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$(eval_…)_in_a_value (1.99s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_!=_assignment (2.31s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$(file_…)_in_a_value (2.29s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_function_at_the_start_of_a_recipe (2.80s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_+=_assignment (2.92s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/include (1.92s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_conditional (2.09s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/vpath (2.10s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/override_assignment (2.11s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/unexport (2.09s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/export_with_an_assignment (2.11s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/define (1.84s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/export (2.18s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/sinclude (1.54s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/-include (1.75s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/load_rule_line (1.96s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/call_with_a_partly_computed_function_name (2.27s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/override_rule_line_with_an_inline_recipe (2.61s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/private_rule_line_with_a_TAB_recipe (2.32s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/undefine_rule_line (2.62s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/private_rule_line_with_an_inline_recipe (2.05s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_non-TAB_line_inside_a_conditional_within_a_recipe (2.41s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_conditional_within_a_recipe (2.11s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/inline_recipe_echo_a=b (1.71s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/inline_recipe_with_a_prerequisite,_holding_X=1 (1.66s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_function_in_a_value (2.35s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_pattern_rule (1.73s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_target-specific_assignment (1.99s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_pattern-specific_assignment (2.01s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_double-colon_rule (2.11s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_second_colon (2.19s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/ifndef_as_a_variable_name (2.29s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/load_as_a_variable_name (2.03s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/vpath_as_a_variable_name (2.70s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/undefine_as_a_variable_name (2.16s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/private_as_a_variable_name (2.12s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/override_as_a_variable_name (1.58s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/export_as_a_variable_name (1.56s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/unexport_as_a_variable_name (1.61s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/endef_as_a_variable_name (1.54s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/sinclude_as_a_variable_name (1.04s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/define_as_a_variable_name (1.55s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/-include_as_a_variable_name (1.22s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/include_as_a_variable_name (1.34s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/endif_as_a_variable_name (1.38s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/ifneq_as_a_variable_name (1.49s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/else_as_a_variable_name (2.17s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/ifeq_as_a_variable_name (2.21s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/ifdef_as_a_variable_name (3.02s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_rule_line_whose_trailing_comment_is_continued (3.51s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_directive_keyword_as_a_rule_target (4.12s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_line_of_only_spaces (3.95s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_right-to-left_override_in_a_comment (3.89s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/an_NBSP-only_line (3.09s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_form_feed (3.79s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_NUL_inside_a_comment (3.34s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/CRLF_line_endings (2.40s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_lone_CR_inside_a_comment (2.20s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_.PHONY_line_continued_with_a_backslash (2.47s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_line_of_only_a_word (2.39s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/grouped_targets_&: (2.31s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_comment_continued_into_a_rule_line (2.72s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/two_targets_on_one_rule_line (2.48s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/$(shell_…)_in_a_recipe (2.55s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_computed_prerequisite (2.59s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_rule_line_continued_with_a_backslash (2.48s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_rule_line_that_starts_with_whitespace (1.61s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_computed_rule_target (1.25s)
+    --- FAIL: TestEveryOutOfGrammarLineIsRefusedBeforeMake/a_computed_variable_name (1.29s)
+--- FAIL: TestTheRealMakefileFitsTheGrammar (0.15s)
+--- FAIL: TestTheGrammarRefusesEveryLineReadersCouldSplitDifferently (0.21s)
+--- FAIL: TestTheAnchorReadsTheRecipeMakeReads (0.36s)
+--- FAIL: TestEveryMakefileReaderConsumesTheOneLineReader (0.44s)
+--- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader (0.00s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/read_text_+_split_in_the_anchor (0.51s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/splitlines_in_makefile_pin (0.51s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/a_second_splitter_inside_a_named_reader (0.55s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/open_+_iterate_in_ci-required-guard (0.55s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/an_inline_(?m)_flag_in_the_anchor (0.56s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/an_aliased_open_in_the_anchor (0.59s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/a_multi-line_regex_over_the_Makefile_in_ci-required-guard (0.59s)
+    --- FAIL: TestTheOneReaderSourceCheckRefusesAPlantedReader/read_bytes_+_decode_in_makefile_pin (0.62s)
+--- FAIL: TestMakefileDigestMutations (0.00s)
+    --- FAIL: TestMakefileDigestMutations/a_pin_entry_deleted_(an_included_file's) (1.57s)
+    --- FAIL: TestMakefileDigestMutations/an_included_file's_bytes (1.71s)
+--- FAIL: TestCIRequiredGuardMakefilePin (0.00s)
+    --- FAIL: TestCIRequiredGuardMakefilePin/grammar-include-pinned (1.78s)
+    --- FAIL: TestCIRequiredGuardMakefilePin/grammar-conditional (1.28s)
+--- FAIL: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe (0.00s)
+    --- FAIL: TestAMakefileMakeWouldRemakeIsRefusedWithoutRunningARecipe/an_included_makefile (1.99s)
+--- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake (0.00s)
+    --- FAIL: TestEveryRefusedSpellingIsRefusedBeforeMake/pattern-specific_ordinary_variable (3.65s)
+--- FAIL: TestMakeIntegrityGuardFixtures (0.00s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/prefix-from-function (1.22s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/prefix-from-pattern-specific (1.32s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/resolver-computed-shell (0.80s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/resolver-computed-recipeprefix (0.95s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/resolver-computed-makeflags (0.92s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/include-pinned-good (0.90s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/resolver-computed-extra-prereqs (0.66s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/resolver-cannot-resolve (0.48s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/grammar-conditional (0.81s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/grammar-continued-comment (0.78s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/grammar-vpath (0.83s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/grammar-substitution-reference (0.86s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/grammar-export (0.89s)
+    --- FAIL: TestMakeIntegrityGuardFixtures/make-q-parse-error (0.46s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	84.482s
+FAIL
+go test exit=1   (exit code captured from an identical re-run on the same overlaid tree; its summary line was also FAIL)

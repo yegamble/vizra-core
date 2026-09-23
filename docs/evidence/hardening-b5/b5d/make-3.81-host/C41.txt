@@ -1,0 +1,62 @@
+# C41 the grammar removed, through every out-of-grammar row (Go-free)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 57a9b3965ff45ddb9431cb72ad87c0101edc6f10  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 925bdc1c6f1be5e58f597cf6c77605a35d1ad5f1
+
+==============================================================
+MUTATION: C41 the grammar removed, through every out-of-grammar row (Go-free)
+  file:   scripts/makefile_pin.py
+  mutate: python3 docs/evidence/hardening-b5/b5d/mutations.py C41
+  check:  python3 docs/evidence/hardening-b5/b5d/rows.py | grep -E '^BROKEN|^rows:' | cut -c1-200; exit ${PIPESTATUS[0]}
+--------------------------------------------------------------
+  sha256 BEFORE: 94e1b66b68b49e4bfd4582621e441583c9fc7a3eb8cb94f4bb195f1b24ae45a8
+  sha256 AFTER:  5969fd802bbf818bad6302528b32d28f05ba4c732f1e0b6f6c02fd74641f844b
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+BROKEN $(origin V) in a value                                                 anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN $(value V) in a value                                                  anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a computed variable name                                               anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a computed rule target                                                 anchor exit=1 make-processes=0 check11 exit=0 | 
+BROKEN a computed prerequisite                                                anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a rule line that starts with whitespace                                anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a rule line continued with a backslash                                 anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a .PHONY line continued with a backslash                               anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN two targets on one rule line                                           anchor exit=1 make-processes=0 check11 exit=0 | 
+BROKEN grouped targets &:                                                     anchor exit=1 make-processes=0 check11 exit=0 | 
+BROKEN a line of only a word                                                  anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN a comment continued into a rule line                                   anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a rule line whose trailing comment is continued                        anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a lone CR inside a comment                                             anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN CRLF line endings                                                      anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a NUL inside a comment                                                 anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN an NBSP-only line                                                      anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN a form feed                                                            anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a right-to-left override in a comment                                  anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a line of only spaces                                                  anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN a directive keyword as a rule target                                   anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN ifdef as a variable name                                               anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN ifndef as a variable name                                              anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN ifeq as a variable name                                                anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN ifneq as a variable name                                               anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN else as a variable name                                                anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN endif as a variable name                                               anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN include as a variable name                                             anchor exit=1 make-processes=0 check11 exit=1 | 
+BROKEN -include as a variable name                                            anchor exit=1 make-processes=0 check11 exit=1 | 
+BROKEN sinclude as a variable name                                            anchor exit=1 make-processes=0 check11 exit=1 | 
+BROKEN define as a variable name                                              anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN endef as a variable name                                               anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN export as a variable name                                              anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN unexport as a variable name                                            anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN override as a variable name                                            anchor exit=1 make-processes=1 check11 exit=0 | 
+BROKEN private as a variable name                                             anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN undefine as a variable name                                            anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN vpath as a variable name                                               anchor exit=0 make-processes=4 check11 exit=0 | 
+BROKEN load as a variable name                                                anchor exit=1 make-processes=0 check11 exit=1 | 
+rows: 4 held, 80 broken, of 84 (80 refusals, 4 controls)
+------------------------------------
+  sha256 RESTORED: 94e1b66b68b49e4bfd4582621e441583c9fc7a3eb8cb94f4bb195f1b24ae45a8
+  restore byte-identical: yes
+  RESULT: C41 the grammar removed, through every out-of-grammar row (Go-free) -> exit 1
+
+== after restore ==
+rows: 84 held, 0 broken, of 84 (80 refusals, 4 controls)

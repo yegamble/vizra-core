@@ -1,0 +1,15 @@
+# D-pins: check 11 on the grammar pin fixtures
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 57a9b3965ff45ddb9431cb72ad87c0101edc6f10  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 925bdc1c6f1be5e58f597cf6c77605a35d1ad5f1
+
+check 11 on grammar-conditional: exit=1
+  FAIL  Makefile:4 is outside the Makefile grammar this anchor allows (a conditional directive): `ifdef VIZRA_B5D_NEVER_SET`. Every line must be empty, a commen
+  FAIL  Makefile:6 is outside the Makefile grammar this anchor allows (a conditional directive): `endif`. Every line must be empty, a comment, `NAME := | ?= | =
+ci-required-guard: FAILED
+pin_scenario grammar-conditional: control HELD (exit 0)
+check 11 on grammar-include-pinned: exit=1
+  FAIL  Makefile:4 is outside the Makefile grammar this anchor allows (the `include` directive): `include inc.mk`. Every line must be empty, a comment, `NAME :=
+ci-required-guard: FAILED
+pin_scenario grammar-include-pinned: control HELD (exit 0)
+all_pins exit=0

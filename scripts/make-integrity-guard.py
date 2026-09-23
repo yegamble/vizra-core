@@ -100,6 +100,26 @@ not discarded:
     GITHUB_STATE, GITHUB_STEP_SUMMARY or any other variable whose value is a
     file in the runner's command-file directory (clean_env), nor MAKEFLAGS,
     MAKEFILES, BASH_ENV or ENV;
+  * FIRST, THE ALLOWLIST GRAMMAR (queue 2p, core B5d; makefile_pin.grammar_problems,
+    ported from vizra-search scripts/makegate.py at 4810048). Default-deny per
+    line: every logical line of every pinned makefile must be empty or a
+    column-0 comment (not backslash-continued), a column-0 literal assignment
+    (NAME not a directive keyword; value only `$$`, `$(NAME)`/`${NAME}` and
+    `$(shell ...)`), `.PHONY:`, a single-literal-target rule with literal
+    prerequisites on one physical line, or a TAB recipe line of such a rule
+    using only `$$` and `$(NAME)`/`${NAME}`; a CR, NUL, other control,
+    invisible-format (Cf) or non-ASCII whitespace character is refused
+    anywhere. Anything else fails the lane by file and line number, before make
+    is ever invoked (check 11 runs the same verify_pin). `include` is outside
+    it, so the pinned read set is the root Makefile alone. Every reading of
+    makefile text here consumes ONE line sequence, makefile_pin.makefile_lines
+    (scripts/testdata/one-reader-probe.py: POISON, SOURCE, IDENTITY). What the
+    grammar cannot see is make's BUILT-IN implicit rules and variables, which
+    have no makefile line: the one `make -q` and the explicit-.PHONY closure
+    rule below answer those. The by-name refusals that follow are the SECOND
+    diagnosis on the same text, and the post-make checks are defence in depth
+    (their committed routes are refused by the grammar first; db-scan-probe.py
+    exercises them in-process);
   * a Makefile (or anything it `include`s) whose TEXT assigns `SHELL`,
     `.SHELLFLAGS`, `MAKEFLAGS`, `GNUMAKEFLAGS` or `MFLAGS` — globally, with
     `export` / `override` / `private`, with `define`, or target- or
@@ -521,10 +541,26 @@ def check_makefile_pin(g: Guard, root: Path):
     None means: do NOT invoke make. The caller returns without running it.
     """
     r = mp.verify_pin(root)
+    # THE GRAMMAR (queue 2p): the primary control for what the pinned bytes may say, reported FIRST and
+    # whatever else is wrong (an `include` line is a grammar refusal before it is an unpinned read). A
+    # line outside it fails the lane here, BEFORE make. When the digests also matched, the by-name
+    # readings after this (check_text, …) still run on the bytes as the second diagnosis, and the gate
+    # in main() then stops make.
+    for p in r.grammar:
+        g.fail(p.message, "make is only run on a Makefile every line of which is one of the allowed shapes.")
     for p in r.problems:
         g.fail(p.message, *_PIN_FAIL_DETAIL.get(p.kind, lambda _p: ())(p))
-    if not r.ok:
+    if r.problems:
         return None
+    if r.grammar:
+        return r.order, {rel: r.digests[rel] for rel in r.order}
+    shapes = {}
+    for rel in r.order:
+        mp.grammar_problems(rel, r.texts[rel])
+        for k, v in mp.grammar_problems.last_shapes.items():
+            shapes[k] = shapes.get(k, 0) + v
+    g.ok(f"every line of the pinned makefile(s) is one of the allowed shapes (the allowlist grammar, before "
+         f"make): {', '.join(f'{v} {k}' for k, v in shapes.items())}")
     g.ok(
         f"make runs only on REVIEWED bytes: the {len(r.order)} file(s) it will read ({', '.join(r.order)}) "
         f"match the sha256 pins in {PIN_FILE}, checked before make was invoked. Those bytes are not "
@@ -896,19 +932,19 @@ def prerequisite_closure(root: Path, files: list[str], seeds: list[str]) -> list
     prereqs: dict[str, list[str]] = {}
     for rel in files:
         try:
-            text = (root / rel).read_text()
-        except OSError:
+            lines = mp.read_makefile_lines(root / rel)
+        except (OSError, UnicodeDecodeError):
             continue
-        for line in text.split("\n"):
-            if line.startswith("\t") or line.lstrip().startswith("#"):
+        for rec in lines:
+            if rec.tab:
                 continue
-            m = RULE_RE.match(line)
+            m = RULE_RE.match(rec.code)
             if not m:
                 continue
             names = m.group(1).split()
             # An inline `;` recipe is not a prerequisite list (it is refused
             # separately); cutting it keeps its words out of the closure.
-            deps = m.group(2).split("#")[0].split(";")[0].replace("|", " ").split()
+            deps = m.group(2).split(";")[0].replace("|", " ").split()
             for n in names:
                 if n.startswith(".") or "%" in n:
                     continue  # .PHONY, .SHELLFLAGS, pattern rules
@@ -928,24 +964,8 @@ def prerequisite_closure(root: Path, files: list[str], seeds: list[str]) -> list
     return out
 
 
-def logical_recipe_lines(lines: list[str], start: int):
-    """Collect one target's recipe from Makefile text, joining continuations."""
-    recipe = []
-    i = start
-    while i < len(lines):
-        line = lines[i]
-        if line.strip() == "" or line.lstrip().startswith("#"):
-            i += 1
-            continue
-        if not line.startswith("\t"):
-            break
-        first, body = i, line[1:]
-        while body.rstrip().endswith("\\") and i + 1 < len(lines):
-            i += 1
-            body = body.rstrip()[:-1] + " " + lines[i].lstrip("\t")
-        recipe.append((first + 1, body.strip()))
-        i += 1
-    return recipe
+# (logical_recipe_lines is gone: every recipe is read by makefile_pin.recipe_lines over the ONE
+# logical-line sequence, deciding which rule a TAB line belongs to exactly as the grammar does.)
 
 
 # Make's own variables, which a makefile may reference without assigning.
@@ -960,7 +980,8 @@ _FUNCTIONS = {
     "firstword", "lastword", "abspath", "realpath", "if", "or", "and", "origin", "value",
     "addprefix", "addsuffix", "basename", "suffix", "join", "findstring", "flavor", "file",
 }
-_ASSIGN_RE = re.compile(r"^\s*(?:export\s+|override\s+)*([A-Za-z_][A-Za-z0-9_.]*)\s*(\?=|:{1,3}=|\+=|!=|=)", re.M)
+# Matched against ONE logical line at a time (makefile_pin.makefile_lines), so no multi-line flag.
+_ASSIGN_RE = re.compile(r"^\s*(?:export\s+|override\s+)*([A-Za-z_][A-Za-z0-9_.]*)\s*(\?=|:{1,3}=|\+=|!=|=)")
 # `$(NAME)` / `${NAME}` — but not the shell's `$${NAME}` inside a recipe.
 _REF_RE = re.compile(r"(?<!\$)\$[({]([A-Za-z_][A-Za-z0-9_]*)[)}]")
 
@@ -987,13 +1008,14 @@ def check_environment_overrides(g: Guard, root: Path, files: list[str], workflow
     for rel in files:
         path = root / rel if not Path(rel).is_absolute() else Path(rel)
         try:
-            text = path.read_text()
-        except OSError:
+            lines = mp.read_makefile_lines(path)
+        except (OSError, UnicodeDecodeError):
             continue
-        for m in _ASSIGN_RE.finditer(text):
-            if m.group(1) not in assigned or m.group(2) == "?=":
+        for rec in lines:
+            m = _ASSIGN_RE.match(rec.raw)
+            if m and (m.group(1) not in assigned or m.group(2) == "?="):
                 assigned[m.group(1)] = m.group(2)
-        refs |= set(_REF_RE.findall(text))
+            refs |= set(_REF_RE.findall(rec.raw))
     from_env = {n for n, op in assigned.items() if op == "?="}
     from_env |= {n for n in refs if n not in assigned} - _MAKE_BUILTIN_VARS - _FUNCTIONS
     from_env.add("GOFLAGS")
@@ -1041,25 +1063,25 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
     for rel in files:
         path = root / rel
         try:
-            text = path.read_text()
-        except OSError as err:
+            recs = mp.read_makefile_lines(path)
+        except (OSError, UnicodeDecodeError) as err:
             g.fail(f"cannot read {rel}, which make will read: {err}")
             continue
-        lines = text.split("\n")
         is_root = Path(rel).name == "Makefile" and Path(rel).parent in (Path("."), Path(""))
 
-        for n, line in enumerate(lines, 1):
+        for rec in recs:
             for token, why in REFUSED_TOKENS.items():
-                if _REFUSED_TOKEN_RE[token].search(line):
-                    g.fail(f"{rel}:{n} names `{token}`: `{line.strip()[:120]}`", why,
+                if _REFUSED_TOKEN_RE[token].search(rec.raw):
+                    g.fail(f"{rel}:{rec.n} names `{token}`: `{rec.raw.strip()[:120]}`", why,
                            "Refused wherever it is named — any operator, modifier or spelling — before make runs.")
 
         controlled = (*CONTROLLED_ASSIGNMENTS, *FORBIDDEN_ASSIGNMENTS)
         in_define = False
         logical_by_line = {}
-        for n, line in mp.logical_lines(text):
+        for rec in recs:
+            n, line = rec.n, rec.code
             logical_by_line[n] = line
-            if line.startswith("\t"):
+            if rec.tab:
                 continue
             ph = re.match(r"^\.PHONY\s*:(?!=)(.*)$", line)
             if ph:
@@ -1128,8 +1150,9 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
                     "is one the per-target recipe reading would not attribute (#11 fix round 1, X-1).",
                 )
 
-        for n, line in enumerate(lines, 1):
-            if line.startswith("\t"):
+        for idx, rec in enumerate(recs):
+            n, line = rec.n, rec.code
+            if rec.tab:
                 continue  # a recipe line, handled below
             m = assignment_re.match(line)
             if m:
@@ -1183,8 +1206,8 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
                     # Guard against a gate target hidden inside a conditional:
                     # which recipe runs would then depend on a variable.
                     depth = 0
-                    for prev in lines[: n - 1]:
-                        head = prev.strip().split(" ")[0]
+                    for prev in recs[:idx]:
+                        head = prev.code.strip().split(" ")[0]
                         if head in MAKE_CONDITIONALS:
                             depth += 1
                         elif head == "endif":
@@ -1195,7 +1218,7 @@ def check_text(g: Guard, root: Path, files: list[str], targets: list[str], seeds
                             "Which recipe runs would depend on a variable, so the recipe a reader sees is",
                             "not necessarily the one that executes. Gate targets must be unconditional.",
                         )
-                    check_recipe(g, rel, t, logical_recipe_lines(lines, n))
+                    check_recipe(g, rel, t, mp.recipe_lines(recs, idx + 1))
 
     if not seen_shell or not seen_shellflags:
         g.fail(

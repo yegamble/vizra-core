@@ -1,0 +1,9 @@
+# D-db-scan-probe: the post-make database checks (defence in depth), fed strings in-process
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 57a9b3965ff45ddb9431cb72ad87c0101edc6f10  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 925bdc1c6f1be5e58f597cf6c77605a35d1ad5f1
+
+ROW ok   remake probe: make -q exit 1: refused=True (expected True); says 'make would REMAKE one of Makefile': True
+ROW ok   remake probe: ONE make -q naming every pinned makefile: refused=False (expected False); says "make calls: [['-q', 'Makefile', 'a.mk', 'b.mk']]": True
+PROBE: all 26 rows as expected
+probe exit=0

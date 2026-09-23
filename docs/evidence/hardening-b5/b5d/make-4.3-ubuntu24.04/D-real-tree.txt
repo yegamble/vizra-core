@@ -1,0 +1,14 @@
+# D-real-tree: both anchor modes and ci-required-guard on the real, unchanged Makefile
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: 2dab194badac035d2efb3b3e915bf624440fa64c  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 925bdc1c6f1be5e58f597cf6c77605a35d1ad5f1
+
+  ok    every line of the pinned makefile(s) is one of the allowed shapes (the allowlist grammar, before make): 56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+anchor --workflow exit=0
+  ok    every line of the pinned makefile(s) is one of the allowed shapes (the allowlist grammar, before make): 56 blank/comment, 11 assignment, 25 phony, 25 rule, 72 recipe
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+anchor lenient exit=0
+  ok    pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree; make will read exactly Makefile (the anchor's own verify_pin), every line of which fits the allowlist grammar
+ci-required-guard: passed (6 required check(s))
+ci-required-guard exit=0
