@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yegamble/vizra-core/internal/cache"
@@ -15,8 +17,10 @@ import (
 	"github.com/yegamble/vizra-core/internal/db"
 	"github.com/yegamble/vizra-core/internal/doctor"
 	"github.com/yegamble/vizra-core/internal/migrate"
+	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/search"
 	"github.com/yegamble/vizra-core/internal/site"
+	"github.com/yegamble/vizra-core/internal/store/sqlcgen"
 )
 
 // This file is deliberately thin: it does the I/O — opening pools, running
@@ -43,6 +47,8 @@ type probes struct {
 	schema          func(context.Context, pooler) (migrate.Status, error)
 	openCache       func(*config.Config) (cacher, error)
 	searchReachable func(context.Context, *config.Config) bool
+	ownerClaim      func(context.Context, pooler) doctor.OwnerClaimState
+	rawPublicOrigin func() string
 }
 
 // pooler and cacher are the narrow views collect() needs, so a fake is three
@@ -74,16 +80,26 @@ func runDoctor(args []string) error {
 
 // realProbes is the production wiring.
 func realProbes(envFile string) probes {
+	// ONE configuration source for every probe that reads configuration. The
+	// origin check compares the operator's raw VIZRA_PUBLIC_ORIGIN with the
+	// normalised value config.LoadFrom produced; under --env those must both
+	// come from F, never one from F and the other from the process environment.
+	var (
+		once      sync.Once
+		lookup    func(string) (string, bool)
+		lookupErr error
+	)
+	source := func() (func(string) (string, bool), error) {
+		once.Do(func() { lookup, lookupErr = envSource(envFile) })
+		return lookup, lookupErr
+	}
 	return probes{
 		loadConfig: func() (*config.Config, error) {
-			if envFile == "" {
-				return config.Load()
-			}
-			env, err := readEnvFile(envFile)
+			l, err := source()
 			if err != nil {
 				return nil, err
 			}
-			return config.LoadFrom(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
+			return config.LoadFrom(l)
 		},
 		compose: composeCheck,
 		openPools: func(ctx context.Context, r *site.Resolver) (pooler, error) {
@@ -112,6 +128,15 @@ func realProbes(envFile string) probes {
 			}
 			return c, nil
 		},
+		ownerClaim: realOwnerClaim,
+		rawPublicOrigin: func() string {
+			l, err := source()
+			if err != nil {
+				return "" // unreachable in practice: loadConfig already failed on it
+			}
+			v, _ := l("VIZRA_PUBLIC_ORIGIN")
+			return v
+		},
 		searchReachable: func(ctx context.Context, cfg *config.Config) bool {
 			if cfg.SearchMode == config.SearchOff {
 				return false
@@ -119,6 +144,30 @@ func realProbes(envFile string) probes {
 			remote := search.NewRemote(cfg.SearchURL, []byte(cfg.SearchHMACKey), cfg.SearchTimeout)
 			return search.NewService(search.NewSQL(), remote, nil).Health(ctx) == search.HealthOK
 		},
+	}
+}
+
+// ownerClaim reads the first-run state. It is a REAL check: it queries the
+// database, and reports FAIL when it cannot — doctor never reports OK for
+// something it did not test.
+func realOwnerClaim(ctx context.Context, pool pooler) doctor.OwnerClaimState {
+	raw, ok := pool.(poolAdapter)
+	if !ok {
+		return doctor.OwnerClaimState{LookupErr: errors.New("no database pool")}
+	}
+	q := sqlcgen.New(raw.pools.Default())
+	claimed, err := q.AnyUserExists(ctx)
+	if err != nil {
+		return doctor.OwnerClaimState{LookupErr: err}
+	}
+	state, err := ownerclaim.State(ctx, q)
+	if err != nil {
+		return doctor.OwnerClaimState{LookupErr: err}
+	}
+	return doctor.OwnerClaimState{
+		Claimed:    claimed,
+		TokenLive:  state.Live,
+		Generation: state.Generation,
 	}
 }
 
@@ -167,6 +216,15 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 			} else {
 				results = append(results, doctor.CheckSchema(st))
 			}
+			// A probe a test did not wire reports SKIP rather than OK: doctor
+			// never claims to have checked something it did not.
+			// TestRealProbesWiresEveryCheck asserts production wires this one.
+			if p.ownerClaim == nil {
+				results = append(results, doctor.Result{Name: "owner claim",
+					Status: doctor.StatusSkip, Detail: "no owner-claim probe was configured"})
+			} else {
+				results = append(results, doctor.CheckOwnerClaim(p.ownerClaim(ctx, pool)))
+			}
 		}
 	}
 
@@ -186,9 +244,31 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 	}
 
 	// --- search -------------------------------------------------------------
+	// Config.PublicOrigin is already normalised by LoadFrom, so compare the raw
+	// environment value against it to show an operator what browsers will send.
+	raw := cfg.PublicOrigin
+	if p.rawPublicOrigin != nil {
+		raw = p.rawPublicOrigin()
+	}
+	results = append(results, doctor.CheckPublicOrigin(
+		raw, cfg.PublicOrigin, cfg.Mode == config.ModeProduction))
+
 	results = append(results, doctor.CheckSearch(cfg.SearchMode, p.searchReachable(ctx, cfg)))
 
 	return results
+}
+
+// envSource is the lookup doctor reads configuration through: the process
+// environment, or the env file named by --env.
+func envSource(envFile string) (func(string) (string, bool), error) {
+	if envFile == "" {
+		return os.LookupEnv, nil
+	}
+	env, err := readEnvFile(envFile)
+	if err != nil {
+		return nil, err
+	}
+	return func(k string) (string, bool) { v, ok := env[k]; return v, ok }, nil
 }
 
 // composeCheck performs the I/O; doctor.CheckCompose decides.

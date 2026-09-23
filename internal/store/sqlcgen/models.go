@@ -5,9 +5,57 @@
 package sqlcgen
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type UserRole string
+
+const (
+	UserRoleGuest   UserRole = "guest"
+	UserRoleMember  UserRole = "member"
+	UserRoleManager UserRole = "manager"
+	UserRoleAdmin   UserRole = "admin"
+	UserRoleOwner   UserRole = "owner"
+)
+
+func (e *UserRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserRole(s)
+	case string:
+		*e = UserRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
+	}
+	return nil
+}
+
+type NullUserRole struct {
+	UserRole UserRole
+	Valid    bool // Valid is true if UserRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserRole), nil
+}
 
 type AuditEvent struct {
 	ID            uuid.UUID
@@ -22,6 +70,15 @@ type AuditEvent struct {
 	After         []byte
 	CorrelationID *string
 	IpPrefix      *string
+}
+
+type Credential struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Kind      string
+	Secret    string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }
 
 type Job struct {
@@ -43,6 +100,16 @@ type Job struct {
 	FinishedAt     pgtype.Timestamptz
 }
 
+type OwnerClaimToken struct {
+	ID           bool
+	TokenSha256  []byte
+	Generation   int64
+	MintedAt     pgtype.Timestamptz
+	ExpiresAt    pgtype.Timestamptz
+	ConsumedAt   pgtype.Timestamptz
+	SupersededAt pgtype.Timestamptz
+}
+
 type Site struct {
 	ID          uuid.UUID
 	Handle      string
@@ -61,4 +128,17 @@ type StorageLocation struct {
 	Config    []byte
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+}
+
+type User struct {
+	ID           uuid.UUID
+	Username     string
+	UsernameFold *string
+	Email        string
+	EmailFold    *string
+	Role         UserRole
+	DisabledAt   pgtype.Timestamptz
+	TombstonedAt pgtype.Timestamptz
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }

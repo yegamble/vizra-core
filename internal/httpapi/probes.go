@@ -163,6 +163,18 @@ func (s *Server) computeReadiness(ctx context.Context) readinessResponse {
 	}
 	resp.Components = append(resp.Components, dbc)
 
+	// owner claim — degraded, never fatal. An unclaimed instance whose boot
+	// bootstrap failed cannot be claimed until the operator acts, and silence
+	// there would leave them with a healthy-looking instance and no way in.
+	if s.deps.OwnerClaimDegraded {
+		resp.Components = append(resp.Components, readinessComponent{
+			Name:   "owner_claim",
+			Status: statusDegraded,
+			Detail: "the owner-claim bootstrap did not complete; run `vizra doctor`",
+		})
+		demote(statusDegraded)
+	}
+
 	// cache — degraded, never fatal. The api falls back to a per-process
 	// in-memory rate limiter and says so (ADR-003).
 	cc := readinessComponent{Name: "cache", Status: statusOK}

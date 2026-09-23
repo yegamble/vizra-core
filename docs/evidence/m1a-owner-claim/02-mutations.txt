@@ -1,0 +1,1371 @@
+src: 085d78b9feb95a0a5f02f0341c43ec8b43f1383a (round 4, the limiter fix). The next commit, 2ad370e, changes only scripts/test-floors.json (integration 140->144, min_tests 1147->1150); the same event streams re-judged against it: ok (see the end of 01).
+host:   Darwin/arm64
+go:     go version go1.27.1 darwin/arm64
+HEAD:   085d78b9feb95a0a5f02f0341c43ec8b43f1383a
+date:   2026-09-23T10:33:32Z
+pg:     PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+
+========================================================================
+MUT-1 — let a re-mint KEEP the previous token digest
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestOwnerClaimRejectsASupersededOrExpiredToken  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  83bd8e3372690952…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestOwnerClaimRejectsASupersededOrExpiredToken (1.11s)
+    owner_claim_test.go:780: a superseded token = 201, want 403. body=map[role:owner username:owner]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.077s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.211s
+GREEN exit=0 (expected zero)
+RESULT: MUT-1 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-2 — remove 'AND tombstoned_at IS NULL' from users_one_owner
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestATombstonedOwnerDoesNotPermanentlyBlockOwnership  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  caf8be2a29bad899…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestATombstonedOwnerDoesNotPermanentlyBlockOwnership (0.39s)
+    owner_claim_test.go:524: a replacement owner must be possible once the previous one is tombstoned: ERROR: duplicate key value violates unique constraint "users_one_owner" (SQLSTATE 23505)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.306s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.519s
+GREEN exit=0 (expected zero)
+RESULT: MUT-2 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-2b — drop the users_one_owner index entirely
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestASecondLiveOwnerIsRefusedByTheDatabase  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  b11c51d98a24aa1d…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestASecondLiveOwnerIsRefusedByTheDatabase (0.60s)
+    owner_claim_test.go:502: a second LIVE owner was accepted; users_one_owner is not enforcing
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.487s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.220s
+GREEN exit=0 (expected zero)
+RESULT: MUT-2b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-16 — drop the explicit ReadCommitted TxOptions from the claim
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestTheClaimTransactionPinsReadCommitted  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  74efc04d9ca858fc…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheClaimTransactionPinsReadCommitted (0.93s)
+    owner_claim_test.go:2410: claimant 0 got 500 (map[error:map[code:internal_error message:an internal error occurred request_id:<id>]]) — want 201 or 409. Under a REPEATABLE READ server default a claimant blocked on the redeem raises 40001, which no branch maps; the claim transaction must pin READ COMMITTED itself
+    owner_claim_test.go:2419: 0 claimants were cleanly declined, want 1
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.816s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.115s
+GREEN exit=0 (expected zero)
+RESULT: MUT-16 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-3 — store the raw token instead of its SHA-256 digest
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestClaimTokenIsStoredOnlyAsASHA256Digest  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  2c516fcf2dd81a94…(sha256 of a tracked file, truncated)
+--- RED run ---
+# github.com/yegamble/vizra-core/internal/ownerclaim
+internal/ownerclaim/ownerclaim.go:24:2: "crypto/sha256" imported and not used
+FAIL	github.com/yegamble/vizra-core/internal/integration [build failed]
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.267s
+GREEN exit=0 (expected zero)
+RESULT: MUT-3 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-5b — flip the announce default to stderr
+========================================================================
+mutates: internal/config/keys.go
+must turn RED: TestTheAnnounceDefaultIsOff  (./internal/httpapi/)
+file sha256 before: d35b6d49814735ac…(sha256 of a tracked file, truncated)
+file sha256 after:  8dc1e40bc5d11cdb…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheAnnounceDefaultIsOff (0.00s)
+    setup_test.go:330: VIZRA_OWNER_CLAIM_ANNOUNCE defaults to "stderr", want "off".
+        Any other default writes a live owner-claim credential to the container log,
+        which every log driver captures, ships and retains (VZ-INSTALL-003 privacy case).
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.809s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.831s
+GREEN exit=0 (expected zero)
+RESULT: MUT-5b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-9 — drop the UPDATE/DELETE immutability trigger
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestAuditEventsCannotBeUpdatedOrDeleted  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  c4ae4c78147bd84c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAuditEventsCannotBeUpdatedOrDeleted (0.43s)
+    owner_claim_test.go:666: audit_events accepted an UPDATE
+    owner_claim_test.go:671: audit_events accepted a DELETE
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.306s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	3.190s
+GREEN exit=0 (expected zero)
+RESULT: MUT-9 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-9b — drop the statement-level TRUNCATE trigger
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestAuditEventsCannotBeTruncated  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  e3857f1cd699cfe3…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAuditEventsCannotBeTruncated (6.24s)
+    owner_claim_test.go:684: audit_events accepted a TRUNCATE; the row trigger alone does not stop it
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	7.491s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	3.264s
+GREEN exit=0 (expected zero)
+RESULT: MUT-9b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-19 — change the audit actor FK to NO ACTION
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestAUserWithAuditRowsCannotBeDeleted  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  18c596d1d854687c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAUserWithAuditRowsCannotBeDeleted (1.67s)
+    owner_claim_test.go:705: the refusal did not come from the audit FK: ERROR: audit_events is append-only (attempted DELETE) (SQLSTATE 42501)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.571s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.830s
+GREEN exit=0 (expected zero)
+RESULT: MUT-19 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-11b — write an audit row for every refusal, including rate-limited ones
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestARateLimitedClaimWritesNoAuditRow  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  0b274d6cfb7a135c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestARateLimitedClaimWritesNoAuditRow (1.01s)
+    owner_claim_test.go:1413: rate_limited rows after the transition = 0, want EXACTLY 1
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.801s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	9.168s
+GREEN exit=0 (expected zero)
+RESULT: MUT-11b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-10 — mask IPv4 to /32 instead of /24
+========================================================================
+mutates: internal/audit/audit.go
+must turn RED: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck|TestIPPrefixIsNeverFinerThanTheContract  (./internal/audit/)
+file sha256 before: 14aaad1feb7add52…(sha256 of a tracked file, truncated)
+file sha256 after:  116513530ba5e690…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck (0.00s)
+    --- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck/IPv4_masks_to_/24 (0.00s)
+        audit_test.go:106: IPPrefix("203.0.113.42:51000") = nil, want "203.0.113.0/24"
+    --- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck/IPv4_without_a_port (0.00s)
+        audit_test.go:106: IPPrefix("198.51.100.7") = nil, want "198.51.100.0/24"
+    --- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck/IPv4-mapped_IPv6_is_unmapped_FIRST_and_masked_to_/24 (0.00s)
+        audit_test.go:106: IPPrefix("[::ffff:203.0.113.9]:80") = nil, want "203.0.113.0/24"
+--- FAIL: TestIPPrefixIsNeverFinerThanTheContract (0.00s)
+    audit_test.go:122: IPv4 must mask to /24, got <nil>
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/audit	0.478s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/audit	0.478s
+GREEN exit=0 (expected zero)
+RESULT: MUT-10 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-10b — remove the output-grammar validation from the ip_prefix writer
+========================================================================
+mutates: internal/audit/audit.go
+must turn RED: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck  (./internal/audit/)
+file sha256 before: 14aaad1feb7add52…(sha256 of a tracked file, truncated)
+file sha256 after:  6d4a05a659831d64…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck (0.00s)
+    --- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck/IPv4_loopback (0.00s)
+        audit_test.go:101: IPPrefix("127.0.0.1:8080") = "127.0.0.0/24", want nil (a non-nil value here can abort a claim)
+    --- FAIL: TestIPPrefixWriterOutputAlwaysSatisfiesTheFrozenCheck/IPv4_unspecified (0.00s)
+        audit_test.go:101: IPPrefix("0.0.0.0:8080") = "0.0.0.0/24", want nil (a non-nil value here can abort a claim)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/audit	0.532s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/audit	0.444s
+GREEN exit=0 (expected zero)
+RESULT: MUT-10b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-24 — let the proxy's own prefix be written as if it were the client
+========================================================================
+mutates: internal/httpapi/setup_limits.go
+must turn RED: TestForwardedHeaderWithoutTrustedProxyYieldsNullIPPrefix  (./internal/integration/)
+file sha256 before: 72e114fa6a2a71a1…(sha256 of a tracked file, truncated)
+file sha256 after:  d609ba8d0d4de5f6…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestForwardedHeaderWithoutTrustedProxyYieldsNullIPPrefix (0.52s)
+    owner_claim_test.go:1456: 1 refusal rows carry an ip_prefix behind an untrusted proxy; want NULL
+    owner_claim_test.go:1459: no refusal row was written at all
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.308s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.158s
+GREEN exit=0 (expected zero)
+RESULT: MUT-24 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-13 — hash the password BEFORE comparing the claim token
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestNoPasswordHashingOccursWithoutAValidToken  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  9454b17c0d035f9a…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestNoPasswordHashingOccursWithoutAValidToken (2.08s)
+    owner_claim_test.go:1206: 5 argon2 derivations ran for rejected tokens; want 0
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	3.265s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.516s
+GREEN exit=0 (expected zero)
+RESULT: MUT-13 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-18 — accept any content type (drop the JSON media-type check)
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimRefusesANonJSONContentType  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  9d08989380f10f7e…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimRefusesANonJSONContentType (0.31s)
+    owner_claim_test.go:978: Content-Type "application/x-www-form-urlencoded" = 400, want 415
+    owner_claim_test.go:978: Content-Type "multipart/form-data; boundary=x" = 400, want 415
+    owner_claim_test.go:978: Content-Type "text/plain" = 400, want 415
+    owner_claim_test.go:978: Content-Type "" = 400, want 415
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.089s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.097s
+GREEN exit=0 (expected zero)
+RESULT: MUT-18 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-8 — remove the MaxBytesReader body bound
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimBodyLimitAppliesToAChunkedRequest  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  24c7e57c723fdb09…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimBodyLimitAppliesToAChunkedRequest (0.41s)
+    owner_claim_test.go:1035: a 9 KiB chunked body = 400, want 413. body={"error":{"code":"bad_request","message":"use at most 256 characters","request_id":"01a0cdd8-0bee-7772-ba14-3d53d64f6333"}}
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.403s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.058s
+GREEN exit=0 (expected zero)
+RESULT: MUT-8 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-25 — allow unknown JSON fields (drop DisallowUnknownFields)
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimRefusesAnUnknownField  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  13477c7b6ba9120e…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimRefusesAnUnknownField (0.75s)
+    owner_claim_test.go:1003: an unknown field = 201, want 400. body=map[role:owner username:owner]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.434s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.002s
+GREEN exit=0 (expected zero)
+RESULT: MUT-25 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-26 — drop the Origin / Sec-Fetch-Site posture check
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimRefusesACrossOriginRequest  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  6f6e69ee782be7df…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimRefusesACrossOriginRequest (0.65s)
+    owner_claim_test.go:1050: a cross-origin claim = 201, want 403
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.442s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.013s
+GREEN exit=0 (expected zero)
+RESULT: MUT-26 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-15 — spend failure budget on success too
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestAValidTokenIsNeverRateLimitedByTheFailureLimiter  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  e87ced0f458c248f…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAValidTokenIsNeverRateLimitedByTheFailureLimiter (0.23s)
+    owner_claim_test.go:1369: the operator's valid token was answered 429 after an attacker flooded the endpoint. body=map[error:map[code:rate_limited message:too many attempts request_id:<id>]]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	0.975s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.252s
+GREEN exit=0 (expected zero)
+RESULT: MUT-15 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-12 — add a route without classifying it
+========================================================================
+mutates: internal/httpapi/server.go
+must turn RED: TestEveryRouteIsEitherUnclaimedAllowlistedOrGuarded  (./internal/httpapi/)
+file sha256 before: 225c7a6b358b85e0…(sha256 of a tracked file, truncated)
+file sha256 after:  965534a7dbb23709…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestEveryRouteIsEitherUnclaimedAllowlistedOrGuarded (0.00s)
+    setup_test.go:47: POST /api/v1/auth/register is in neither claimExemptRoutes nor claimGuardedRoutes.
+        Every route must be classified deliberately: may it be reached before this
+        instance has an owner? Add it to exactly one set.
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	2.789s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.808s
+GREEN exit=0 (expected zero)
+RESULT: MUT-12 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-27 — let the unclaimed guard fall through on a lookup error
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimGuardReturns503WhenTheStateCannotBeRead  (./internal/httpapi/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  ed91fc145adb93c6…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimGuardReturns503WhenTheStateCannotBeRead (0.00s)
+    setup_test.go:104: guard with an unreadable state = 403, want 503
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.805s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.880s
+GREEN exit=0 (expected zero)
+RESULT: MUT-27 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-17 — delete the users_one_owner case from the error mapper
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimErrorMapping  (./internal/httpapi/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  496dd05e175d7ff0…(sha256 of a tracked file, truncated)
+--- RED run ---
+2026/09/23 06:39:05 ERROR http: a CHECK constraint refused a request the validator accepted constraint=users_email_shape request_id=""
+2026/09/23 06:39:05 ERROR http: the claim endpoint could not reach the database where=claim error="ownerclaim: the database is unavailable: beginning claim: %!v(PANIC=Error method: runtime error: invalid memory address or nil pointer dereference)" request_id=""
+2026/09/23 06:39:05 ERROR http: the claim endpoint could not reach the database where=claim error="ownerclaim: the database is unavailable: dial: connection refused" request_id=""
+2026/09/23 06:39:05 ERROR http: the claim endpoint could not reach the database where=claim error=":  (SQLSTATE 57P01)" request_id=""
+2026/09/23 06:39:05 ERROR http: the claim endpoint could not reach the database where=claim error=":  (SQLSTATE 08006)" request_id=""
+2026/09/23 06:39:05 ERROR http: the claim endpoint could not reach the database where=claim error=":  (SQLSTATE 53300)" request_id=""
+2026/09/23 06:39:05 ERROR http: the claim endpoint could not reach the database where=claim error="ownerclaim: the database is unavailable: re-reading the claimed state: closed pool" request_id=""
+--- FAIL: TestClaimErrorMapping (0.00s)
+    --- FAIL: TestClaimErrorMapping/two_live_owners (0.00s)
+        setup_test.go:196: :  (SQLSTATE 23505) produced message "that username or email address is already taken", want "this instance already has an owner" — two branches answering the same status and code are only distinguishable by what the operator reads
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.736s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.659s
+GREEN exit=0 (expected zero)
+RESULT: MUT-17 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-17b — delete the users_one_owner case from the error mapper (through the handler)
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestUsersOneOwnerFiresThroughTheHandler  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  496dd05e175d7ff0…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestUsersOneOwnerFiresThroughTheHandler (0.92s)
+    owner_claim_test.go:2061: message = "that username or email address is already taken"; the two-owners case must read as an owner conflict, not as a duplicate identifier
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.806s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.313s
+GREEN exit=0 (expected zero)
+RESULT: MUT-17b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-11c — delete the handler's claimed short-circuit (every POST reaches the database again)
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  29e91180f9629c15…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail (0.27s)
+    owner_claim_test.go:1731: 100 refused claims acquired 100 pooled connections; once the claimed bit is cached the endpoint must stop touching the database entirely
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.023s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.029s
+GREEN exit=0 (expected zero)
+RESULT: MUT-11c PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-11d — audit every already-claimed refusal again
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  c5d791eb044c99e0…(sha256 of a tracked file, truncated)
+--- RED run ---
+# github.com/yegamble/vizra-core/internal/httpapi
+internal/httpapi/setup.go:415:33: undefined: audit.ReasonAlreadyClaimed
+FAIL	github.com/yegamble/vizra-core/internal/integration [build failed]
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.429s
+GREEN exit=0 (expected zero)
+RESULT: MUT-11d PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-29 — hash inside the claim transaction again
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestNoConnectionIsHeldWhileHashing  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  7f3226a48b33e6a9…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestNoConnectionIsHeldWhileHashing (0.25s)
+    owner_claim_test.go:1763: 1 pooled connection(s) were checked out while hashing; the derivation must happen outside the transaction
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.221s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.259s
+GREEN exit=0 (expected zero)
+RESULT: MUT-29 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-31 — remove the liveness pre-check before hashing
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestACorrectButDeadTokenCostsNoDerivation  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  a66e5ce566993a64…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestACorrectButDeadTokenCostsNoDerivation (2.25s)
+    --- FAIL: TestACorrectButDeadTokenCostsNoDerivation/expired (0.68s)
+        owner_claim_test.go:1241: a correct-but-expired token cost 1 derivations, want 0
+    --- FAIL: TestACorrectButDeadTokenCostsNoDerivation/consumed (0.62s)
+        owner_claim_test.go:1259: a correct-but-consumed token cost 1 derivations, want 0
+    --- FAIL: TestACorrectButDeadTokenCostsNoDerivation/superseded (0.96s)
+        owner_claim_test.go:1275: a correct-but-superseded token cost 1 derivations, want 0
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	3.125s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.371s
+GREEN exit=0 (expected zero)
+RESULT: MUT-31 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-14b — move the liveness decision back outside the advisory lock
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestConcurrentBootsMintExactlyOneToken  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  af165947b4fefeac…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestConcurrentBootsMintExactlyOneToken (0.32s)
+    owner_claim_test.go:1828: 2 of 2 concurrent boots minted, want exactly 1
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.038s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	0.962s
+GREEN exit=0 (expected zero)
+RESULT: MUT-14b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-32 — drop the users guard from the mint statement
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestMintIsRefusedByTheDatabaseOnAClaimedInstance  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  d6eb27b491c3d8c0…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestMintIsRefusedByTheDatabaseOnAClaimedInstance (0.37s)
+    owner_claim_test.go:1863: minting on a claimed instance returned <nil>, want pgx.ErrNoRows from the statement's own WHERE NOT EXISTS (SELECT 1 FROM users)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.186s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.050s
+GREEN exit=0 (expected zero)
+RESULT: MUT-32 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-28 — delete the ErrUnavailable branch from the error mapper
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimErrorMapping  (./internal/httpapi/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  a68e57764ff0758d…(sha256 of a tracked file, truncated)
+--- RED run ---
+2026/09/23 06:40:35 ERROR http: a CHECK constraint refused a request the validator accepted constraint=users_email_shape request_id=""
+2026/09/23 06:40:35 ERROR http: the claim endpoint could not reach the database where=claim error=":  (SQLSTATE 57P01)" request_id=""
+2026/09/23 06:40:35 ERROR http: the claim endpoint could not reach the database where=claim error=":  (SQLSTATE 08006)" request_id=""
+2026/09/23 06:40:35 ERROR http: the claim endpoint could not reach the database where=claim error=":  (SQLSTATE 53300)" request_id=""
+--- FAIL: TestClaimErrorMapping (0.00s)
+    --- FAIL: TestClaimErrorMapping/database_unreachable (0.00s)
+        setup_test.go:193: ownerclaim: the database is unavailable: beginning claim: %!v(PANIC=Error method: runtime error: invalid memory address or nil pointer dereference) mapped to 500/internal_error, want 503/unavailable
+    --- FAIL: TestClaimErrorMapping/a_bare_network_error_wrapped_as_unavailable (0.00s)
+        setup_test.go:193: ownerclaim: the database is unavailable: dial: connection refused mapped to 500/internal_error, want 503/unavailable
+    --- FAIL: TestClaimErrorMapping/the_claimed_re-read_cannot_reach_the_database (0.00s)
+        setup_test.go:193: ownerclaim: the database is unavailable: re-reading the claimed state: closed pool mapped to 500/internal_error, want 503/unavailable
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.795s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.776s
+GREEN exit=0 (expected zero)
+RESULT: MUT-28 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-30 — stamp minted_at from the application clock
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestMintTimestampsComeFromTheDatabaseClock  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  4b1652d28a182185…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestMintTimestampsComeFromTheDatabaseClock (0.26s)
+    owner_claim_test.go:1566: [first mint] minted_at (2026-09-23 10:40:41.751902 +0000 UTC) is not exactly expires_at - 1h0m0s (2026-09-23 10:40:44.751902 +0000 UTC): the two stamps did not come from one statement's now(), so at least one is the application host's clock
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.134s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.212s
+GREEN exit=0 (expected zero)
+RESULT: MUT-30 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-33 — serve claim-status from the uncached path again
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  bcfdb3780d9c90b1…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed (0.21s)
+    owner_claim_test.go:1974: 100 GETs performed 100 claimed lookups; once the bit is true it is monotonic and must be answered from the cache
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.092s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	0.881s
+GREEN exit=0 (expected zero)
+RESULT: MUT-33 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-34 — take the hard ceiling off the claim-status route
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestClaimStatusIsBoundedByTheHardCeiling  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  6797e65e317ac168…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimStatusIsBoundedByTheHardCeiling (0.54s)
+    owner_claim_test.go:1997: 3100 unauthenticated GETs were never rate limited; the status route must sit under the same hard ceiling as the POST
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	3.623s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	7.026s
+GREEN exit=0 (expected zero)
+RESULT: MUT-34 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-35 — compare origins as raw strings again
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestOriginsAreComparedNormalisedNotAsStrings  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  28e32e35dddc7490…(sha256 of a tracked file, truncated)
+--- RED run ---
+# github.com/yegamble/vizra-core/internal/httpapi
+internal/httpapi/setup.go:18:2: "github.com/yegamble/vizra-core/internal/config" imported and not used
+FAIL	github.com/yegamble/vizra-core/internal/integration [build failed]
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	6.558s
+GREEN exit=0 (expected zero)
+RESULT: MUT-35 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-37 — print the claim token to stderr as well as stdout
+========================================================================
+mutates: cmd/vizra/claimtoken.go
+must turn RED: TestClaimTokenCLIOnAnUnclaimedInstance  (./internal/integration/)
+file sha256 before: e34ea9929e2bdef8…(sha256 of a tracked file, truncated)
+file sha256 after:  d98468eee1f1f9f0…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimTokenCLIOnAnUnclaimedInstance (33.83s)
+    claimtoken_cli_test.go:79: vizra claim-token -> exit 0, stdout 65 bytes (1 64-hex lines), stderr 270 bytes
+    claimtoken_cli_test.go:93: stderr repeated the token; it belongs on stdout only
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	34.696s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	51.785s
+GREEN exit=0 (expected zero)
+RESULT: MUT-37 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-38 — loosen credentials_password_is_argon2id to accept anything
+========================================================================
+mutates: migrations/0005_users_credentials_owner_claim.up.sql
+must turn RED: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret  (./internal/integration/)
+file sha256 before: 49ad3a9cc23da72b…(sha256 of a tracked file, truncated)
+file sha256 after:  9eedb7a9f5ad0f07…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret (1.25s)
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/plaintext (0.03s)
+        owner_claim_test.go:2105: the database accepted a plaintext secret; credentials_password_is_argon2id exists to refuse exactly this
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/bcrypt (0.01s)
+        owner_claim_test.go:2109: refused for the wrong reason: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/scrypt (0.05s)
+        owner_claim_test.go:2109: refused for the wrong reason: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/argon2i,_the_wrong_variant (0.03s)
+        owner_claim_test.go:2109: refused for the wrong reason: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/sha256_hex (0.03s)
+        owner_claim_test.go:2109: refused for the wrong reason: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/empty-ish (0.04s)
+        owner_claim_test.go:2109: refused for the wrong reason: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+    --- FAIL: TestTheCredentialsCheckRefusesEveryNonArgon2idSecret/a_near_miss (0.02s)
+        owner_claim_test.go:2109: refused for the wrong reason: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+    owner_claim_test.go:2119: a real argon2id verifier must be accepted: ERROR: duplicate key value violates unique constraint "credentials_one_per_user_per_kind" (SQLSTATE 23505)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.092s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.923s
+GREEN exit=0 (expected zero)
+RESULT: MUT-38 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-39 — audit every rate-limited request instead of the transition
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestARateLimitedClaimWritesNoAuditRow  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  50a01f1828ed910f…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestARateLimitedClaimWritesNoAuditRow (3.20s)
+    owner_claim_test.go:1413: rate_limited rows after the transition = 60, want EXACTLY 1
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	4.084s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	9.857s
+GREEN exit=0 (expected zero)
+RESULT: MUT-39 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-40 — normalise the configured origin but not the request's
+========================================================================
+mutates: internal/config/config.go
+must turn RED: TestLoadStoresTheNormalisedPublicOrigin  (./internal/config/)
+file sha256 before: 9915cbe1524a5bb9…(sha256 of a tracked file, truncated)
+file sha256 after:  40210cbe6c4c6063…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestLoadStoresTheNormalisedPublicOrigin (0.00s)
+    origin_test.go:93: PublicOrigin = "HTTPS://Photos.Example.ORG:443", want the normalised form
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/config	0.430s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/config	0.419s
+GREEN exit=0 (expected zero)
+RESULT: MUT-40 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-41 — collapse the two setup ceilings back into one shared bucket
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket  (./internal/httpapi/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  932654892efded4e…(sha256 of a tracked file, truncated)
+--- RED run ---
+2026/09/23 06:44:18 ERROR http: request failed error="the instance state could not be read" request_id=01a0cddd-c51e-75b8-8325-188329528bab path=/api/v1/setup/claim-owner method=POST
+--- FAIL: TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket (0.00s)
+    setup_test.go:372: expected one ceiling key per route; saw [:rl:setup.claim:ceiling :rl:setup.claim:ceiling]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.866s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.847s
+GREEN exit=0 (expected zero)
+RESULT: MUT-41 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-42 — declare no 429 on getSetupClaimStatus
+========================================================================
+mutates: api/openapi.yaml
+must turn RED: TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs  (./internal/httpapi/)
+file sha256 before: 1a37f1a201accc03…(sha256 of a tracked file, truncated)
+file sha256 after:  c73072aa0773d982…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs (0.01s)
+    setup_test.go:304: /api/v1/setup/claim-status can return 429 (claimStatusCeiling) but the contract does not declare it
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.906s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.799s
+GREEN exit=0 (expected zero)
+RESULT: MUT-42 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-43 — launder a failed claimed re-read into a token refusal
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestAFailedClassificationReadAnswers503AndChargesNothing  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  5a9198463d8e82f8…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAFailedClassificationReadAnswers503AndChargesNothing (0.56s)
+    owner_claim_test.go:3003: a classification read that could not complete answered 403 map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]], want 503 unavailable
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.464s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.288s
+GREEN exit=0 (expected zero)
+RESULT: MUT-43 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-44 — drop the cause from the 503 log line
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestADatabaseOutageIsDiagnosableFromTheLog  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  240e46289518903d…(sha256 of a tracked file, truncated)
+--- RED run ---
+# github.com/yegamble/vizra-core/internal/httpapi
+internal/httpapi/setup.go:20:2: "github.com/yegamble/vizra-core/internal/obs" imported and not used
+FAIL	github.com/yegamble/vizra-core/internal/integration [build failed]
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.086s
+GREEN exit=0 (expected zero)
+RESULT: MUT-44 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-45 — allow an origin that cannot be normalised
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestAnUnnormalisableOriginNeverMatches  (./internal/httpapi/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  801cb279de8de6d8…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAnUnnormalisableOriginNeverMatches (0.00s)
+    setup_test.go:411: configured "not-an-origin", Origin "null": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "not-an-origin", Origin "not-an-origin": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "not-an-origin", Origin "https://фотки.example": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "", Origin "null": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "", Origin "not-an-origin": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "", Origin "https://фотки.example": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "https://фотки.example", Origin "null": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "https://фотки.example", Origin "not-an-origin": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+    setup_test.go:411: configured "https://фотки.example", Origin "https://фотки.example": got <nil>, want 403 origin_mismatch — two unnormalisable values must never compare equal
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.805s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.756s
+GREEN exit=0 (expected zero)
+RESULT: MUT-45 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-6 — remove the expires_at predicate from the redeem
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestTheRedeemStatementRefusesADeadToken  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  7ab4eda5b2b8f29c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheRedeemStatementRefusesADeadToken (1.18s)
+    --- FAIL: TestTheRedeemStatementRefusesADeadToken/expired (0.54s)
+        owner_claim_test.go:2231: the redeem statement accepted a expired token (err=<nil>); the CTE's guard is the enforcement of record and must refuse it whatever Go did first
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.151s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.117s
+GREEN exit=0 (expected zero)
+RESULT: MUT-6 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-1b — drop 'consumed_at IS NULL' from the redeem CTE
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestTheRedeemStatementRefusesADeadToken  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  4e1af55c5389e214…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheRedeemStatementRefusesADeadToken (1.30s)
+    --- FAIL: TestTheRedeemStatementRefusesADeadToken/already_consumed (0.28s)
+        owner_claim_test.go:2231: the redeem statement accepted a already consumed token (err=<nil>); the CTE's guard is the enforcement of record and must refuse it whatever Go did first
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.207s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.414s
+GREEN exit=0 (expected zero)
+RESULT: MUT-1b PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-1c — drop 'superseded_at IS NULL' from the redeem CTE
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestTheRedeemStatementRefusesADeadToken  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  5823fe545f2216f2…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheRedeemStatementRefusesADeadToken (1.25s)
+    --- FAIL: TestTheRedeemStatementRefusesADeadToken/superseded (0.50s)
+        owner_claim_test.go:2231: the redeem statement accepted a superseded token (err=ERROR: new row for relation "owner_claim_tokens" violates check constraint "owner_claim_tokens_one_terminal_state" (SQLSTATE 23514)); the CTE's guard is the enforcement of record and must refuse it whatever Go did first
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.145s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.933s
+GREEN exit=0 (expected zero)
+RESULT: MUT-1c PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-46 — drop the users guard from the redeem CTE
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestTheRedeemStatementRefusesAClaimedInstance  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  9607f092e11e714d…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheRedeemStatementRefusesAClaimedInstance (0.45s)
+    owner_claim_test.go:2263: the redeem statement ran on an instance that already has users (err=ERROR: duplicate key value violates unique constraint "users_one_owner" (SQLSTATE 23505))
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.369s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.471s
+GREEN exit=0 (expected zero)
+RESULT: MUT-46 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-47 — report a benign ErrHasUsers boot race as degraded
+========================================================================
+mutates: internal/ownerclaim/announce.go
+must turn RED: TestABootRaceWithTheFirstAccountReportsClaimedNotDegraded  (./internal/integration/)
+file sha256 before: 9a8ef564b54107aa…(sha256 of a tracked file, truncated)
+file sha256 after:  085e06dadc1af35c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestABootRaceWithTheFirstAccountReportsClaimedNotDegraded (0.40s)
+    owner_claim_test.go:2474: a benign race with the first account returned an error: ownerclaim: instance already has users
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.243s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.430s
+GREEN exit=0 (expected zero)
+RESULT: MUT-47 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-48 — stop treating a server-signalled outage as unavailable
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestAConnectionKilledMidClaimAnswers503NotFiveHundred  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  bd24b96ebb0f0cfd…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAConnectionKilledMidClaimAnswers503NotFiveHundred (0.86s)
+    owner_claim_test.go:2545: a connection killed mid-claim answered 500, want 503 — a server-signalled outage is still an outage. body=map[error:map[code:internal_error message:an internal error occurred request_id:<id>]]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.744s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.345s
+GREEN exit=0 (expected zero)
+RESULT: MUT-48 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-50 — answer a claimed instance only from an ALREADY-warm cache again
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody  (./internal/integration/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  f157a28f3d430728…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody (1.04s)
+    owner_claim_test.go:2635: [empty body] as the first request after a restart, a CLAIMED instance answered 400, want 409 whatever the body (OQ-4: the claimed check strictly precedes any token examination). body={"error":{"code":"bad_request","message":"the request body is empty","request_id":"01a0cddf-e6e0-7449-8f52-4e1f5e3f9299"}}
+    owner_claim_test.go:2635: [unknown field] as the first request after a restart, a CLAIMED instance answered 400, want 409 whatever the body (OQ-4: the claimed check strictly precedes any token examination). body={"error":{"code":"bad_request","message":"the request body is not the expected JSON object","request_id":"01a0cddf-e6fd-75e3-bac4-a3c4aa66c065"}}
+    owner_claim_test.go:2635: [not JSON at all] as the first request after a restart, a CLAIMED instance answered 415, want 409 whatever the body (OQ-4: the claimed check strictly precedes any token examination). body={"error":{"code":"unsupported_media_type","message":"send application/json","request_id":"01a0cddf-e710-7e21-9ba2-32afd72c47d2"}}
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.925s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.699s
+GREEN exit=0 (expected zero)
+RESULT: MUT-50 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-51 — examine the token before the claimed state again (library)
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestClaimReadsTheClaimedStateBeforeExaminingTheToken  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  98ea5d5acb67ea44…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestClaimReadsTheClaimedStateBeforeExaminingTheToken (0.37s)
+    owner_claim_test.go:2680: token "x" on a claimed instance: got ownerclaim: token not accepted, want ErrAlreadyClaimed — the claimed check must precede any examination of the token, including its shape
+    owner_claim_test.go:2680: token "" on a claimed instance: got ownerclaim: token not accepted, want ErrAlreadyClaimed — the claimed check must precede any examination of the token, including its shape
+    owner_claim_test.go:2680: token "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" on a claimed instance: got ownerclaim: token not accepted, want ErrAlreadyClaimed — the claimed check must precede any examination of the token, including its shape
+    owner_claim_test.go:2680: token "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" on a claimed instance: got ownerclaim: token not accepted, want ErrAlreadyClaimed — the claimed check must precede any examination of the token, including its shape
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.243s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.144s
+GREEN exit=0 (expected zero)
+RESULT: MUT-51 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-52 — answer the redeem's no-row case with a token refusal regardless
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestTheClaimTransactionPinsReadCommitted  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  5bba9546bc629151…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheClaimTransactionPinsReadCommitted (0.51s)
+    owner_claim_test.go:2410: claimant 1 got 403 (map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]]) — want 201 or 409. Under a REPEATABLE READ server default a claimant blocked on the redeem raises 40001, which no branch maps; the claim transaction must pin READ COMMITTED itself
+    owner_claim_test.go:2419: 0 claimants were cleanly declined, want 1
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.400s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.286s
+GREEN exit=0 (expected zero)
+RESULT: MUT-52 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-54 — delete BOTH the in-transaction gate and the redeem's users guard
+========================================================================
+mutates: store/queries/owner_claim.sql
+must turn RED: TestAClaimRefusesWhenAUserAppearsDuringTheHash  (./internal/integration/)
+file sha256 before: 38753b8444643ce9…(sha256 of a tracked file, truncated)
+file sha256 after:  9607f092e11e714d…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAClaimRefusesWhenAUserAppearsDuringTheHash (0.47s)
+    owner_claim_test.go:2716: a user appearing during the hash yielded 201, want 409 (the instance is claimed the moment it has any user). body=map[role:owner username:owner]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	1.375s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	1.235s
+GREEN exit=0 (expected zero)
+RESULT: MUT-54 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-55 — read the raw public origin from the process env under --env again
+========================================================================
+mutates: cmd/vizra/doctor.go
+must turn RED: TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig  (./cmd/vizra/)
+file sha256 before: aefa6055a0c616e7…(sha256 of a tracked file, truncated)
+file sha256 after:  eac35122fa4a6396…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig (0.00s)
+    doctor_test.go:296: --env: raw public origin = "https://process.invalid", want the env file's "https://Photos.Example.org/"
+FAIL
+FAIL	github.com/yegamble/vizra-core/cmd/vizra	0.638s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/cmd/vizra	0.642s
+GREEN exit=0 (expected zero)
+RESULT: MUT-55 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-56 — bypass the classification on the read phase (refuse on the stale snapshot)
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  79d15101525b706c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409 (1.28s)
+    --- FAIL: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/not_live_(consumed_by_the_winner) (0.39s)
+        owner_claim_test.go:2866: A answered 403 map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]], want 409 conflict: the instance is claimed, and a refusal decided on the read phase's stale snapshot must be classified against a fresh one (OQ-4)
+    --- FAIL: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/digest_mismatch (0.30s)
+        owner_claim_test.go:2866: A answered 403 map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]], want 409 conflict: the instance is claimed, and a refusal decided on the read phase's stale snapshot must be classified against a fresh one (OQ-4)
+    --- FAIL: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/malformed_shape (0.33s)
+        owner_claim_test.go:2866: A answered 403 map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]], want 409 conflict: the instance is claimed, and a refusal decided on the read phase's stale snapshot must be classified against a fresh one (OQ-4)
+    --- FAIL: TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409/no_token_row_(never_minted) (0.26s)
+        owner_claim_test.go:2866: A answered 403 map[error:map[code:forbidden message:that claim token was not accepted request_id:<id>]], want 409 conflict: the instance is claimed, and a refusal decided on the read phase's stale snapshot must be classified against a fresh one (OQ-4)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	2.141s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	2.957s
+GREEN exit=0 (expected zero)
+RESULT: MUT-56 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-57 — let the classification answer 409 whatever the claimed state
+========================================================================
+mutates: internal/ownerclaim/ownerclaim.go
+must turn RED: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403|TestATokenSupersededDuringTheHashIsTheUniform403  (./internal/integration/)
+file sha256 before: c4e72cbcdc5f8586…(sha256 of a tracked file, truncated)
+file sha256 after:  ad5a5364bb982cc8…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403 (1.82s)
+    --- FAIL: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/digest_mismatch (0.38s)
+        owner_claim_test.go:2949: A answered 409 map[error:map[code:conflict message:this instance already has an owner request_id:<id>]], want the uniform 403 forbidden
+    --- FAIL: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/malformed_shape (0.37s)
+        owner_claim_test.go:2949: A answered 409 map[error:map[code:conflict message:this instance already has an owner request_id:<id>]], want the uniform 403 forbidden
+    --- FAIL: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/no_token_row_(never_minted) (0.46s)
+        owner_claim_test.go:2949: A answered 409 map[error:map[code:conflict message:this instance already has an owner request_id:<id>]], want the uniform 403 forbidden
+    --- FAIL: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/not_live_(expired_while_paused) (0.38s)
+        owner_claim_test.go:2949: A answered 409 map[error:map[code:conflict message:this instance already has an owner request_id:<id>]], want the uniform 403 forbidden
+    --- FAIL: TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/superseded_while_paused (0.25s)
+        owner_claim_test.go:2949: A answered 409 map[error:map[code:conflict message:this instance already has an owner request_id:<id>]], want the uniform 403 forbidden
+--- FAIL: TestATokenSupersededDuringTheHashIsTheUniform403 (0.62s)
+    owner_claim_test.go:3035: a token superseded mid-hash answered 409 map[error:map[code:conflict message:this instance already has an owner request_id:<id>]], want the uniform 403
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	3.304s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	3.147s
+GREEN exit=0 (expected zero)
+RESULT: MUT-57 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-58 — compile the claim test seam's setter into production builds
+========================================================================
+mutates: internal/ownerclaim/seam_integration.go
+must turn RED: TestTheClaimSeamCannotBeSetFromAProductionBuild  (./internal/ownerclaim/)
+file sha256 before: f4a1787eb6a49f58…(sha256 of a tracked file, truncated)
+file sha256 after:  9ff5f88be6f4e77f…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheClaimSeamCannotBeSetFromAProductionBuild (0.00s)
+    ownerclaim_test.go:269: SetAfterClaimedCheckHookForTest is not declared in any file a production build EXCLUDES; either it moved into the default build or it was renamed and this test is no longer checking it
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/ownerclaim	0.438s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/ownerclaim	0.512s
+GREEN exit=0 (expected zero)
+RESULT: MUT-58 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-59 — let the handler decide 409-vs-403 for an empty redeem again
+========================================================================
+mutates: internal/httpapi/setup.go
+must turn RED: TestTheHandlerDoesNotDecideBetween409And403  (./internal/httpapi/)
+file sha256 before: c2eb8b3d5878b743…(sha256 of a tracked file, truncated)
+file sha256 after:  d27aea01f305ea9c…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheHandlerDoesNotDecideBetween409And403 (0.00s)
+    setup_test.go:217: a bare pgx.ErrNoRows mapped to 403/forbidden: the handler is deciding 409-vs-403 again; that decision belongs to ownerclaim.classifyRefusal alone
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.890s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/httpapi	3.814s
+GREEN exit=0 (expected zero)
+RESULT: MUT-59 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-62 — restore the unconditional EXPIRE (every request refreshes the window)
+========================================================================
+mutates: internal/cache/ratelimit.go
+must turn RED: TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow|TestTheCacheLimiterReopensWhenTheWindowRolls|TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics  (./internal/integration/)
+file sha256 before: f6320ee63fde6da7…(sha256 of a tracked file, truncated)
+file sha256 after:  a51e4739dd4fdfe4…(sha256 of a tracked file, truncated)
+--- RED run ---
+redis: 2026/09/23 06:48:39 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:39 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:40 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:40 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:41 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:43 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:44 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:44 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:45 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:45 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:46 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:46 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:46 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+redis: 2026/09/23 06:48:47 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:1: connect: connection refused
+--- FAIL: TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics (11.57s)
+    ratelimit_test.go:233: step 4 (+6.3s): [cache up] allowed=false, want true (fixed window: 2 per 6s from the FIRST request of the window)
+    ratelimit_test.go:233: step 5 (+6.4s): [cache up] allowed=false, want true (fixed window: 2 per 6s from the FIRST request of the window)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	17.586s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	17.278s
+GREEN exit=0 (expected zero)
+RESULT: MUT-62 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-63 — set the TTL only when INCR returns 1 (a TTL-less key never gets one)
+========================================================================
+mutates: internal/cache/ratelimit.go
+must turn RED: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne  (./internal/integration/)
+file sha256 before: f6320ee63fde6da7…(sha256 of a tracked file, truncated)
+file sha256 after:  a9d402b8efa78069…(sha256 of a tracked file, truncated)
+--- RED run ---
+--- FAIL: TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne (0.01s)
+    ratelimit_test.go:138: after a call the TTL-less key's PTTL is -1ns, want (0, 10s]: a counter with no expiry never resets, which is a permanent lockout
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	0.853s
+FAIL
+RED exit=1 (expected non-zero)
+--- GREEN run (mutation reverted) ---
+ok  	github.com/yegamble/vizra-core/internal/integration	0.911s
+GREEN exit=0 (expected zero)
+RESULT: MUT-63 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-60 — delete the owner-claim integration tests (owner_claim_test.go + claimtoken_cli_test.go)
+========================================================================
+deletes: internal/integration/owner_claim_test.go internal/integration/claimtoken_cli_test.go
+must turn RED: the 'integration' report's per-package floor for ./internal/integration/
+committed floor: 140
+--- RED run ---
+go-test-report: suite 'integration' from ev.json
+  tests executed:           49  (floor: 140)
+  github.com/yegamble/vizra-core/internal/integration: 49 test(s) (floor: 140)
+::error::go-test-report: only 49 test(s) executed; the recorded floor for 'integration' is 140.
+::error::go-test-report: package github.com/yegamble/vizra-core/internal/integration executed 49 test(s); its recorded floor is 140.
+go-test-report: FAILED (2 problem(s))
+RED exit=1 (expected non-zero)
+--- GREEN run (files restored) ---
+go-test-report: suite 'integration' from ev.json
+  tests executed:           169  (floor: 140)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 140)
+go-test-report: ok — 169 test(s) executed across 1 package(s), 0 unexpected skips, floor 140 met
+GREEN exit=0 (expected zero)
+RESULT: MUT-60 PASS (red under mutation, green when restored)
+
+========================================================================
+MUT-61 — delete the setup handler's unit tests (setup_test.go)
+========================================================================
+deletes: internal/httpapi/setup_test.go
+must turn RED: the 'unit' report's per-package floor for ./internal/httpapi/
+committed floor: 48
+--- RED run ---
+go-test-report: suite 'unit' from ev.json
+  tests executed:           32  (floor: 48)
+  github.com/yegamble/vizra-core/internal/httpapi: 32 test(s) (floor: 48)
+::error::go-test-report: only 32 test(s) executed; the recorded floor for 'unit' is 48.
+::error::go-test-report: package github.com/yegamble/vizra-core/internal/httpapi executed 32 test(s); its recorded floor is 48.
+go-test-report: FAILED (2 problem(s))
+RED exit=1 (expected non-zero)
+--- GREEN run (files restored) ---
+go-test-report: suite 'unit' from ev.json
+  tests executed:           56  (floor: 48)
+  github.com/yegamble/vizra-core/internal/httpapi: 56 test(s) (floor: 48)
+go-test-report: ok — 56 test(s) executed across 1 package(s), 0 unexpected skips, floor 48 met
+GREEN exit=0 (expected zero)
+RESULT: MUT-61 PASS (red under mutation, green when restored)
+
+========================================================================
+REVIEW-ONLY PROPERTIES (no mutation here turns a test red)
+========================================================================
+Stated rather than implied, because a mutation matrix that quietly omits these
+would overclaim:
+
+  MUT-4  replacing subtle.ConstantTimeCompare with bytes.Equal. Behaviourally
+         identical; a timing difference is not observable from a Go test.
+
+  MUT-4b passing the PRESENTED digest rather than the row's own digest to the
+         redeem statement. Identical results today; the property is defence
+         against a future index-probing change. Code review owns it.
+
+  MUT-53 deleting ONLY the in-transaction AnyUserExists gate in Claim — the one
+         the code calls THE authoritative gate. MEASURED: nothing reddens, and
+         the reason is structural. Since the redeem statement gained
+         `AND NOT EXISTS (SELECT 1 FROM users)` (FU-2), a user present when the
+         redeem runs makes it return no row, and ownerclaim.classifyRefusal —
+         the ONE classification every token refusal goes through since the
+         closing slice, keyed on the CLAIMED state as OQ-4 defines it — answers
+         409 exactly as the gate would, with no audit row and no budget charged. The two paths
+         are indistinguishable from outside. Before FU-2 they were not: the
+         verifier measured HTTP 201 and an owner created with this gate deleted.
+         The statement guard is scored on its own by MUT-46 (a direct-query test
+         that bypasses every Go check), and MUT-54 deletes both layers together
+         to prove the end-to-end test catches the race they jointly prevent.
+         Making this single deletion observable would require the re-read to
+         answer 403 on a claimed instance, which is the wrong answer.
+
+  MUT-36 flipping `refuseIfUsersExist` to false in `vizra claim-token` — the S-12
+         escalation path the verifier found unobserved. MEASURED: it no longer
+         reddens anything, and the reason is the fix N-6/F-2 asked for.
+         `MintOwnerClaimToken` now carries
+         `WHERE NOT EXISTS (SELECT 1 FROM users)`, so the STATEMENT refuses the
+         mint and the CLI still exits non-zero with nothing minted. The scored
+         proof of that guard is MUT-32, whose test
+         (TestMintIsRefusedByTheDatabaseOnAClaimedInstance) calls the generated
+         query directly, bypassing every Go-side check. The Go flag is now
+         redundancy in front of a database guarantee — which is the right way
+         round, and better than the first round where neither existed.
+
+  MUT-14 re-minting unconditionally at boot. The decision it targeted MOVED into
+         Mint, under the advisory lock, which is the whole point of the fix —
+         MUT-14b mutates it in its new home and reddens
+         TestConcurrentBootsMintExactlyOneToken.
+
+
+========================================================================
+SUMMARY
+========================================================================
+passed:       62
+failed:       0
+harness-fail: 0
+harness exit=0
+
+## MUT-60 re-run against 2ad370e's raised floor (144)
+MUT-60 — delete the owner-claim integration tests (owner_claim_test.go + claimtoken_cli_test.go)
+========================================================================
+deletes: internal/integration/owner_claim_test.go internal/integration/claimtoken_cli_test.go
+must turn RED: the 'integration' report's per-package floor for ./internal/integration/
+committed floor: 144
+--- RED run ---
+go-test-report: suite 'integration' from ev.json
+  tests executed:           49  (floor: 144)
+  github.com/yegamble/vizra-core/internal/integration: 49 test(s) (floor: 144)
+::error::go-test-report: only 49 test(s) executed; the recorded floor for 'integration' is 144.
+::error::go-test-report: package github.com/yegamble/vizra-core/internal/integration executed 49 test(s); its recorded floor is 144.
+go-test-report: FAILED (2 problem(s))
+RED exit=1 (expected non-zero)
+--- GREEN run (files restored) ---
+go-test-report: suite 'integration' from ev.json
+  tests executed:           169  (floor: 144)
+  github.com/yegamble/vizra-core/internal/integration: 169 test(s) (floor: 144)
+go-test-report: ok — 169 test(s) executed across 1 package(s), 0 unexpected skips, floor 144 met
+GREEN exit=0 (expected zero)
+RESULT: MUT-60 PASS (red under mutation, green when restored)

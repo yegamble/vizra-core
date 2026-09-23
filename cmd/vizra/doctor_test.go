@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -30,6 +31,8 @@ var everyCheckDoctorMustReport = []string{
 	"database",
 	"database version",
 	"schema",
+	"owner claim",
+	"public origin",
 	"cache",
 	"cache version floor",
 	"search",
@@ -87,6 +90,9 @@ func healthyProbes(t *testing.T) probes {
 			return fakeCache{info: cache.ServerInfo{Flavour: cache.FlavourValkey, Version: "9.1.2"}}, nil
 		},
 		searchReachable: func(context.Context, *config.Config) bool { return false },
+		ownerClaim: func(context.Context, pooler) doctor.OwnerClaimState {
+			return doctor.OwnerClaimState{Claimed: true}
+		},
 	}
 }
 
@@ -254,5 +260,43 @@ func TestDoctorStopsEarlyOnAnUnloadableConfigButStillFails(t *testing.T) {
 		if r.Name == "database" || r.Name == "schema" {
 			t.Errorf("doctor reported %q without a configuration to connect with", r.Name)
 		}
+	}
+}
+
+// TestRealProbesWiresEveryCheck is the converse of collect()'s nil guards: the
+// guards keep a test fake from panicking, and this keeps that leniency from
+// hiding a production check that nobody wired.
+func TestRealProbesWiresEveryCheck(t *testing.T) {
+	p := realProbes("")
+	if p.ownerClaim == nil {
+		t.Error("realProbes does not wire ownerClaim, so `vizra doctor` would SKIP the owner-claim check in production")
+	}
+	if p.loadConfig == nil || p.openPools == nil || p.schema == nil || p.openCache == nil || p.searchReachable == nil {
+		t.Error("realProbes left a probe unwired")
+	}
+}
+
+// R2-G(d): `vizra doctor --env F` validated F's configuration but compared the
+// PROCESS environment's VIZRA_PUBLIC_ORIGIN against it, so the origin check
+// judged a value the operator never wrote into F — or reported an empty one.
+// Both halves of that check must come from the same source.
+func TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig(t *testing.T) {
+	t.Setenv("VIZRA_PUBLIC_ORIGIN", "https://process.invalid")
+
+	file := t.TempDir() + "/vizra.env"
+	if err := os.WriteFile(file, []byte("VIZRA_PUBLIC_ORIGIN=https://Photos.Example.org/\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	p := realProbes(file)
+	if p.rawPublicOrigin == nil {
+		t.Fatal("realProbes does not wire rawPublicOrigin")
+	}
+	if got, want := p.rawPublicOrigin(), "https://Photos.Example.org/"; got != want {
+		t.Errorf("--env: raw public origin = %q, want the env file's %q", got, want)
+	}
+
+	if got, want := realProbes("").rawPublicOrigin(), "https://process.invalid"; got != want {
+		t.Errorf("no --env: raw public origin = %q, want the process environment's %q", got, want)
 	}
 }

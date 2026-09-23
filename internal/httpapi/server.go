@@ -22,6 +22,7 @@ import (
 
 	"github.com/yegamble/vizra-core/internal/cache"
 	"github.com/yegamble/vizra-core/internal/config"
+	"github.com/yegamble/vizra-core/internal/credential"
 	"github.com/yegamble/vizra-core/internal/db"
 	"github.com/yegamble/vizra-core/internal/jobs"
 	"github.com/yegamble/vizra-core/internal/search"
@@ -42,6 +43,12 @@ type Deps struct {
 	// EmbeddedSchemaVersion is the highest migration compiled into this binary.
 	EmbeddedSchemaVersion int64
 
+	// OwnerClaimDegraded is set when the first-run bootstrap could not complete
+	// at boot. It is a readiness signal rather than a boot refusal: an operator
+	// must be able to see that an unclaimed instance has no usable claim path,
+	// without the api crash-looping while they work out why.
+	OwnerClaimDegraded bool
+
 	// QueueSnapshot reads job-queue state for readiness (Q-028). It is a
 	// function so the api process does not have to import the worker loop, and
 	// so a test can drive the threshold without a database.
@@ -54,6 +61,21 @@ type Deps struct {
 	// before; the ping itself is one library call.
 	PingDatabase func(ctx context.Context) error
 	PingCache    func(ctx context.Context) error
+
+	// InstanceClaimed reports whether this instance has an owner yet. It is the
+	// same kind of seam as PingDatabase: New installs the real lookup, and a
+	// test overrides it so route behaviour can be exercised without standing up
+	// PostgreSQL. It is NOT a bypass — the default performs the real query, and
+	// an error from it is 503, never "allow".
+	InstanceClaimed func(ctx context.Context) (bool, error)
+
+	// Hasher derives password verifiers. It is an interface with a derivation
+	// counter so "the password is hashed only after the claim token has been
+	// verified" — the endpoint's central denial-of-service property — is an
+	// assertion in tests rather than a sentence in a comment. New installs the
+	// production hasher, which carries the ONE process-wide bound on concurrent
+	// argon2id derivations (internal/credential).
+	Hasher credential.Hasher
 
 	// Now is injectable for tests.
 	Now func() time.Time
@@ -71,6 +93,10 @@ type Server struct {
 
 	readiness *readinessCache
 	draining  atomicBool
+
+	// claimed memoises whether this instance has an owner. The bit is monotonic,
+	// so once true the unclaimed guard costs nothing for the life of the process.
+	claimed claimedCache
 }
 
 // New builds the server and registers every route. Routes are registered in one
@@ -81,6 +107,9 @@ func New(deps Deps) *Server {
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
+	}
+	if deps.Hasher == nil {
+		deps.Hasher = credential.New()
 	}
 	if deps.PingDatabase == nil {
 		pools := deps.Pools
@@ -116,11 +145,26 @@ func New(deps Deps) *Server {
 	e.Use(securityHeadersMiddleware())
 	e.Use(siteMiddleware(deps.Resolver, deps.Logger))
 	e.Use(routeAttributeMiddleware())
+	// The unclaimed guard is STRUCTURAL, not a decorator a future author must
+	// remember to attach: while the instance has no owner, only an explicit
+	// allowlist is reachable and everything else — including the router's 404
+	// path — answers 403. A guard that must be remembered is fail-open, and
+	// "every signup path answers 403 while unclaimed" is an acceptance bullet
+	// (VZ-INSTALL-003).
+	e.Use(s.requireClaimedMiddleware())
 
+	// Probes stay unprefixed: they are infrastructure surfaces, not API
+	// surfaces, and their paths are already frozen in api/openapi.yaml.
 	e.GET("/healthz", s.handleHealthz)
 	e.GET("/readyz", s.handleReadyz)
 	e.GET("/version", s.handleVersion)
 	e.GET("/schemaz", s.handleSchemaz)
+
+	// /api/v1 is registered as a group here because this slice creates the
+	// convention every later slice inherits (VZ-INSTALL-003 surfaces.api).
+	v1 := e.Group(apiV1Prefix)
+	v1.GET("/setup/claim-status", s.handleClaimStatus)
+	v1.POST("/setup/claim-owner", s.handleClaimOwner)
 
 	return s
 }

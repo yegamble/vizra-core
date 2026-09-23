@@ -83,7 +83,7 @@ config-template-check: ## Every config key has exactly one documented home
 .PHONY: openapi-verify
 openapi-verify: ## Route<->spec drift, BOTH directions, plus the internal search contract
 	@echo "==> openapi-verify"
-	@$(GO) test -count=1 -run 'TestEveryRouteHasASpecOperation|TestEverySpecOperationHasARoute|TestSpecOperationIDsAreUniqueAndPresent|TestM0ContractIsTheFourProbes|TestInternalSearchContractIsValid|TestInternalOperationsAreNotInThePublicContract|TestHMACTestVectorsArePublished' ./internal/httpapi/
+	@$(GO) test -count=1 -run 'TestEveryRouteHasASpecOperation|TestEverySpecOperationHasARoute|TestSpecOperationIDsAreUniqueAndPresent|TestPublicContractIsTheProbesPlusTheSetupOperations|TestInternalSearchContractIsValid|TestInternalOperationsAreNotInThePublicContract|TestHMACTestVectorsArePublished' ./internal/httpapi/
 
 .PHONY: sqlc-verify
 sqlc-verify: ## Generated sqlc output matches the queries (hand edits fail)

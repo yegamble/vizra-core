@@ -68,6 +68,8 @@ var Registry = []Key{
 	{Name: "VIZRA_JOB_LEASE", Default: "60s", Doc: "Lease duration. The heartbeat renews at lease/3."},
 	{Name: "VIZRA_JOB_TIMEOUT", Default: "5m", Doc: "Per-job wall-clock timeout, applied as a context deadline."},
 	{Name: "VIZRA_SHUTDOWN_GRACE", Default: "20s", Doc: "Time allowed for in-flight requests after SIGTERM."},
+	{Name: "VIZRA_OWNER_CLAIM_ANNOUNCE", Default: "off", Doc: "Where an unclaimed instance announces its owner-claim token: 'off' (default) prints only the command that mints one; 'stderr' WRITES A LIVE CREDENTIAL to the container log, which every log driver captures, ships and retains. Use 'stderr' only on a single host with no log aggregation."},
+	{Name: "VIZRA_OWNER_CLAIM_TTL", Default: "1h", Doc: "How long an owner-claim token stays redeemable. It is minted on demand by `vizra claim-token`, so this only has to cover one claim attempt."},
 }
 
 // RetiredKey is a name this repository USED TO read and no longer does.
