@@ -3,6 +3,8 @@ package search
 import (
 	"context"
 	"log/slog"
+
+	"github.com/yegamble/vizra-core/internal/obs"
 )
 
 // Service is the composition callers hold. It owns the one rule Q-001 cares
@@ -50,7 +52,13 @@ func (s *Service) Search(ctx context.Context, req SearchRequest) (SearchResult, 
 		// A configured but unreachable or misconfigured search is a degraded
 		// readiness signal while requests are still served from SQL — never a
 		// silent fallback (Q-001).
-		s.log.Warn("search: falling back to SQL after a remote fault", "error", err.Error())
+		//
+		// obs.Redact at the call site, not left to the handler: NewService falls
+		// back to slog.Default(), and a VIZRA_SEARCH_URL that fails to parse
+		// comes back from http.NewRequestWithContext quoted whole, userinfo and
+		// query included (B3 verifier, core #12 V-1;
+		// TestTheFallbackLogLinesAreRedacted).
+		s.log.Warn("search: falling back to SQL after a remote fault", "error", obs.Redact(err.Error()))
 		return s.sql.Search(ctx, req)
 	case res.Status == StatusNotIndexed:
 		// Not a fault. The service is healthy and is telling us it holds no index.
@@ -67,7 +75,7 @@ func (s *Service) Suggest(ctx context.Context, req SuggestRequest) (SuggestResul
 	res, err := s.remote.Suggest(ctx, req)
 	switch {
 	case err != nil:
-		s.log.Warn("search: falling back to SQL after a remote fault", "error", err.Error())
+		s.log.Warn("search: falling back to SQL after a remote fault", "error", obs.Redact(err.Error()))
 		return s.sql.Suggest(ctx, req)
 	case res.Status == StatusNotIndexed:
 		return s.sql.Suggest(ctx, req)

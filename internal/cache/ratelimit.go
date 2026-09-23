@@ -84,15 +84,23 @@ func (l *FallbackLimiter) Degraded() bool {
 // permanent lockout. NX needs Redis >= 7.0; ADR-001 sets the supported floor at
 // Redis/Valkey >= 7.2 and CI runs Valkey 9.1.2 and Redis 7.2.
 //
-// A request whose context has ENDED — the client disconnected, or its deadline
-// passed — is answered (false, 0) and touches nothing: not the cache, not the
-// in-process counter, and not the degraded flag. It is not a cache failure, and
-// treating it as one flipped /readyz to degraded whenever a client hung up, and
-// charged the fallback for a request that was already dead (security review of
-// the core #8 limiter, L-2). The check runs twice: before the command, and again
-// when the command fails, because a context that ends while the command is in
-// flight surfaces as an Exec error indistinguishable from an outage. The answer
-// goes to a request nobody is waiting for, so refusing it costs nothing.
+// A request whose context has ENDED is answered (false, 0) and touches nothing:
+// not the cache, not the in-process counter, and not the degraded flag. It is
+// not a cache failure, and treating it as one flipped /readyz to degraded
+// whenever a client hung up, and charged the fallback for a request that was
+// already dead (security review of the core #8 limiter, L-2). The check runs
+// twice: before the command, and again when the command fails, because a
+// context that ends while the command is in flight surfaces as an Exec error
+// indistinguishable from an outage.
+//
+// TODAY the only thing that ends a request context before Allow is the client
+// disconnecting. The server's ReadTimeout and WriteTimeout do not cancel
+// r.Context() (measured by the B3 verifier, core #12 V-3), and neither cmd/api
+// nor internal/httpapi sets a per-request deadline. So the (false, 0) goes to a
+// request nobody is waiting for. If a per-request deadline is ever added, that
+// stops being true: a client still waiting whose deadline expired would be
+// answered 429 "rate_limited" by the ceiling callers (allowSetupRequest)
+// instead of a 503, and that caller must then map a context error first.
 func (l *FallbackLimiter) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, int) {
 	if ctx.Err() != nil {
 		return false, 0
