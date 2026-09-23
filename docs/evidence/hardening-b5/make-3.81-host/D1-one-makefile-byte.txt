@@ -1,0 +1,31 @@
+# D1 one byte of the Makefile changed ('contract' -> 'Contract' in line 1's comment)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+
+==============================================================
+MUTATION: D1 one Makefile byte
+  file:   Makefile
+  mutate: python3 -c "p='Makefile';b=open(p,'rb').read();n=b'is the contract.';assert b.count(n)==1;open(p,'wb').write(b.replace(n,b'is the Contract.'))"
+  check:  anchor --workflow; anchor; guard
+--------------------------------------------------------------
+  sha256 BEFORE: e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2
+  sha256 AFTER:  78e6e7d25d9db35f06162c243d55a891c89c1fb6950cb9f9bdf40e616783e1fd
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+anchor [--workflow] exit=1 processes-started=1 make-processes=0
+  FAIL  Makefile: sha256 78e6e7d25d9db35f06162c243d55a891c89c1fb6950cb9f9bdf40e616783e1fd does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2)
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 processes-started=1 make-processes=0
+  FAIL  Makefile: sha256 78e6e7d25d9db35f06162c243d55a891c89c1fb6950cb9f9bdf40e616783e1fd does not match .github/pinned-makefiles.yml (e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2)
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+ci-required-guard exit=1
+  FAIL  Makefile changed without the paired update to pinned-makefiles.yml:
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: e7cc357cd09a6fc78e006d4f55a396e425dd574ea5cc7888b740513b18778fb2
+  restore byte-identical: yes
+  RESULT: D1 one Makefile byte -> exit 0
+
+== after restore ==
+anchor [--workflow] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)

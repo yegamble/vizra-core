@@ -1,0 +1,31 @@
+# D4 a pin entry deleted (the Makefile's line in .github/pinned-makefiles.yml)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+
+==============================================================
+MUTATION: D4 pin entry deleted
+  file:   .github/pinned-makefiles.yml
+  mutate: python3 -c "import re;p='.github/pinned-makefiles.yml';s=open(p).read();n=len(re.findall(r'(?m)^  Makefile: [0-9a-f]{64}\n',s));assert n==1;open(p,'w').write(re.sub(r'(?m)^  Makefile: [0-9a-f]{64}\n','',s))"
+  check:  anchor --workflow; anchor; guard
+--------------------------------------------------------------
+  sha256 BEFORE: 982ebfb0967ae14f71988eec8d3274630c20d89caa1af4381ff4e10161373754
+  sha256 AFTER:  2490683d12ccee9c2ad9e7b23fcdcffa3b81df20945b9e07b083dfffb70bf6e7
+  CHECK EXIT: 0
+--- check output (last 40 lines) ---
+anchor [--workflow] exit=1 processes-started=1 make-processes=0
+  FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+anchor [lenient] exit=1 processes-started=1 make-processes=0
+  FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+ci-required-guard exit=1
+  FAIL  /private/tmp/claude-501/-Users-yosefgamble-github-vizra/7321b930-95d2-4a95-ba2e-61ef2ce3c13c/scratchpad/b5digest.qOKipF/clone/.github/pinned-makefiles.yml pins no file. An empty pin would let 
+ci-required-guard: FAILED
+------------------------------------
+  sha256 RESTORED: 982ebfb0967ae14f71988eec8d3274630c20d89caa1af4381ff4e10161373754
+  restore byte-identical: yes
+  RESULT: D4 pin entry deleted -> exit 0
+
+== after restore ==
+anchor [--workflow] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)

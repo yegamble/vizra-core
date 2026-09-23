@@ -1,0 +1,10 @@
+# D0 control: the clean tree, both modes, and check 11
+# host: Linux aarch64  make: GNU Make 4.3  python3: Python 3.12.3  go: 
+# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+
+anchor [--workflow] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)
+anchor [lenient] exit=0 processes-started=19 make-processes=18 first-make-argv=['make', '-q', 'Makefile']
+make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)
+ci-required-guard exit=0
+  ok    pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree

@@ -1,0 +1,39 @@
+# C2 the pre-make gate narrowed to pin failures only (an environment failure would reach make again)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 3c56be5922e741286e4a51b8fa2cfd3f7dec03a8  (0 uncommitted path(s) before the run)
+
+==============================================================
+MUTATION: C2 gate narrowed
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 -c "p='scripts/make-integrity-guard.py';s=open(p).read();n='    if g.failed:\n        print(f\"make-integrity-guard: FAILED — make was NOT invoked';assert s.count(n)==1;open(p,'w').write(s.replace(n,'    if pinned is None:\n        print(f\"make-integrity-guard: FAILED — make was NOT invoked'))"
+  check:  gotest 'TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake'
+--------------------------------------------------------------
+  sha256 BEFORE: 814c68265f5709fc1fd30862fe79ca659eb9ea22693f5bd0aae015fa98a4b4d2
+  sha256 AFTER:  182de89b1402f72fc339d0431b05a1afe75afda3bebc51e1f2d8df25d020506e
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+--- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake (0.00s)
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/GO=true (0.74s)
+        makefiledigest_test.go:742: workflow/GO=true: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFILES (0.83s)
+        makefiledigest_test.go:742: local/MAKEFILES: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/local/MAKEFLAGS=-ki (0.83s)
+        makefiledigest_test.go:742: local/MAKEFLAGS=-ki: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFLAGS=-i (0.84s)
+        makefiledigest_test.go:742: workflow/MAKEFLAGS=-i: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/MAKEFILES (0.84s)
+        makefiledigest_test.go:742: workflow/MAKEFILES: make was STARTED 1 time(s) although a pre-flight check had refused:
+    --- FAIL: TestAFailedEnvironmentCheckStopsTheAnchorBeforeMake/workflow/BASH_ENV (1.01s)
+        makefiledigest_test.go:742: workflow/BASH_ENV: make was STARTED 1 time(s) although a pre-flight check had refused:
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	1.417s
+FAIL
+go test exit=1
+------------------------------------
+  sha256 RESTORED: 814c68265f5709fc1fd30862fe79ca659eb9ea22693f5bd0aae015fa98a4b4d2
+  restore byte-identical: yes
+  RESULT: C2 gate narrowed -> exit 1
+
+== after restore ==
+ok  	github.com/yegamble/vizra-core/scripts	0.768s
+go test exit=0

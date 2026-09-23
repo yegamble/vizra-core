@@ -1,0 +1,52 @@
+ci-required-guard:
+  ok    pinned-steps.yml: 8 make body(ies), 3 direct-test body(ies), required invocations for ['build-test', 'cache-matrix-leg', 'fixtures', 'govulncheck']
+  ok    all 6 floor lane(s) are present and non-optional
+  ok    required check 'append-only' resolves to a job
+  ok    required check 'build-test' resolves to a job
+  ok    required check 'cache-matrix' resolves to a job
+  ok    required check 'fixtures' resolves to a job
+  ok    required check 'govulncheck' resolves to a job
+  ok    required check 'docker-build' resolves to a job
+  ok    checked lane 'append-only' runs on pull_request
+  ok    checked lane 'append-only' invokes no `make`, so it needs no make-integrity anchor
+  ok    checked lane 'append-only' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'append-only' carries no continue-on-error
+  ok    checked lane 'build-test' runs on pull_request
+  ok    checked lane 'build-test' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
+  ok    checked lane 'build-test': 3 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'build-test' runs all 3 required invocation(s) for 'build-test'
+  ok    checked lane 'build-test' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'build-test' carries no continue-on-error
+  ok    checked lane 'cache-matrix' runs on pull_request
+  ok    checked lane 'cache-matrix' invokes no `make`, so it needs no make-integrity anchor
+  ok    checked lane 'cache-matrix' performs no checkout, so it needs no provenance step
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg' runs the make-integrity-guard anchor (step 4) before `make` (step 5), unconditionally and without continue-on-error
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg': 2 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg' runs all 2 required invocation(s) for 'cache-matrix-leg'
+  ok    checked lane 'cache-matrix -> needs:cache-matrix-leg' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'cache-matrix' carries no continue-on-error
+  ok    checked lane 'docker-build' runs on pull_request
+  ok    checked lane 'docker-build' invokes no `make`, so it needs no make-integrity anchor
+  ok    checked lane 'docker-build' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'docker-build' carries no continue-on-error
+  ok    checked lane 'fixtures' runs on pull_request
+  ok    checked lane 'fixtures' runs the make-integrity-guard anchor (step 5) before `make` (step 6), unconditionally and without continue-on-error
+  ok    checked lane 'fixtures': 2 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'fixtures' runs all 2 required invocation(s) for 'fixtures'
+  ok    checked lane 'fixtures' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'fixtures' carries no continue-on-error
+  ok    checked lane 'govulncheck' runs on pull_request
+  ok    checked lane 'govulncheck' runs the make-integrity-guard anchor (step 3) before `make` (step 4), unconditionally and without continue-on-error
+  ok    checked lane 'govulncheck': 1 make step(s) are byte-equal to a pinned body, carry no key but name/run/id, and each is immediately preceded by the anchor
+  ok    checked lane 'govulncheck' runs all 1 required invocation(s) for 'govulncheck'
+  ok    checked lane 'govulncheck' runs scripts/provenance.sh after checking out, unconditionally
+  ok    checked lane 'govulncheck' carries no continue-on-error
+  ok    the unit suite runs directly, without make, from a pinned body in lane 'build-test' step 'Unit suite, invoked directly (no make), with counts'
+  ok    the integration suite runs directly, without make, from a pinned body in lane 'build-test' step 'Integration suite, invoked directly (no make), with counts'
+  ok    the test-race lane selects the whole module (PKGS = ./...)
+  ok    the test-race target uses $(PKGS)
+  ok    all 2 -run selections are non-empty
+  ok    pinned-makefiles.yml pins 1 makefile(s) (Makefile), covers the Makefile, and every digest matches the tree
+  ok    every job runs on GitHub-hosted ubuntu-24.04
+  ok    every third-party action is pinned to a commit SHA
+ci-required-guard: passed (6 required check(s))
