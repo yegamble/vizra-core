@@ -1,0 +1,57 @@
+# C36 the one reader's cache removed (IDENTITY)
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 57a9b3965ff45ddb9431cb72ad87c0101edc6f10  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 925bdc1c6f1be5e58f597cf6c77605a35d1ad5f1
+
+==============================================================
+MUTATION: C36 the one reader's cache removed (IDENTITY)
+  file:   scripts/makefile_pin.py
+  mutate: python3 docs/evidence/hardening-b5/b5d/mutations.py C36
+  check:  probe_verdict
+--------------------------------------------------------------
+  sha256 BEFORE: 94e1b66b68b49e4bfd4582621e441583c9fc7a3eb8cb94f4bb195f1b24ae45a8
+  sha256 AFTER:  bd7c7d9e34131fc3c8789df7dd98cd266657716f2a0f3e2788c35716e60274e0
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+ok   POISON makefile_pin.grammar_problems
+ok   POISON makefile_pin.static_read_set (its include reading)
+ok   POISON makefile_pin.verify_pin (its parse-time sites)
+ok   POISON makefile_pin.verify_pin (its grammar)
+ok   POISON anchor prerequisite_closure
+ok   POISON anchor check_text (recipes, through makefile_pin.recipe_lines)
+ok   POISON anchor check_text (assignments)
+ok   POISON anchor check_text (definitions)
+ok   POISON anchor check_text (a named token)
+ok   POISON anchor check_environment_overrides
+ok   POISON ci-required-guard load_makefile_env_names
+ok   POISON ci-required-guard check_makefile_selection (PKGS)
+ok   POISON ci-required-guard check_makefile_selection (the test-race recipe)
+ok   POISON ci-required-guard check_makefile_selection (-run)
+ok   POISON ci-required-guard check_makefile_pin (check 11's grammar)
+BAD  IDENTITY text ee49ccf26021: 21 distinct sequence(s)
+probe: 15 probe(s), 20 named non-makefile read(s), 1 problem(s)
+probe_verdict exit=1
+------------------------------------
+  sha256 RESTORED: 94e1b66b68b49e4bfd4582621e441583c9fc7a3eb8cb94f4bb195f1b24ae45a8
+  restore byte-identical: yes
+  RESULT: C36 the one reader's cache removed (IDENTITY) -> exit 1
+
+== after restore ==
+ok   POISON makefile_pin.grammar_problems
+ok   POISON makefile_pin.static_read_set (its include reading)
+ok   POISON makefile_pin.verify_pin (its parse-time sites)
+ok   POISON makefile_pin.verify_pin (its grammar)
+ok   POISON anchor prerequisite_closure
+ok   POISON anchor check_text (recipes, through makefile_pin.recipe_lines)
+ok   POISON anchor check_text (assignments)
+ok   POISON anchor check_text (definitions)
+ok   POISON anchor check_text (a named token)
+ok   POISON anchor check_environment_overrides
+ok   POISON ci-required-guard load_makefile_env_names
+ok   POISON ci-required-guard check_makefile_selection (PKGS)
+ok   POISON ci-required-guard check_makefile_selection (the test-race recipe)
+ok   POISON ci-required-guard check_makefile_selection (-run)
+ok   POISON ci-required-guard check_makefile_pin (check 11's grammar)
+ok   IDENTITY text ee49ccf26021: 1 distinct sequence(s)
+probe: 15 probe(s), 20 named non-makefile read(s), 0 problem(s)
+probe_verdict exit=0

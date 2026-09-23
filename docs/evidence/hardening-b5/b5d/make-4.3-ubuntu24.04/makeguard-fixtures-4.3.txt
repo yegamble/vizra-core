@@ -1,0 +1,69 @@
+GNU Make 4.3
+at-dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `@-./run-the-real-tests.sh`
+closure-not-phony exit=1 notinv=1   FAIL  gate closure target(s) not declared `.PHONY` in the pinned bytes: ci
+computed-prerequisite exit=1 notinv=1   FAIL  Makefile:6 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `ci: $(LANE)`.
+computed-target-recipe exit=1 notinv=1   FAIL  Makefile:7 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(GATE_NAME):
+conditional-target exit=1 notinv=1   FAIL  Makefile:5 is outside the Makefile grammar this anchor allows (a conditional directive): `ifeq ($(SKIP),)`. Every line must be empty
+dash-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `-`: `-./run-the-real-tests.sh`
+default-recipe exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.DEFAULT:`. Every line must be empty
+define-shell exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (the `define` directive): `define SHELL`. Every line must be empty, a 
+digest-mismatch exit=1 notinv=1   FAIL  Makefile: sha256 bdf444022bc26ade2b4fadbd5afa178337636ba9b2f3996f40406a2c47901f3c does not match .github/pinned-makefiles.yml (6b275
+duplicate-target exit=1 notinv=1   FAIL  gate target `ci` is defined 2 times: Makefile:5, Makefile:9
+eval-in-pinned-bytes exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(eval EXTRA 
+extra-prereqs exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.EXTRA_PREREQS := Makefile`. Every l
+gnumakefile-present exit=1 notinv=1   FAIL  GNUmakefile exists beside the Makefile. With no -f, GNU make reads GNUmakefile INSTEAD of Makefile, so the pinned Makefile would not
+gnumakeflags exit=1 notinv=1   FAIL  Makefile:1 assigns GNUMAKEFLAGS: `GNUMAKEFLAGS := -k`
+good exit=0 notinv=0 
+grammar-conditional exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (a conditional directive): `ifdef VIZRA_B5D_NEVER_SET`. Every line mus
+grammar-continued-comment exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (a comment continued onto the next line by a trailing backslash; make 
+grammar-export exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `export` directive): `export INERT_EXPORTED := 1`. Every line mus
+grammar-substitution-reference exit=1 notinv=1   FAIL  Makefile:10 is outside the Makefile grammar this anchor allows (an assignment value using `$(INERT_LIST:a=b)` (a function, a substit
+grammar-vpath exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `vpath` directive): `vpath %.inert .`. Every line must be empty, 
+ignore-bare exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.IGNORE:`. Every line must be empty,
+ignore-per-target exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.IGNORE: ci`. Every line must be emp
+include-computed exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `include` directive): `include $(INC)`. Every line must be empty,
+include-outside exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (the `-include` directive): `-include /usr/local/include/vizra.mk`. Ev
+include-pinned-good exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (the `include` directive): `include a.mk`. Every line must be empty, a
+include-unpinned exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (the `include` directive): `include inc.mk`. Every line must be empty,
+included-makeflags exit=1 notinv=1   FAIL  Makefile:1 is outside the Makefile grammar this anchor allows (the `include` directive): `include inc.mk`. Every line must be empty,
+included-shell exit=1 notinv=1   FAIL  Makefile:1 is outside the Makefile grammar this anchor allows (the `include` directive): `include inc.mk`. Every line must be empty,
+inline-recipe exit=1 notinv=1   FAIL  Makefile:5 is outside the Makefile grammar this anchor allows (an inline `;` recipe or a `;` outside a recipe): `ci: ; ./run-the-rea
+make-q-parse-error exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `this line is not make syntax`. Every
+makefile-symlink exit=1 notinv=1   FAIL  Makefile is not a regular file (a symlink, FIFO or device is refused): make would read whatever it points at, which is not what was 
+makeflags-ignore exit=1 notinv=1   FAIL  Makefile:1 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `MAKEFLAGS += -i`. Every line must be
+missing-prerequisite exit=1 notinv=1   FAIL  `no-such-file-and-no-rule`, a prerequisite in the gate closure, has no explicit rule in the pinned bytes.
+missing-target exit=1 notinv=1   FAIL  gate target `ci` is not defined in any makefile make will read.
+multi-target-rule exit=1 notinv=1   FAIL  Makefile:5 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `ci other:`. Every line must be empty
+no-shell-pin exit=1 notinv=1   FAIL  the root Makefile does not carry BOTH approved assignments.
+oneshell exit=1 notinv=1   FAIL  Makefile:3 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.ONESHELL:`. Every line must be empt
+or-true exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line ending `|| true`: `./run-the-real-tests.sh || true`
+pattern-rule exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `%.done:`. Every line must be empty, 
+pattern-specific-shell exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `%: SHELL := /usr/bin/true`. Every li
+pin-empty exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml pins no file. An empty pin would let make read anything.
+pin-malformed exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml:2: not a `  <path>: <64 lowercase hex sha256>` entry: '  "Makefile": 6b275cc68da75a13c5a8a3ac260a15da5b
+pin-missing exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml does not exist. It is the list of Makefile bytes make may read; without it nothing says which bytes wer
+pin-without-makefile exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml does not pin `Makefile`, the file make reads first.
+plus-prefix exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line prefixed `+`: `+echo "forced to run even under -n"`
+posix exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.POSIX:`. Every line must be empty, 
+prefix-from-chained-variable exit=1 notinv=0   FAIL  Makefile:10 — gate target `ci`: `@$(EMPTY) $(IGNORE_FAILURE)./run-the-real-tests.sh` expands to a recipe line prefixed `@-` in mak
+prefix-from-function exit=1 notinv=1   FAIL  Makefile:7 is outside the Makefile grammar this anchor allows (a recipe line using `$(if yes,-)` (a function, a substitution referen
+prefix-from-pattern-specific exit=1 notinv=1   FAIL  Makefile:4 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `%: IGNORE_FAILURE := -`. Every line 
+prefix-from-variable exit=1 notinv=0   FAIL  Makefile:8 — gate target `ci`: `$(IGNORE_FAILURE)./run-the-real-tests.sh` expands to a recipe line prefixed `-` in make's own data
+recipeprefix exit=1 notinv=1   FAIL  Makefile:3 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.RECIPEPREFIX := >`. Every line must
+resolver-cannot-resolve exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(if $(filter
+resolver-computed-default exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(DEFAULT_HEA
+resolver-computed-extra-prereqs exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(EXTRA_HEAD)
+resolver-computed-ignore exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(IGNORE_HEAD
+resolver-computed-makeflags exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(FLAGS_NAME)
+resolver-computed-recipeprefix exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(PREFIX_HEAD
+resolver-computed-secondexpansion exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(EXPANSION_H
+resolver-computed-shell exit=1 notinv=1   FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (an expansion outside an assignment value or a recipe): `$(SHELL_NAME)
+secondexpansion exit=1 notinv=1   FAIL  Makefile:8 is outside the Makefile grammar this anchor allows (not one of the allowed shapes): `.SECONDEXPANSION:`. Every line must 
+semicolon-true exit=1 notinv=1   FAIL  Makefile:7 — gate target `ci` has a recipe line ending `; true`: `./run-the-real-tests.sh ; true`
+shell-colon exit=1 notinv=1   FAIL  Makefile:1 sets SHELL to something other than the approved value: `SHELL := :`
+shell-override exit=1 notinv=1   FAIL  Makefile:1 sets SHELL to something other than the approved value: `SHELL := /usr/bin/true`
+shellflags-neutered exit=1 notinv=1   FAIL  Makefile:2 sets .SHELLFLAGS to something other than the approved value: `.SHELLFLAGS := -c`
+stale-pin-entry exit=1 notinv=1   FAIL  .github/pinned-makefiles.yml pins old.mk, which make would NOT read from the pinned bytes.
+submake exit=1 notinv=1   FAIL  Makefile:7 is outside the Makefile grammar this anchor allows (a recipe line using `$(MAKE)`): `$(MAKE) other`. Every line must be e
+suffix-from-variable exit=1 notinv=0   FAIL  `ci`: make's own dry run prints command(s) whose exit status is discarded:
+tree after: 0 uncommitted path(s)

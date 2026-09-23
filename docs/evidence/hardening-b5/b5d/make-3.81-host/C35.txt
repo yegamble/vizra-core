@@ -1,0 +1,85 @@
+# C35 the anchor no longer reports the grammar
+# host: Darwin arm64  make: GNU Make 3.81  python3: Python 3.9.6  go: go1.27.1
+# tree: 57a9b3965ff45ddb9431cb72ad87c0101edc6f10  (0 uncommitted path(s) before the run)
+# scripts/ tree object: 925bdc1c6f1be5e58f597cf6c77605a35d1ad5f1
+
+==============================================================
+MUTATION: C35 the anchor no longer reports the grammar
+  file:   scripts/make-integrity-guard.py
+  mutate: python3 docs/evidence/hardening-b5/b5d/mutations.py C35
+  check:  all_fixtures
+--------------------------------------------------------------
+  sha256 BEFORE: eb778142f1fd949621bc1a3f3b10819efdb1e66a53ea06648dbc6e0dc72dfdf6
+  sha256 AFTER:  167d9bac85ca7c244f169b771f1bad2c51535be343e8def7f46ffa2a90f3066d
+  CHECK EXIT: 1
+--- check output (last 40 lines) ---
+grammar-conditional anchor [--workflow] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+grammar-conditional anchor [lenient] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+fixture_scenario grammar-conditional: control BROKEN (exit 1)
+grammar-export anchor [--workflow] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+grammar-export anchor [lenient] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+fixture_scenario grammar-export: control BROKEN (exit 1)
+grammar-continued-comment anchor [--workflow] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+grammar-continued-comment anchor [lenient] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+fixture_scenario grammar-continued-comment: control BROKEN (exit 1)
+grammar-vpath anchor [--workflow] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+grammar-vpath anchor [lenient] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+fixture_scenario grammar-vpath: control BROKEN (exit 1)
+grammar-substitution-reference anchor [--workflow] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+grammar-substitution-reference anchor [lenient] exit=0 make-processes=4
+make-integrity-guard: passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)
+fixture_scenario grammar-substitution-reference: control BROKEN (exit 1)
+all_fixtures exit=1
+------------------------------------
+  sha256 RESTORED: eb778142f1fd949621bc1a3f3b10819efdb1e66a53ea06648dbc6e0dc72dfdf6
+  restore byte-identical: yes
+  RESULT: C35 the anchor no longer reports the grammar -> exit 1
+
+== after restore ==
+grammar-conditional anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (a conditional directive): `ifdef VIZRA_B5D_NEVER_SET`. Every line must be empty, a commen
+  FAIL  Makefile:11 is outside the Makefile grammar this anchor allows (a conditional directive): `endif`. Every line must be empty, a comment, `NAME := | ?= | 
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+grammar-conditional anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (a conditional directive): `ifdef VIZRA_B5D_NEVER_SET`. Every line must be empty, a commen
+  FAIL  Makefile:11 is outside the Makefile grammar this anchor allows (a conditional directive): `endif`. Every line must be empty, a comment, `NAME := | ?= | 
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario grammar-conditional: control HELD (exit 0)
+grammar-export anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `export` directive): `export INERT_EXPORTED := 1`. Every line must be empty, a commen
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+grammar-export anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `export` directive): `export INERT_EXPORTED := 1`. Every line must be empty, a commen
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario grammar-export: control HELD (exit 0)
+grammar-continued-comment anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (a comment continued onto the next line by a trailing backslash; make reads that next line
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+grammar-continued-comment anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (a comment continued onto the next line by a trailing backslash; make reads that next line
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario grammar-continued-comment: control HELD (exit 0)
+grammar-vpath anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `vpath` directive): `vpath %.inert .`. Every line must be empty, a comment, `NAME := 
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+grammar-vpath anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:9 is outside the Makefile grammar this anchor allows (the `vpath` directive): `vpath %.inert .`. Every line must be empty, a comment, `NAME := 
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario grammar-vpath: control HELD (exit 0)
+grammar-substitution-reference anchor [--workflow] exit=1 make-processes=0
+  FAIL  Makefile:10 is outside the Makefile grammar this anchor allows (an assignment value using `$(INERT_LIST:a=b)` (a function, a substitution reference or a
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+grammar-substitution-reference anchor [lenient] exit=1 make-processes=0
+  FAIL  Makefile:10 is outside the Makefile grammar this anchor allows (an assignment value using `$(INERT_LIST:a=b)` (a function, a substitution reference or a
+make-integrity-guard: FAILED — make was NOT invoked (0 make process(es) started). A make-driven gate is only run on reviewed bytes in a clean environment.
+fixture_scenario grammar-substitution-reference: control HELD (exit 0)
+all_fixtures exit=0
