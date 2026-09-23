@@ -36,7 +36,13 @@
     "To regenerate after the suites grow (then never set a floor below its current value):",
     "  go test -count=1 -json ./... > e.json; echo $? > x.txt",
     "  python3 scripts/go-test-report.py --events e.json --suite unit \\",
-    "    --floors scripts/test-floors.json --go-exit-file x.txt --emit-floors"
+    "    --floors scripts/test-floors.json --go-exit-file x.txt --emit-floors",
+    "",
+    "M1-A (core PR #8) added three packages: internal/audit, internal/credential and",
+    "internal/ownerclaim. Their floors were GENERATED with `--emit-floors` from a local",
+    "measured run of the merge of PR #8's closing slice with main eeeea06 (PostgreSQL 18.6,",
+    "Valkey 9.1.2, go1.27.1, darwin/arm64): measured 17 / 6 / 19 in BOTH suites, floors",
+    "14 / 4 / 16. No other floor was changed."
   ],
   "suites": {
     "unit": {
@@ -44,15 +50,18 @@
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 8,
+        "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 4,
         "github.com/yegamble/vizra-core/internal/config": 82,
+        "github.com/yegamble/vizra-core/internal/credential": 4,
         "github.com/yegamble/vizra-core/internal/doctor": 33,
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
         "github.com/yegamble/vizra-core/internal/httpapi": 26,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 14,
+        "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
         "github.com/yegamble/vizra-core/internal/search": 110,
         "github.com/yegamble/vizra-core/internal/site": 4,
         "github.com/yegamble/vizra-core/scripts": 161
@@ -64,9 +73,11 @@
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
         "github.com/yegamble/vizra-core/cmd/vizra": 8,
+        "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 4,
         "github.com/yegamble/vizra-core/internal/config": 82,
+        "github.com/yegamble/vizra-core/internal/credential": 4,
         "github.com/yegamble/vizra-core/internal/doctor": 33,
         "github.com/yegamble/vizra-core/internal/fixtures": 36,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
@@ -74,6 +85,7 @@
         "github.com/yegamble/vizra-core/internal/integration": 40,
         "github.com/yegamble/vizra-core/internal/jobs": 26,
         "github.com/yegamble/vizra-core/internal/obs": 14,
+        "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
         "github.com/yegamble/vizra-core/internal/search": 110,
         "github.com/yegamble/vizra-core/internal/site": 4,
         "github.com/yegamble/vizra-core/scripts": 161
