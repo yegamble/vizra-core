@@ -393,11 +393,11 @@ a hang before the job is killed. A host whose load average is several times its
 core count can still exceed it; that is contention, not a property of the
 suite, and `go test -timeout` can be given directly there.
 
-What was cut: `TestManifestDetectsEveryClassOfDrift` generated the corpus 9 times
-(three only to put files on disk) and ran its cases one after another. Its cases
-now copy the shared corpus and run in parallel, and the four heavy fixtures tests
-run in parallel with each other; the package generates the corpus 6 times instead
-of 10.
+What was cut: `TestManifestDetectsEveryClassOfDrift` generated the corpus 6 times
+(three of them only to put files on disk for a mutation) and ran its cases one
+after another. Its mutations now copy the shared corpus, its cases run in
+parallel, and the four heavy fixtures tests run in parallel with each other; the
+package generates the corpus 6 times instead of 9 (each 13-35s under `-race`).
 
 | Lane (own TMPDIR, own containers) | before `3994893` | after `d817f33` |
 |---|---|---|

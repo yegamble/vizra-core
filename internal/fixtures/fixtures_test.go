@@ -382,9 +382,11 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 	}
 
 	// Each case has its own copy of the repository slice and its own scratch
-	// directory, so they run in parallel: four of them regenerate the corpus
-	// inside VerifyAgainstManifest, and serially that was most of this
-	// package's wall time.
+	// directory, so they run in parallel. VerifyAgainstManifest regenerates the
+	// corpus only when every earlier check passed — here the dotfile and the
+	// edited-hash cases — and those two, run one after the other, plus the
+	// three generations the mutations used to do, were most of this package's
+	// wall time.
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
