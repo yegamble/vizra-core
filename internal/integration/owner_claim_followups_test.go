@@ -15,12 +15,14 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/yegamble/vizra-core/internal/credential"
 	"github.com/yegamble/vizra-core/internal/httpapi"
 	"github.com/yegamble/vizra-core/internal/obs"
 	"github.com/yegamble/vizra-core/internal/ownerclaim"
@@ -227,6 +229,15 @@ func TestEveryCodePointThisServerCallsSpaceIsRefusedByTheValidator(t *testing.T)
 	var collate string
 	if err := pool.QueryRow(t.Context(), `SELECT datctype FROM pg_database WHERE datname = current_database()`).Scan(&collate); err != nil {
 		t.Fatal(err)
+	}
+	// AGENTS.md states this measurement FOR en_US.utf8. On any other LC_CTYPE it
+	// would measure something else while the sentence stayed the same, so it
+	// fails rather than quietly re-scoping (verifier NIT-5). CI's PostgreSQL is
+	// the official postgres image at the pinned digest, whose initdb default is
+	// en_US.utf8.
+	if collate != "en_US.utf8" {
+		t.Fatalf("the database's LC_CTYPE is %q, not en_US.utf8: this test's measurement, and the AGENTS.md "+
+			"sentence that cites it, are about en_US.utf8", collate)
 	}
 	rows, err := pool.Query(t.Context(), `SELECT cp FROM generate_series(1, 1114111) AS cp
 	  WHERE cp NOT BETWEEN 55296 AND 57343 AND chr(cp) ~ '[[:space:]]'`)
@@ -519,6 +530,97 @@ func TestEverySetup503LogsItsCause(t *testing.T) {
 				t.Errorf("the 503 logged nothing about its cause %q:\n%s", tc.want, logs.String())
 			}
 		})
+	}
+}
+
+// isOwnCancellation needs BOTH halves (verifier R1-F1 on core #14): a
+// context.Canceled cause on a LIVE request is not the client's doing, and a
+// DeadlineExceeded cause on an ENDED request is a connect timeout that merely
+// coincided with the client leaving. Each is an outage, logged with its cause.
+// Dropping either half of the predicate turns one of these red.
+func TestOnlyTheRequestsOwnCancellationSkipsTheOutageLog(t *testing.T) {
+	cfg, resolver, _ := freshDatabase(t)
+	serve := func(t *testing.T, claimed func(context.Context) (bool, error), ctx context.Context) (int, string) {
+		logs := &safeBuffer{}
+		srv := httpapi.New(httpapi.Deps{
+			Config: cfg, Resolver: resolver, Pools: poolsOf(t, resolver),
+			EmbeddedSchemaVersion: mustEmbedded(t),
+			Logger:                obs.NewLogger(logs, false),
+			InstanceClaimed:       claimed,
+		})
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/setup/claim-status", nil).WithContext(ctx)
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, req)
+		return rec.Code, logs.String()
+	}
+
+	t.Run("a live request whose cause is context.Canceled", func(t *testing.T) {
+		code, logs := serve(t, func(context.Context) (bool, error) { return false, context.Canceled }, context.Background())
+		if code != http.StatusServiceUnavailable {
+			t.Fatalf("-> %d, want 503", code)
+		}
+		if !strings.Contains(logs, "could not reach the database") || !strings.Contains(logs, "context canceled") {
+			t.Errorf("a Canceled cause on a LIVE request is not the client's cancellation and must be logged "+
+				"as an outage with its cause:\n%s", logs)
+		}
+	})
+
+	t.Run("an ended request whose cause is DeadlineExceeded", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = context.WithValue(ctx, cancelKey{}, cancel)
+		code, logs := serve(t, func(ctx context.Context) (bool, error) {
+			cancelRequest(ctx)
+			return false, errors.Join(errors.New("dial tcp: i/o timeout"), context.DeadlineExceeded)
+		}, ctx)
+		if code != http.StatusServiceUnavailable {
+			t.Fatalf("-> %d, want 503", code)
+		}
+		if !strings.Contains(logs, "could not reach the database") || !strings.Contains(logs, "i/o timeout") {
+			t.Errorf("a connect timeout that coincided with the client leaving is still an outage and must be "+
+				"logged with its cause:\n%s", logs)
+		}
+	})
+}
+
+// A client that hangs up while WAITING FOR A HASH SLOT is the request's own
+// cancellation too (sentinel N-3 on core #14, S-0023): it is not logged as the
+// server being busy. credential.Hash used to return a bare ErrBusy there and
+// drop ctx.Err(), so the error handler could not tell.
+func TestAClientThatHangsUpWaitingForAHashSlotIsNotLogged(t *testing.T) {
+	e := newClaimEnv(t)
+	token, _ := e.mint(t)
+	// ONE slot, held by a deliberately slow derivation for a few seconds.
+	slow := credential.ADR003
+	slow.Time = 150
+	one := credential.NewArgon2id(slow, 1)
+	e.hasher.inner = one
+	var reachedHash atomic.Bool
+	e.hasher.before = func() { reachedHash.Store(true) }
+	held := make(chan struct{})
+	go func() {
+		defer close(held)
+		_, _ = one.Hash(context.Background(), testPassphrase())
+	}()
+	time.Sleep(200 * time.Millisecond) // let the blocker take the slot
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	claim := e.postAsync(t, validBody(token), func(r *http.Request) { *r = *r.WithContext(ctx) })
+	time.Sleep(500 * time.Millisecond) // the claim is now waiting for the slot
+	cancel()
+	o := await(t, claim)
+	<-held
+
+	// The scenario really happened: the claim reached the hasher, waited, and
+	// derived nothing (the one derivation is the blocker's).
+	if o.code != http.StatusServiceUnavailable || bodyCode(o.body) != "unavailable" || !reachedHash.Load() || one.Derivations() != 1 {
+		t.Fatalf("-> %d %s, reached the hasher=%v, derivations=%d: want a 503 from a claim that waited for the "+
+			"slot and derived nothing; the scenario this test exists for did not happen",
+			o.code, bodyCode(o.body), reachedHash.Load(), one.Derivations())
+	}
+	if logs := e.logs.String(); strings.Contains(logs, "level=ERROR") {
+		t.Errorf("a client that hung up while waiting for a hash slot was logged as a failure:\n%s", logs)
 	}
 }
 

@@ -492,8 +492,12 @@ func (s *Server) mapClaimError(c *echo.Context, err error) error {
 		return s.refuseToken(c)
 
 	case errors.Is(err, credential.ErrBusy):
-		return newCodedError(http.StatusServiceUnavailable, "unavailable",
-			"the server is busy; try again shortly")
+		// The cause is kept: a client that hung up while waiting for a hash slot
+		// is the request's own cancellation, and the error handler does not log
+		// it (sentinel N-3 on core #14). A busy answer to a request still waiting
+		// cannot happen — the wait ends only when the request's context does.
+		return &codedError{status: http.StatusServiceUnavailable, code: "unavailable",
+			message: "the server is busy; try again shortly", cause: err}
 
 	case errors.Is(err, ownerclaim.ErrUnavailable):
 		// The published contract promises 503 for a database outage and ADR-003

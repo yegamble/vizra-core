@@ -2,6 +2,7 @@ package credential
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"sync"
@@ -147,8 +148,10 @@ func TestHashingHonoursTheRequestContext(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if _, err := h2.Hash(ctx, strings.Repeat("z", 24)); err != ErrBusy {
-		t.Fatalf("a waiter past its deadline must get ErrBusy, got %v", err)
+	// errors.Is, not ==: ErrBusy now carries the context's own error as well,
+	// so a caller can tell the client's cancellation from a deadline.
+	if _, err := h2.Hash(ctx, strings.Repeat("z", 24)); !errors.Is(err, ErrBusy) || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("a waiter past its deadline must get ErrBusy wrapping DeadlineExceeded, got %v", err)
 	}
 	close(release)
 }
@@ -173,5 +176,22 @@ func TestDecodeRejectsAnythingThatIsNotOurEncoding(t *testing.T) {
 		if _, _, _, err := Decode(bad); err == nil {
 			t.Errorf("Decode(%q) accepted a value that is not our encoding", bad)
 		}
+	}
+}
+
+// sentinel N-3 on core #14 (S-0023, RULES R18): a waiter whose context is
+// CANCELLED gets ErrBusy that still says so, so the HTTP layer can recognise the
+// request's own cancellation and not log it as saturation.
+func TestABusyWaiterKeepsItsContextError(t *testing.T) {
+	h := NewArgon2id(ADR003, 1)
+	h.sem <- struct{}{} // the only slot, taken
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := h.Hash(ctx, strings.Repeat("z", 24))
+	if !errors.Is(err, ErrBusy) {
+		t.Fatalf("got %v, want ErrBusy", err)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("ErrBusy dropped the context error: %v", err)
 	}
 }

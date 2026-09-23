@@ -62,7 +62,8 @@ const (
 )
 
 // ErrBusy means every derivation slot was occupied until the caller's context
-// expired. Callers answer 503; they must never queue unbounded.
+// ended. Callers answer 503; they must never queue unbounded. Hash returns it
+// wrapped together with the context's error, so match it with errors.Is.
 var ErrBusy = errors.New("credential: hashing capacity exhausted")
 
 // Hasher derives and verifies password verifiers.
@@ -116,7 +117,10 @@ func (h *Argon2id) Hash(ctx context.Context, password string) (string, error) {
 	case h.sem <- struct{}{}:
 		defer func() { <-h.sem }()
 	case <-ctx.Done():
-		return "", ErrBusy
+		// The context's own error rides along (%w, RULES R18), so a caller can
+		// tell a client that hung up (Canceled) from a deadline — errors.Is(err,
+		// ErrBusy) is unchanged (sentinel N-3 on core #14).
+		return "", fmt.Errorf("%w: %w", ErrBusy, ctx.Err())
 	}
 	salt := make([]byte, h.params.SaltLen)
 	if _, err := rand.Read(salt); err != nil {
