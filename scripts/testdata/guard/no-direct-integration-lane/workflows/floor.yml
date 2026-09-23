@@ -19,11 +19,11 @@ jobs:
       - name: Provenance
         run: ./scripts/provenance.sh
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: tidy
         run: make tidy-check
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: make ci
         run: make ci
       # The direct lane: a no-opped Makefile cannot make the suite silent. Its
@@ -41,7 +41,7 @@ jobs:
             --floors scripts/test-floors.json --go-exit-file unit-exit.txt || exit 1
           exit "$rc"
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: build
         run: make build
   cache-matrix:
@@ -54,11 +54,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: fixtures
         run: make fixtures
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: fixtures-verify
         run: make fixtures-verify
   govulncheck:
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: govulncheck
         run: make govulncheck
   docker-build:

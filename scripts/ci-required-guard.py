@@ -44,11 +44,13 @@ Checks, all of which must pass:
                   ./... and every -run pattern is non-empty.
   6. RUNNER       every job runs on GitHub-hosted ubuntu-24.04.
   7. PINNED       every action is pinned to a 40-character commit SHA.
-  8. ANCHOR       every checked-lane job that invokes `make` runs
-                  scripts/make-integrity-guard.sh FIRST, as its own step,
-                  unconditionally and without continue-on-error — and neither
-                  the workflow nor the job overrides `defaults.run.shell`, which
-                  is the Actions analogue of `SHELL := /usr/bin/true`.
+  8. ANCHOR       every checked-lane job that invokes `make` runs the anchor —
+                  a step BYTE-EQUAL to pinned-steps.yml `anchor_step`
+                  (`./scripts/make-integrity-guard.sh --workflow`) — before its
+                  first make step, unconditionally and without continue-on-error,
+                  and neither the workflow nor the job sets `defaults.run`. A
+                  step that NAMES make-integrity-guard without being byte-equal
+                  to the pin is refused anywhere in the lane.
   8b. ARGV        a checked lane's `make` step may not carry, ON THE WORKFLOW
                   LINE, a flag or variable override that no-ops the recipes, and
                   neither the step, the job nor the workflow may set a
@@ -91,10 +93,16 @@ ways to name a command — so the control was inverted:
       fail-closed classifier below decides that, a token in a comment included)
       must be BYTE-EQUAL to a literal in .github/pinned-steps.yml after
       trimming one trailing newline, may carry no key but `name`/`run`/`id`,
-      and must be IMMEDIATELY preceded by the anchor step — which must itself
-      carry no key but those. No flags, no overrides, no chains, one invocation
-      per step. Every one of the thirteen fails this by construction, because
-      every one changes the bytes or adds a key.
+      and must be IMMEDIATELY preceded by a step byte-equal to the pinned
+      anchor — which must itself carry no key but those. No flags, no
+      overrides, no chains, one invocation per step. A workflow file with a
+      duplicate YAML key is refused outright (last-wins would let this guard
+      read a different value than a reviewer sees first).
+      Eleven of the thirteen change the bytes of the make step or add a key, so they fail
+      that test statically. The other two are $GITHUB_ENV / $GITHUB_PATH writes: refused
+      statically when the writer sits between the anchor and make or IS the anchor step
+      (the anchor below is pinned too), and at RUNTIME by the anchor when the writer is an
+      earlier step and the write touches a variable the anchor checks.
 
   8c  The lane must actually RUN the invocations pinned-steps.yml records for
       it, byte-equal. Pinning a shape does not stop a step being DELETED or
@@ -105,7 +113,11 @@ ways to name a command — so the control was inverted:
 Adjacency is what makes the anchor's environment assertions mean anything: a
 `$GITHUB_ENV` or `$GITHUB_PATH` write applies to LATER steps, so with a step in
 between, the anchor would inspect a clean environment and make would run in a
-poisoned one.
+poisoned one. And the adjacent step must BE the pinned anchor: round 2 accepted
+any step CONTAINING `make-integrity-guard`, so the anchor step itself could run
+the guard and then write MAKEFLAGS for the next step (PR#9 re-verification,
+R-1). The pin's `--workflow` selects the anchor's strict environment mode; the
+mode is never chosen by the environment (R-2).
 
 `timeout-minutes` is refused on these steps too. Not because it is dangerous —
 it can only make a step fail sooner — but because nothing here uses one, and an
@@ -211,11 +223,49 @@ class Guard:
         self.failed = True
 
 
+class _NoDuplicateKeysLoader(yaml.SafeLoader):
+    """A SafeLoader that REFUSES a duplicate mapping key.
+
+    PyYAML resolves duplicates last-wins, so a step with `run: make -i ci`
+    followed by `run: make ci` in the SAME mapping read as `make ci` here — green
+    — while a human reviewer reads the first line (PR#9 re-verification,
+    FINDING R-4). Whatever GitHub's own parser does with it, the guard must never
+    read a different value than the one a reviewer sees first, so a duplicate is
+    a FAILURE, anywhere in the file.
+    """
+
+
+def _construct_mapping_no_dupes(loader, node, deep=False):
+    seen = {}
+    for key_node, _ in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        try:
+            hash(key)
+        except TypeError:
+            continue
+        if key in seen:
+            raise yaml.constructor.ConstructorError(
+                None, None,
+                f"duplicate key {key!r} (first at line {seen[key] + 1}); the guard refuses to guess "
+                f"which value a runner would use",
+                key_node.start_mark)
+        seen[key] = key_node.start_mark.line
+    return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
+
+
+_NoDuplicateKeysLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping_no_dupes)
+
+
+def safe_load_strict(text: str):
+    return yaml.load(text, Loader=_NoDuplicateKeysLoader)
+
+
 def load_workflows(d: Path) -> dict[Path, dict]:
     out: dict[Path, dict] = {}
     for p in sorted(list(d.glob("*.yml")) + list(d.glob("*.yaml"))):
         try:
-            doc = yaml.safe_load(p.read_text())
+            doc = safe_load_strict(p.read_text())
         except yaml.YAMLError as e:
             print(f"  FAIL  {p} is not valid YAML: {e}", file=sys.stderr)
             raise SystemExit(1)
@@ -281,9 +331,27 @@ def step_runs_make(step: dict) -> bool:
     return isinstance(run, str) and bool(MAKE_INVOCATION.search(run))
 
 
+# Set from .github/pinned-steps.yml `anchor_step` by load_pins() before any
+# check runs. None means "not loaded", and then NOTHING is an anchor: fail closed.
+ANCHOR_BODY: str | None = None
+
+
 def step_is_the_anchor(step: dict) -> bool:
+    """BYTE-EQUAL to the pinned anchor body — not a substring test.
+
+    Round 2 accepted any step whose text CONTAINED `make-integrity-guard`, so a
+    compound anchor (`… && echo MAKEFLAGS=-i >> "$GITHUB_ENV"`) or a no-op that
+    merely named it (`: make-integrity-guard`) satisfied adjacency (PR#9
+    re-verification, FINDING R-1, N1–N4). Keys are judged separately, so a
+    pinned anchor that also carries `if:` is reported as exactly that.
+    """
     run = step.get("run")
-    return isinstance(run, str) and MAKE_INTEGRITY_GUARD in run and not MAKE_INVOCATION.search(run)
+    return ANCHOR_BODY is not None and isinstance(run, str) and trim_one_newline(run) == ANCHOR_BODY
+
+
+def step_mentions_the_anchor(step: dict) -> bool:
+    run = step.get("run")
+    return isinstance(run, str) and MAKE_INTEGRITY_GUARD in run
 
 
 # ---------------------------------------------------------------------------
@@ -472,6 +540,9 @@ STEP_KEYS_ALLOWED = {"name", "run", "id"}
 DANGEROUS_ENV_NAMES = {
     "MAKEFLAGS", "GNUMAKEFLAGS", "MFLAGS", "MAKEFILES",
     "SHELL", "PATH", "BASH_ENV", "ENV",
+    # Make's own recipe variables. A job-level `env: MAKELEVEL:` is how round 2's
+    # anchor was talked into its lenient mode (PR#9 re-verification, R-2, J4).
+    "MAKELEVEL", "MAKE_RESTARTS", "MAKEOVERRIDES", "MAKECMDGOALS",
 }
 
 
@@ -486,9 +557,17 @@ def load_pins(path: Path) -> tuple[list[str], list[str]]:
             f"ci-required-guard: {path} is missing. It is the allowlist that makes a floor "
             f"lane's make step and direct test step default-deny; without it there is no gate."
         )
-    doc = yaml.safe_load(path.read_text()) or {}
+    doc = safe_load_strict(path.read_text()) or {}
     make_steps = [trim_one_newline(x) for x in (doc.get("make_steps") or [])]
     direct = [trim_one_newline(x) for x in (doc.get("direct_test_steps") or [])]
+    anchor = doc.get("anchor_step")
+    if not isinstance(anchor, str) or not anchor.strip():
+        raise SystemExit(
+            f"ci-required-guard: {path} has no anchor_step. Without a pinned anchor, any step that "
+            f"merely NAMES make-integrity-guard would satisfy adjacency (PR#9 re-verification, R-1)."
+        )
+    global ANCHOR_BODY
+    ANCHOR_BODY = trim_one_newline(anchor)
     required_inv = {
         str(k): [trim_one_newline(x) for x in (v or [])]
         for k, v in (doc.get("required_invocations") or {}).items()
@@ -512,14 +591,33 @@ def extra_keys(step: dict) -> list[str]:
     return sorted(k for k in step if str(k) not in STEP_KEYS_ALLOWED)
 
 
+# Names the Makefile assigns with `?=` — the ENVIRONMENT wins over those, so a
+# job-level `env: GO: 'true'` makes `$(GO) test` run `true test` and exit 0.
+# Read from the Makefile the lanes run (even under --skip-makefile, which only
+# disables check 5), plus GOFLAGS, which the go command reads directly. The
+# anchor refuses the same names at runtime, from every file make read.
+MAKEFILE_ENV_NAMES: set[str] = {"GOFLAGS"}
+
+
+def load_makefile_env_names(makefile: Path) -> None:
+    if makefile.exists():
+        MAKEFILE_ENV_NAMES.update(
+            re.findall(r"^\s*(?:export\s+|override\s+)*([A-Za-z_][A-Za-z0-9_]*)\s*\?=",
+                       makefile.read_text(), re.M))
+
+
 def env_problems(scope: str, env) -> list[str]:
     if not isinstance(env, dict):
         return []
-    return [
-        f"{scope} env sets {key}: {value!r}"
-        for key, value in env.items()
-        if str(key).strip().upper() in DANGEROUS_ENV_NAMES
-    ]
+    out = []
+    for key, value in env.items():
+        name = str(key).strip()
+        if name.upper() in DANGEROUS_ENV_NAMES:
+            out.append(f"{scope} env sets {key}: {value!r}")
+        elif name in MAKEFILE_ENV_NAMES:
+            out.append(f"{scope} env sets {key}: {value!r}, which the Makefile takes FROM the "
+                       f"environment (`?=`) — so the environment decides what the recipe runs")
+    return out
 
 
 def check_pinned_make_steps(g: Guard, lane: str, path: Path, doc, job: dict, pins: list[str]) -> None:
@@ -650,6 +748,17 @@ def check_required_invocations(g: Guard, lane: str, path: Path, job_key: str, jo
 
 def check_job_surroundings(g: Guard, lane: str, path: Path, doc, job: dict) -> None:
     """Checks that apply to a checked lane whether or not it invokes make."""
+    for i, step in enumerate(s for s in (job.get("steps") or []) if isinstance(s, dict)):
+        if step_mentions_the_anchor(step) and not step_is_the_anchor(step):
+            g.fail(
+                f"checked lane {lane!r} ({path.name}) step {(step.get('name') or f'step {i}')!r} names "
+                f"make-integrity-guard but its `run:` is not byte-equal to the pinned anchor "
+                f"{ANCHOR_BODY!r}.",
+                f"got: {trim_one_newline(step.get('run') or '')!r}",
+                "A step that runs the guard and THEN writes to $GITHUB_ENV / $GITHUB_PATH, or that only",
+                "names it (`: make-integrity-guard`), would otherwise pass for the anchor while the",
+                "write reaches make and not the guard (PR#9 re-verification, R-1, N1–N4).",
+            )
     for scope, holder in (("workflow", doc or {}), ("job", job)):
         defaults_run = ((holder or {}).get("defaults") or {}).get("run")
         if defaults_run is not None:
@@ -967,6 +1076,7 @@ def main() -> int:
         g.fail(f"{args.manifest} lists no checks; ci-required would pass with nothing verified")
         return 1
 
+    load_makefile_env_names(args.makefile)
     make_pins, direct_pins, required_inv = load_pins(args.pins)
     g.ok(f"pinned-steps.yml: {len(make_pins)} make body(ies), {len(direct_pins)} direct-test "
          f"body(ies), required invocations for {sorted(required_inv)}")

@@ -36,7 +36,8 @@ test-race`.
 are gated from outside make. CI runs both as their own steps, before any `make`.
 
 ```
-./scripts/make-integrity-guard.sh      # the Makefile and everything it includes
+./scripts/make-integrity-guard.sh --workflow   # STRICT: exactly as CI's pinned anchor runs it
+./scripts/make-integrity-guard.sh              # local-parity mode, what `make ci-guard` runs
 ./scripts/ci-required-guard.sh         # the manifest, the workflows, and each make step's own argv
 ```
 
@@ -64,13 +65,21 @@ be exhaustive:
 It also refuses a job-level `container:`, a `defaults.run` at either scope, an
 undigested service image, and a MAKEFLAGS/GNUMAKEFLAGS/MFLAGS/MAKEFILES/SHELL/
 PATH/BASH_ENV/ENV `env:` at job or workflow level. Its own negative cases are
-`scripts/testdata/guard/` (65 fixtures), driven by `scripts/scripts_test.go`.
+`scripts/testdata/guard/` (75 fixtures), driven by `scripts/scripts_test.go`.
 
-`make-integrity-guard` additionally asserts, in its own process, that the
-MAKEFLAGS family and MAKEFILES/BASH_ENV/ENV are unset, that `SHELL` is a real
-shell, and that `make` is a program on disk in a system directory — not a
-function, an alias or a stub earlier on PATH. Adjacency is what makes that
-meaningful: a `$GITHUB_ENV`/`$GITHUB_PATH` write applies to LATER steps.
+With `--workflow` — the only form a floor lane may use, because the anchor
+step is pinned byte-equal — `make-integrity-guard` also checks its own process
+in STRICT mode. The mode is chosen by that argument, never by the environment.
+It requires the MAKEFLAGS family to be unset; make's recipe variables
+(MAKELEVEL, MAKE_RESTARTS, MAKEOVERRIDES, MAKECMDGOALS) to be absent; every
+variable the makefiles take from the environment (`?=`, or referenced but never
+assigned) to be absent; MAKEFILES/BASH_ENV/ENV to be unset; `SHELL` to be a real
+shell; and `make` to resolve to a file named make in a system directory. It
+does not inspect that file's contents. Adjacency is what makes this meaningful:
+a `$GITHUB_ENV`/`$GITHUB_PATH` write applies to LATER steps. Without
+`--workflow`, as `make ci-guard` runs it, MAKEFLAGS may carry only the words
+GNU make itself was measured to export. That mode is local parity, not a
+control.
 
 ## The suites, the way CI runs them
 

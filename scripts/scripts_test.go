@@ -201,6 +201,26 @@ func TestCIRequiredGuardFixtures(t *testing.T) {
 		{dir: "no-provenance", wantFail: true, wantText: "has no scripts/provenance.sh step"},
 		{dir: "provenance-conditional", wantFail: true, wantText: "provenance step conditional"},
 		{dir: "required-not-floor", wantFail: true, wantText: "'extra-lane'"},
+		// Fix round 2, R-1: the anchor is PINNED, not recognised by substring.
+		// Each of these satisfied round 2's "immediately preceded by the anchor"
+		// while the write reached make and not the guard (PR#9 re-verification,
+		// N1–N5). Each is refused as a look-alike AND fails adjacency.
+		{dir: "anchor-compound-github-env", wantFail: true, wantText: "names make-integrity-guard but its `run:` is not byte-equal to the pinned anchor"},
+		{dir: "anchor-then-lookalike", wantFail: true, wantText: "names make-integrity-guard but its `run:` is not byte-equal to the pinned anchor"},
+		{dir: "anchor-fake-noop", wantFail: true, wantText: "names make-integrity-guard but its `run:` is not byte-equal to the pinned anchor"},
+		{dir: "anchor-compound-github-path", wantFail: true, wantText: "names make-integrity-guard but its `run:` is not byte-equal to the pinned anchor"},
+		{dir: "anchor-compound-makelevel", wantFail: true, wantText: "names make-integrity-guard but its `run:` is not byte-equal to the pinned anchor"},
+		// The round-2 anchor form, without --workflow, would run the lenient mode.
+		{dir: "anchor-without-workflow-flag", wantFail: true, wantText: "not byte-equal to the pinned anchor"},
+		// R-2: make's own recipe variables are refused at job and workflow level.
+		{dir: "job-env-makelevel", wantFail: true, wantText: "job-level env sets makelevel"},
+		{dir: "workflow-env-makeoverrides", wantFail: true, wantText: "workflow-level env sets makeoverrides"},
+		// R-4: a duplicate key is refused, so the guard never reads a different
+		// value than the one a reviewer sees first.
+		{dir: "duplicate-run-key", wantFail: true, wantText: "duplicate key 'run'"},
+		// Found while fixing round 2: `GO ?= go` means the ENVIRONMENT wins, so
+		// `GO=true` turns `make test-race` from exit 2 into exit 0.
+		{dir: "job-env-makefile-override", wantFail: true, wantText: "which the makefile takes from the environment"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir, func(t *testing.T) {
@@ -319,6 +339,96 @@ func TestMakeIntegrityGuardFixtures(t *testing.T) {
 			}
 			if tc.wantText != "" && !strings.Contains(strings.ToLower(out), strings.ToLower(tc.wantText)) {
 				t.Fatalf("the failure does not mention %q, so an author would not know what to fix:\n%s", tc.wantText, out)
+			}
+		})
+	}
+}
+
+// The anchor's OWN environment, as the workflow invokes it (`--workflow`) and as
+// `make ci-guard` invokes it (no flag). Round 2 chose the mode from MAKELEVEL's
+// mere presence, which an earlier step can set through $GITHUB_ENV; the lenient
+// path then passed -ki, n and --ign, and GNU Make 4.3 made a failing recipe exit 0
+// under each (PR#9 re-verification, FINDING R-2). The mode is now chosen by the
+// invocation, and the lenient path is an allowlist of what make itself exports —
+// MEASURED on 4.3 and 3.81, recorded in make-integrity-guard.py.
+func TestMakeIntegrityGuardEnvironment(t *testing.T) {
+	cases := []struct {
+		name     string
+		workflow bool
+		env      []string
+		wantFail bool
+		wantText string
+	}{
+		// --workflow (the pinned anchor): strict.
+		{"workflow/control", true, nil, false, ""},
+		{"workflow/MAKELEVEL=1 MAKEFLAGS=-ki", true, []string{"MAKELEVEL=1", "MAKEFLAGS=-ki"}, true, "makelevel"},
+		{"workflow/MAKELEVEL=1 MAKEFLAGS=n", true, []string{"MAKELEVEL=1", "MAKEFLAGS=n"}, true, "makelevel"},
+		{"workflow/MAKELEVEL= (empty) MAKEFLAGS=--ign", true, []string{"MAKELEVEL=", "MAKEFLAGS=--ign"}, true, "makelevel=''"},
+		{"workflow/MAKELEVEL=1 GNUMAKEFLAGS=-ki", true, []string{"MAKELEVEL=1", "GNUMAKEFLAGS=-ki"}, true, "gnumakeflags"},
+		{"workflow/MAKEFLAGS=-i", true, []string{"MAKEFLAGS=-i"}, true, "must be unset"},
+		{"workflow/MAKEFLAGS=--no-such-flag", true, []string{"MAKEFLAGS=--no-such-flag"}, true, "must be unset"},
+		{"workflow/MAKEFLAGS present but empty", true, []string{"MAKEFLAGS="}, true, "must be unset"},
+		{"workflow/MAKE_RESTARTS", true, []string{"MAKE_RESTARTS=1"}, true, "make_restarts"},
+		{"workflow/MAKEOVERRIDES", true, []string{"MAKEOVERRIDES=SHELL=/usr/bin/true"}, true, "makeoverrides"},
+		{"workflow/MAKEFILES", true, []string{"MAKEFILES=/tmp/x.mk"}, true, "makefiles"},
+		{"workflow/BASH_ENV", true, []string{"BASH_ENV=/tmp/fn.sh"}, true, "bash_env"},
+		{"workflow/SHELL=/usr/bin/true", true, []string{"SHELL=/usr/bin/true"}, true, "not a usable shell"},
+		// `?=` variables: the environment decides what the recipe runs.
+		{"workflow/GO=true", true, []string{"GO=true"}, true, "the environment sets go='true'"},
+		{"workflow/GOFLAGS", true, []string{"GOFLAGS=-run=^$"}, true, "goflags"},
+		{"workflow/SQLC=true", true, []string{"SQLC=true"}, true, "sqlc='true'"},
+		// no flag (`make ci-guard` parity): an ALLOWLIST of make's own exports.
+		{"local/control", false, nil, false, ""},
+		{"local/plain make", false, []string{"MAKELEVEL=1", "MAKEFLAGS="}, false, ""},
+		{"local/make -j2 (4.3)", false, []string{"MAKELEVEL=1", "MAKEFLAGS= -j2 --jobserver-auth=3,4", "MFLAGS=-j2 --jobserver-auth=3,4"}, false, ""},
+		{"local/make -j2 (3.81)", false, []string{"MAKELEVEL=1", "MAKEFLAGS= --jobserver-fds=3,4 -j", "MFLAGS=- --jobserver-fds=3,4 -j"}, false, ""},
+		{"local/make -s -w", false, []string{"MAKELEVEL=2", "MAKEFLAGS=sw", "MFLAGS=-s -w"}, false, ""},
+		{"local/MAKEFLAGS=-ki", false, []string{"MAKELEVEL=1", "MAKEFLAGS=-ki"}, true, "['-ki'] is not a flag make itself"},
+		{"local/MAKEFLAGS=n", false, []string{"MAKELEVEL=1", "MAKEFLAGS=n"}, true, "['n'] is not a flag make itself"},
+		{"local/MAKEFLAGS=--ign", false, []string{"MAKELEVEL=", "MAKEFLAGS=--ign"}, true, "['--ign'] is not a flag make itself"},
+		{"local/GNUMAKEFLAGS=-ki", false, []string{"MAKELEVEL=1", "GNUMAKEFLAGS=-ki"}, true, "['-ki'] is not a flag make itself"},
+		{"local/MAKEFLAGS=e", false, []string{"MAKELEVEL=1", "MAKEFLAGS=e"}, true, "['e'] is not a flag make itself"},
+		// Locally a developer may pin their own go; this mode is not a control.
+		{"local/GO=go", false, []string{"GO=go"}, false, ""},
+	}
+	root := repoRoot(t)
+	strip := map[string]bool{"MAKEFLAGS": true, "GNUMAKEFLAGS": true, "MFLAGS": true, "MAKELEVEL": true,
+		"MAKE_RESTARTS": true, "MAKEOVERRIDES": true, "MAKECMDGOALS": true, "MAKEFILES": true,
+		"BASH_ENV": true, "ENV": true,
+		"GO": true, "SQLC": true, "GOFLAGS": true, "RELEASE": true, "COMMIT": true, "BUILT_AT": true}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Start from a CLEAN environment: `make ci` runs this package under make,
+			// so the inherited MAKELEVEL/MAKEFLAGS must not leak into a strict case.
+			env := []string{}
+			for _, kv := range os.Environ() {
+				if !strip[strings.SplitN(kv, "=", 2)[0]] {
+					env = append(env, kv)
+				}
+			}
+			env = append(env, tc.env...)
+			// The environment checks do not depend on which targets are resolved,
+			// so one target keeps 30 runs of the resolver cheap under -race.
+			args := []string{"--targets", "ci"}
+			if tc.workflow {
+				args = append(args, "--workflow")
+			}
+			cmd := exec.Command(filepath.Join(root, "scripts", "make-integrity-guard.sh"), args...)
+			cmd.Dir = root
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			code := 0
+			if ee, ok := err.(*exec.ExitError); ok {
+				code = ee.ExitCode()
+			} else if err != nil {
+				t.Fatalf("make-integrity-guard.sh: %v\n%s", err, out)
+			}
+			if (code != 0) != tc.wantFail {
+				t.Fatalf("exit %d, want failed=%v\n%s", code, tc.wantFail, out)
+			}
+			if tc.wantText != "" && !strings.Contains(strings.ToLower(string(out)), tc.wantText) {
+				t.Fatalf("the refusal does not mention %q:\n%s", tc.wantText, out)
 			}
 		})
 	}

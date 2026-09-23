@@ -116,7 +116,7 @@ jobs:
       # moving it down turns `ci-required` red.
       # ---------------------------------------------------------------
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: Generate the corpus
         run: make fixtures
@@ -128,7 +128,7 @@ jobs:
       # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
       # $GITHUB_PATH, which GitHub applies to LATER steps only.
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: Reproduce the manifest byte-identically
         run: make fixtures-verify
 

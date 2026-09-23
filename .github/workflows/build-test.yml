@@ -203,7 +203,7 @@ jobs:
       # moving it down turns `ci-required` red.
       # ---------------------------------------------------------------
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: go.mod and go.sum are tidy
         run: make tidy-check
@@ -212,7 +212,7 @@ jobs:
       # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
       # $GITHUB_PATH, which GitHub applies to LATER steps only.
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: make ci
         run: make ci
 
@@ -252,7 +252,7 @@ jobs:
       # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
       # $GITHUB_PATH, which GitHub applies to LATER steps only.
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: Build all three entry points
         run: make build
@@ -445,7 +445,7 @@ jobs:
       # moving it down turns `ci-required` red.
       # ---------------------------------------------------------------
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
 
       - name: Integration tests against ${{ matrix.flavour }}
         run: make test-integration
@@ -458,7 +458,7 @@ jobs:
       # between them could write MAKEFLAGS to $GITHUB_ENV or a stub `make` to
       # $GITHUB_PATH, which GitHub applies to LATER steps only.
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: Integration tests against ${{ matrix.flavour }}, shuffled order
         run: make test-integration-shuffle
 

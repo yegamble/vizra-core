@@ -51,24 +51,56 @@ exhaustive** — the shell has unbounded ways to name a command.
 So the control was INVERTED. It is now DEFAULT-DENY on the SHAPE of the two
 kinds of step that carry the gate, and it does not read their shell at all:
 
-1. **`scripts/make-integrity-guard.sh`** runs as its own workflow step,
+1. **The anchor — `./scripts/make-integrity-guard.sh --workflow`, pinned
+   byte-for-byte** in `.github/pinned-steps.yml` — runs as its own step
    IMMEDIATELY before every make step. It refuses a `SHELL` / `.SHELLFLAGS` /
    `MAKEFLAGS` / `GNUMAKEFLAGS` / `.ONESHELL` override, a `-`/`@-` prefix or
    `|| true` suffix on a gate recipe, and a duplicate gate target — in the
-   Makefile **and everything it includes**. It also asserts, in its OWN process:
-   MAKEFLAGS/GNUMAKEFLAGS/MFLAGS are unset (not merely free of flags it
-   recognises), MAKEFILES and BASH_ENV/ENV are unset, `SHELL` is a real shell,
-   and **`make` is a program on disk** in a system directory — not a function,
-   an alias, or a stub earlier on PATH. Adjacency is what makes that meaningful:
-   a `$GITHUB_ENV` / `$GITHUB_PATH` write applies to LATER steps, so it lands in
-   this process exactly as it would in make's.
+   Makefile **and everything it includes**. And it checks its OWN process, in a
+   STRICT mode selected by the pinned `--workflow` argument, **never by the
+   environment**:
+   - MAKEFLAGS / GNUMAKEFLAGS / MFLAGS are **unset** — not empty, not "free of
+     flags it recognises";
+   - MAKELEVEL / MAKE_RESTARTS / MAKEOVERRIDES / MAKECMDGOALS are **absent** —
+     the anchor is not a make recipe, so if any is present something planted it;
+   - every variable the makefiles take FROM the environment is **absent** —
+     today `GO`, `SQLC`, `GOFLAGS`, `RELEASE`, `COMMIT`, `BUILT_AT` (all `?=`),
+     derived from every file make read, because `GO=true make test-race`
+     turns a failing test into exit 0;
+   - MAKEFILES, BASH_ENV and ENV are unset, and `SHELL` is a real shell;
+   - `make` resolves to a FILE (not a function or alias) whose real name is
+     `make`, in a system directory. It does not inspect that file's contents.
+
+   Adjacency is what makes those runtime checks mean anything. A `$GITHUB_ENV`
+   or `$GITHUB_PATH` write applies to LATER steps, so a write made by any
+   EARLIER step lands in the anchor's process exactly as it lands in make's,
+   and is refused there. The step immediately before make cannot be the writer,
+   because it must BE the pinned anchor literal.
+
+   Without `--workflow` — only `make ci-guard`, for local parity, which is not a
+   control — make itself exports MAKEFLAGS to the recipe, so every word must be
+   one GNU make was **measured** to export (3.81 and 4.3: `-jN`,
+   `--jobserver-*`, `s`, `w`, `--no-print-directory`). That is an allowlist; no
+   floor lane can select this mode, because its invocation is not the pin.
 2. **`ci-required-guard.py` check 8b pins the make step's SHAPE.** A step whose
    `run:` mentions `make` at all — the wide, fail-closed classifier decides
    that, a token in a comment included — must be **byte-equal** to a literal in
    `.github/pinned-steps.yml`, may carry no key but `name`/`run`/`id`, and must
-   be immediately preceded by the anchor. No flags, no overrides, no chains, one
-   invocation per step. Every one of the thirteen fails this by construction,
-   because every one changes the bytes or adds a key.
+   be immediately preceded by a step that is **byte-equal to the pinned anchor**
+   (also `name`/`run`/`id` only). A step that names `make-integrity-guard`
+   without being byte-equal to that pin is refused anywhere in a floor lane.
+   A workflow file with a **duplicate key** is refused outright, so the guard
+   never reads a different value than the one a reviewer sees first.
+
+   Of the verifier's thirteen, eleven change the make step's bytes or add a key
+   and are refused statically by 8b or 8c. The other two are
+   `$GITHUB_ENV` / `$GITHUB_PATH` writes. They are refused statically when the
+   writer sits between the anchor and make, or IS the anchor step. When the
+   writer is an EARLIER step they are refused at RUNTIME, by the anchor —
+   provided the write is to a variable the anchor checks (the list above), or
+   puts a directory other than a system one first on PATH.
+   `docs/evidence/hardening-b1/R1-evasion-table.txt` and
+   `R2-anchor-environment.txt` carry one row for each.
 3. **Check 8c asserts the lane actually RUNS its gate invocations.** Pinning a
    shape does not stop a step being DELETED or replaced by one that reaches make
    through an indirection no classifier can see (`M=make; $M -i ci`). So
@@ -109,6 +141,16 @@ What they **cannot** do:
   includes, its environment, what `make` resolves to) and nothing else.
   **Review is the control for that, and CODEOWNERS is advisory** until the
   owner's ruleset exists (it currently returns 403 on their plan).
+- **The anchor checks a named set of variables, not the whole environment.**
+  A `$GITHUB_ENV` write by an earlier step of any variable NOT in the list
+  above (`GOTOOLCHAIN`, `GODEBUG`, `CGO_ENABLED`, …) is not refused. The
+  per-package floors in the direct test steps still turn a suite that was made
+  to run nothing red; anything subtler is review-only.
+- **The anchor checks what `make` IS, not what it DOES.** A real file named
+  `make`, written into `/usr/local/bin` by an earlier step, that forwards the
+  anchor's own `make -pn` and exits 0 otherwise, passes — and the anchor's log
+  line says so, rather than claiming to have ruled it out. Planting it needs
+  another step to modify the machine, which is the first bullet's boundary.
 - **A wrapper script or composite action that calls make is not read.** It
   carries no `make` token on the workflow line, so it is not classified as a
   make step. Check 8c limits the damage — the required invocations must still
@@ -128,10 +170,12 @@ What they **cannot** do:
 - Everything here is checked out from the pull request under test and can be
   edited in it.
 
-Every remaining claim above maps to a fixture that goes red:
-`scripts/testdata/guard/` (65), `scripts/testdata/gotest/` (12) and
-`scripts/testdata/fakedocker/` (6), all driven from the required `scripts`
-package.
+Every remaining claim above maps to a fixture or a table case that goes red:
+`scripts/testdata/guard/` (75), `scripts/testdata/gotest/` (12),
+`scripts/testdata/fakedocker/` (6), and the anchor's own environment in
+`TestMakeIntegrityGuardEnvironment` (both modes, one row per variable class) —
+all driven from the required `scripts` package. The review-only bullets above
+are the ones with no fixture, and they say so.
 
 Read the guarantee at exactly that strength; the guard's own docstring states it
 the same way.
@@ -198,7 +242,7 @@ decision it protects.
 | Default-deny authorization over the frozen ADR-007 matrix | `internal/authz`, `TestFrozenMatrix` (315 cases) |
 | A required lane cannot be removed by the pull request it gates | `scripts/ci-required-guard.py`, `FLOOR_LANES`, with fixtures under `scripts/testdata/guard/` |
 | A lane that is REQUIRED but not on the FLOOR is checked like any other — trigger, continue-on-error, anchor adjacency, pinned make steps, required invocations, provenance | `ci-required-guard.py` runs checks 3, 4, 8, 8b, 8c and 10 over `set(FLOOR_LANES) \| set(required)`; fixture `scripts/testdata/guard/required-not-floor/` |
-| A one-line edit to the **Makefile or its includes**, and any edit to a workflow's own make line, cannot turn a required lane into a no-op | DEFAULT-DENY on the step's SHAPE, not a blacklist of shell spellings. `scripts/make-integrity-guard.py` runs as an out-of-make step IMMEDIATELY before every make step and asserts its own environment, what `make` resolves to, and the Makefile with its includes; `ci-required-guard.py` check **8b** requires each make step's `run:` to be **byte-equal** to a literal in `.github/pinned-steps.yml` with no key but name/run/id, and check **8c** requires the lane to actually RUN its recorded invocations — which closes indirection (`$M -i ci`) without parsing shell. 65 fixtures under `scripts/testdata/guard/`, plus `scripts/testdata/makeguard/`. **Residual: a wrapper script or `uses:` action may run additionally; review is the control** |
+| A one-line edit to the **Makefile or its includes**, and any edit to a workflow's own make line, cannot turn a required lane into a no-op | DEFAULT-DENY on the step's SHAPE, not a blacklist of shell spellings. The anchor, `./scripts/make-integrity-guard.sh --workflow`, is **pinned byte-equal** and must be the step IMMEDIATELY before every make step; in that pinned strict mode it refuses, in its own process, a set MAKEFLAGS family, any make recipe variable (MAKELEVEL, …), any variable the makefiles take from the environment (`GO`, `GOFLAGS`, …), MAKEFILES/BASH_ENV/ENV, and a `make` that is not a file named make in a system directory. `ci-required-guard.py` check **8b** requires each make step's `run:` to be **byte-equal** to a literal in `.github/pinned-steps.yml` with no key but name/run/id, refuses a look-alike anchor and a duplicate YAML key, and check **8c** requires the lane to actually RUN its recorded invocations. 75 fixtures under `scripts/testdata/guard/`, `TestMakeIntegrityGuardEnvironment`, plus `scripts/testdata/makeguard/`. **Residual (review-only): what another step does to the machine — a wrapper script, a forwarding `make` binary, a variable outside the anchor's list** |
 | Whatever make did, a real failing test — UNIT **or INTEGRATION** — still fails a required lane | `ci-required-guard.py` check 9 requires a make-free unit AND integration `go test ./...` in a required lane, each **byte-equal to a pinned body**: the exit handling (`\|\| exit 1` on the report, `exit "$rc"` last) is what makes a failing test fail the step, and a substring check could not see it removed (PR#9 VERIFY, FINDING 6). Fixtures `no-direct-test-lane/`, `no-direct-integration-lane/`, `direct-lane-without-report/`, `direct-lane-without-exit-rc/` |
 | A test lane cannot pass having run NOTHING, one package cannot disappear inside the headroom, and its skip count is readable from the job log | the direct steps emit `go test -json`; `scripts/go-test-report.py` judges `go test`'s own exit code, names every failure and skip, fails on any skip not allowlisted by test name with a reason, and holds the count to committed floors in `scripts/test-floors.json` — whole-suite **and one per package, for every package in both suites** (PR#9 VERIFY, FINDING 7). 12 fixtures under `scripts/testdata/gotest/` |
 | An image assertion cannot pass on a `docker run` FAILURE | `scripts/assert-runtime-image.sh` captures and judges every `docker run` exit; `$DOCKER` is injectable, and `scripts/testdata/fakedocker/` drives it against six stub daemons — including `broken-probes-1-3`, which reproduces the shape where main's inline step printed all three reassuring lines and exited 0 |

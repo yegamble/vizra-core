@@ -47,6 +47,6 @@ jobs:
         run: ./scripts/provenance.sh
 
       - name: Refuse a neutered Makefile
-        run: ./scripts/make-integrity-guard.sh
+        run: ./scripts/make-integrity-guard.sh --workflow
       - name: govulncheck
         run: make govulncheck

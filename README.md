@@ -77,7 +77,7 @@ pinned byte-for-byte in `.github/pinned-steps.yml` — the control is default-de
 on the step's shape, not a parser for shell:
 
 ```sh
-./scripts/make-integrity-guard.sh   # the Makefile and everything it includes
+./scripts/make-integrity-guard.sh --workflow   # exactly as CI's pinned anchor step runs it
 ./scripts/ci-required-guard.sh      # the manifest, the workflows, and each make step's own argv
 ```
 

@@ -27,8 +27,11 @@
 # ways to name a command. So the control was INVERTED. A step in a floor lane
 # that mentions `make` at all no longer has its flags parsed — it must be
 # BYTE-EQUAL to one of the literals below, and may carry no keys but `name`,
-# `run` and `id`. Every one of the thirteen fails that test by construction,
-# because every one of them changes the bytes of the `run:` or adds a key.
+# `run` and `id`. Eleven of the thirteen change the bytes of the make step or add a key, so they fail
+# that test statically. The other two are $GITHUB_ENV / $GITHUB_PATH writes: refused
+# statically when the writer sits between the anchor and make or IS the anchor step
+# (the anchor below is pinned too), and at RUNTIME by the anchor when the writer is an
+# earlier step and the write touches a variable the anchor checks.
 #
 # HOW IT IS ENFORCED
 # ------------------
@@ -43,6 +46,28 @@
 # as FLOOR_LANES. It is NOT prevented; it is made visible. One invocation per
 # entry: a multi-command script that mentions make is refused and must be split
 # into its own step, so that every gate invocation is readable on one line.
+
+# --------------------------------------------------------------------------
+# THE ANCHOR. Pinned byte-for-byte exactly like the make steps (fix round 2).
+#
+# Round 2 recognised "the anchor" by SUBSTRING — any step whose text contained
+# `make-integrity-guard` — and never compared its body to anything. So the step
+# immediately before `make ci` could be the real guard followed by a write
+# (`… && echo MAKEFLAGS=-i >> "$GITHUB_ENV"`), or a no-op that merely named it
+# (`: make-integrity-guard`), and adjacency was satisfied while the write
+# reached make and not the guard (PR#9 re-verification, FINDING R-1, N1–N4).
+#
+# Now: the step immediately before each make step must BE this literal, carrying
+# no key but name/run/id, and a step anywhere in a floor lane that mentions
+# `make-integrity-guard` without being byte-equal to it is refused.
+#
+# `--workflow` is load-bearing, not decoration. It selects the anchor's STRICT
+# environment mode — chosen by the invocation, never by the environment (R-2).
+# `make ci-guard` invokes the script without it; that path is not a control, and
+# no floor lane can use it, because it is not byte-equal to this pin.
+# --------------------------------------------------------------------------
+anchor_step: |
+  ./scripts/make-integrity-guard.sh --workflow
 
 # --------------------------------------------------------------------------
 # MAKE STEPS. Exactly the make invocations that exist today. No flags, no
