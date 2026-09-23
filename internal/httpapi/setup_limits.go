@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/yegamble/vizra-core/internal/audit"
+	"github.com/yegamble/vizra-core/internal/obs"
 	"github.com/yegamble/vizra-core/internal/site"
 	"github.com/yegamble/vizra-core/internal/store/sqlcgen"
 )
@@ -142,7 +143,7 @@ func (s *Server) recordClaimRefusal(c *echo.Context, reason string) {
 		// A refusal that cannot be audited is logged and dropped: it must not
 		// turn a 403 into a 500 for the caller, and there is no business
 		// transaction here to protect.
-		s.deps.Logger.Warn("http: could not record a claim refusal", "request_id", requestIDOf(c))
+		s.deps.Logger.Warn("http: could not record a claim refusal", "request_id", obs.Redact(requestIDOf(c)))
 	}
 }
 

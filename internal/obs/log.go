@@ -1,7 +1,19 @@
-// Package obs holds cross-cutting observability. The redaction layer here is
-// the VZ-OPS-005 rule made mechanical: "no process ever logs credentials,
-// signed URLs, session ids, API keys or raw private metadata", enforced in the
-// logger so a call site that passes a secret cannot put it in a log line.
+// Package obs holds cross-cutting observability, including the redaction that
+// VZ-OPS-005 asks for ("no process ever logs credentials, signed URLs, session
+// ids, API keys or raw private metadata"). What is implemented here is narrower
+// than that sentence, and this comment says so rather than repeat it:
+//
+//   - Redact removes the value forms valuePatterns lists — URL userinfo, the
+//     Cookie/Set-Cookie headers, credential-named key=value pairs (query
+//     parameters, presigned-URL parameters, keyword/value DSNs, session cookie
+//     pairs), Bearer tokens and vzk_ API keys — and nothing else. There is NO
+//     pattern for raw private metadata.
+//   - The handler NewLogger builds replaces the whole value of an attribute
+//     whose KEY is in secretKeys, and runs Redact over every other string value
+//     and over the message. It protects only what is logged through it: a
+//     process that logs through another handler (slog.Default() included) gets
+//     no redaction unless the call site applies Redact itself, which is why the
+//     worker and internal/httpapi do exactly that and test it.
 package obs
 
 import (
@@ -25,31 +37,54 @@ var secretKeys = map[string]bool{
 	"kek": true, "mfa_key_kek": true, "signature": true, "private_key": true,
 }
 
-// valuePatterns match a secret embedded in a larger string, which is how a
-// credential usually escapes: inside a URL, or inside a tool's stderr.
-var valuePatterns = []*regexp.Regexp{
-	// userinfo in any URL: scheme://user:password@host
-	regexp.MustCompile(`([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@`),
-	// presigned-URL query parameters
-	regexp.MustCompile(`(?i)([?&](?:X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token|Signature|AWSAccessKeyId|token|sig)=)[^&\s"']+`),
-	// bearer tokens and Vizra API keys
-	regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`),
-	regexp.MustCompile(`\bvzk_[A-Za-z0-9._~+/=-]{8,}`),
+// redaction is one pattern and what replaces its match.
+type redaction struct {
+	re   *regexp.Regexp
+	repl string
 }
 
-// Redact scrubs a free-text string. It is exported because every subprocess
-// stderr capture must pass through it too: a tool that echoes a presigned URL
-// must not be able to put it in a log line (ADR-002 § Logging and redaction).
+// valuePatterns match a secret embedded in a larger string, which is how a
+// credential usually escapes: inside a URL, a connection string, a header, or a
+// tool's stderr. This list IS the guarantee Redact gives; a form not matched here
+// is not removed. TestRedactCoversEveryCredentialForm has one row per form, and
+// TestRedactLeavesLookalikesAlone is the false-positive control.
+var valuePatterns = []redaction{
+	// URL userinfo: scheme://user:password@ — the username may be EMPTY, which
+	// is the Redis requirepass form (redis://:pw@host) that redis.ParseURL
+	// accepts. A password containing a raw "/" or "@" (not percent-encoded) is
+	// only partly matched: a stated residual.
+	{regexp.MustCompile(`([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s:@]*:[^/\s@]+@`), "${1}" + redacted + "@"},
+	// Cookie and Set-Cookie header values, to the end of the line.
+	{regexp.MustCompile(`(?i)\b((?:set-)?cookie):[ \t]*[^\r\n"]+`), "${1}: " + redacted},
+	// key=value pairs whose KEY names a credential, wherever they appear: URL
+	// query parameters (?password=, ?api_key=, &key=, ?access_token=,
+	// ?claim_token=, presigned X-Amz-*/X-Goog-*/sig= parameters), keyword/value
+	// connection strings (password=… or password='…'), and cookie pairs
+	// (vizra_session=…). The key must start at a non-word boundary, so
+	// "monkey=" and "hotkey=" are left alone; a key merely CONTAINING password,
+	// secret, token, session, credential or api_key/apikey is matched, so
+	// "db_password=" and "csrf_token=" are too. The value runs to "&",
+	// whitespace, a quote or "<>"; a quoted value is taken whole.
+	{regexp.MustCompile(`(?i)(^|[^a-z0-9_-])((?:[a-z0-9_-]*(?:password|passwd|secret|token|session|credential|api[_-]?key)[a-z0-9_-]*|key|sig|signature|awsaccesskeyid|x-(?:amz|goog)-signature)=)('[^']*'|"[^"]*"|[^&\s"'<>]+)`), "${1}${2}" + redacted},
+	// bearer tokens and Vizra API keys
+	{regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`), redacted},
+	{regexp.MustCompile(`\bvzk_[A-Za-z0-9._~+/=-]{8,}`), redacted},
+}
+
+// Redact scrubs a free-text string of the forms valuePatterns lists, and only
+// those. It is exported because every subprocess stderr capture, and every log
+// call site that passes error or request text, must pass through it: a tool
+// that echoes a presigned URL must not be able to put it in a log line
+// (ADR-002 § Logging and redaction).
+//
+// What it does NOT remove, stated so nobody reads more into it: raw private
+// metadata (there is no pattern for EXIF, captions or e-mail addresses), a
+// secret under a JSON key ("password":"…"), a URL password containing a raw
+// "/" or "@", a credential-shaped value with no recognisable key or prefix, and
+// an API key that is not a vzk_ key.
 func Redact(s string) string {
-	for i, re := range valuePatterns {
-		switch i {
-		case 0:
-			s = re.ReplaceAllString(s, "${1}"+redacted+"@")
-		case 1:
-			s = re.ReplaceAllString(s, "${1}"+redacted)
-		default:
-			s = re.ReplaceAllString(s, redacted)
-		}
+	for _, p := range valuePatterns {
+		s = p.re.ReplaceAllString(s, p.repl)
 	}
 	return s
 }

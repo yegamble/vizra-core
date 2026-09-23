@@ -1,6 +1,7 @@
 package search
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -766,5 +767,51 @@ func TestPingDoesNotFollowRedirects(t *testing.T) {
 	defer mu.Unlock()
 	if second != 0 {
 		t.Fatalf("ping followed the redirect %d time(s)", second)
+	}
+}
+
+// Both fallback log lines in Service go through obs.Redact at the call site,
+// whatever handler the service was built with (B3 verifier, core #12 V-1:
+// service.go logged the raw err.Error() and falls back to slog.Default()).
+//
+// The error is a REAL one, not a fabricated string: a VIZRA_SEARCH_URL that
+// fails to parse makes http.NewRequestWithContext return a *url.Error that
+// quotes the whole URL — userinfo and query included — and call() returns it
+// unwrapped. The logger is a PLAIN text handler, so only the call site can have
+// removed the secrets.
+func TestTheFallbackLogLinesAreRedacted(t *testing.T) {
+	userinfoPW := "Zq" + strings.Repeat("u8", 6)
+	queryPW := "Zq" + strings.Repeat("p7", 6)
+	base := "http://core:" + userinfoPW + "@search\x7f.internal/?password=" + queryPW
+
+	for name, call := range map[string]func(*Service) error{
+		"Search": func(s *Service) error {
+			_, err := s.Search(context.Background(), SearchRequest{Query: "x"})
+			return err
+		},
+		"Suggest": func(s *Service) error {
+			_, err := s.Suggest(context.Background(), SuggestRequest{Prefix: "x"})
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			s := NewService(NewSQL(), NewRemote(base, testKey, time.Second), slog.New(slog.NewTextHandler(&buf, nil)))
+			if err := call(s); err != nil {
+				t.Fatalf("the SQL fallback must still answer: %v", err)
+			}
+			logged := buf.String()
+			if !strings.Contains(logged, "falling back to SQL") {
+				t.Fatalf("the fallback was not logged, so this test would pass vacuously:\n%s", logged)
+			}
+			for _, secret := range []string{userinfoPW, queryPW} {
+				if strings.Contains(logged, secret) {
+					t.Errorf("the fallback log line leaked a credential:\n%s", logged)
+				}
+			}
+			if !strings.Contains(logged, "[redacted]") {
+				t.Errorf("nothing was marked redacted:\n%s", logged)
+			}
+		})
 	}
 }
