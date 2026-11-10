@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,6 +51,7 @@ type Config struct {
 	CacheURL       string
 	CacheNamespace string
 	StoragePrefix  string
+	StorageRoot    string
 
 	SessionSecret string
 	MFAKeyKEK     string
@@ -229,6 +231,7 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 		CacheURL:       get("VIZRA_CACHE_URL"),
 		CacheNamespace: get("VIZRA_CACHE_NAMESPACE"),
 		StoragePrefix:  get("VIZRA_STORAGE_PREFIX"),
+		StorageRoot:    get("VIZRA_STORAGE_ROOT"),
 		SessionSecret:  get("VIZRA_SESSION_SECRET"),
 		MFAKeyKEK:      get("VIZRA_MFA_KEY_KEK"),
 		SearchMode:     SearchMode(strings.ToLower(get("VIZRA_SEARCH_MODE"))),
@@ -280,6 +283,9 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 	}
 	if c.StoragePrefix == "" {
 		bad("VIZRA_STORAGE_PREFIX", "must not be empty; it is supplied by the site resolver, never a hardcoded root")
+	}
+	if !filepath.IsAbs(c.StorageRoot) {
+		bad("VIZRA_STORAGE_ROOT", "must be an absolute path")
 	}
 
 	// Public origin.

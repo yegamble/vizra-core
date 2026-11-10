@@ -62,6 +62,11 @@ type Deps struct {
 	PingDatabase func(ctx context.Context) error
 	PingCache    func(ctx context.Context) error
 
+	// CheckStorage is the same kind of seam for the storage root. New installs
+	// the real filesystem check against Config.StorageRoot; with no root
+	// configured it fails closed.
+	CheckStorage func(ctx context.Context) error
+
 	// InstanceClaimed reports whether this instance has an owner yet. It is the
 	// same kind of seam as PingDatabase: New installs the real lookup, and a
 	// test overrides it so route behaviour can be exercised without standing up
@@ -128,6 +133,14 @@ func New(deps Deps) *Server {
 			}
 			return c.Ping(ctx)
 		}
+	}
+	if deps.CheckStorage == nil {
+		root := ""
+		if deps.Config != nil {
+			root = deps.Config.StorageRoot
+		}
+		probe := &storageProbe{check: func() error { return checkStorageRoot(root) }}
+		deps.CheckStorage = probe.Check
 	}
 
 	e := echo.New()

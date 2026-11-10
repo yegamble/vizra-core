@@ -56,8 +56,13 @@ func mustEnv(t *testing.T, key string) string {
 
 func testConfig(t *testing.T) *config.Config {
 	t.Helper()
+	// A real, writable media root: /readyz checks it (VZ-FOUND-005), and the
+	// default path does not exist on a CI runner.
+	storageRoot := t.TempDir()
 	cfg, err := config.LoadFrom(func(k string) (string, bool) {
 		switch k {
+		case "VIZRA_STORAGE_ROOT":
+			return storageRoot, true
 		case "DATABASE_URL":
 			return mustEnv(t, "VIZRA_TEST_DATABASE_URL"), true
 		case "VIZRA_CACHE_URL":

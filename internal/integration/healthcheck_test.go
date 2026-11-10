@@ -335,6 +335,7 @@ func TestHealthcheckApiIsZeroWhenReadyAndNonZeroWhenPostgresStops(t *testing.T) 
 		"DATABASE_URL":       proxiedDSN(t, direct, proxy.addr()),
 		"VIZRA_CACHE_URL":    mustEnv(t, "VIZRA_TEST_CACHE_URL"),
 		"VIZRA_LISTEN_ADDR":  listen,
+		"VIZRA_STORAGE_ROOT": t.TempDir(),
 		"VIZRA_METRICS_ADDR": freePort(t),
 	}
 	svc := startService(t, "vizra-api", env)

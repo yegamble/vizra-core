@@ -83,7 +83,9 @@ paths:
       summary: Readiness probe
       description: |
         Drain-aware readiness with a 2 second single-flight cache (ADR-002
-        § Probes). PostgreSQL unreachable yields 503 `unavailable`. Every other
+        § Probes). PostgreSQL unreachable yields 503 `unavailable`, and so does
+        a storage root that is missing, not a directory or not writable
+        (VZ-FOUND-005). Every other
         degraded dependency — cache unreachable, search misconfigured or
         unreachable (Q-001), oldest queued job above the configured age
         threshold (Q-028) — yields 200 `degraded` with the component named, so a
@@ -98,7 +100,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReadinessResponse"
         "503":
-          description: Not ready. PostgreSQL is unreachable, or the process is draining.
+          description: Not ready. PostgreSQL is unreachable, the storage root is unusable, or the process is draining.
           content:
             application/json:
               schema:
