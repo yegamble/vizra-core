@@ -10,7 +10,7 @@ The pinned set for this milestone, with the licence each carries upstream. SPDX
 identifiers are re-read from each upstream LICENSE file when a pin changes; the
 "verified" column records where that was done.
 
-  github.com/labstack/echo/v5            v5.3.1     MIT
+  github.com/labstack/echo/v5            v5.4.4     MIT
   github.com/labstack/echo-contrib/v5    v5.0.1     MIT              (not yet linked)
   github.com/jackc/pgx/v5                v5.11.0    MIT
   github.com/golang-migrate/migrate/v4   v4.20.1    MIT
