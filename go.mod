@@ -4,16 +4,19 @@ module github.com/yegamble/vizra-core
 // 1.26 so a 1.26 toolchain can still build the module with GOTOOLCHAIN=local.
 go 1.26.0
 
-// The pinned build toolchain (ADR-001 § Go and HTTP). 1.27.1 is the newest 1.27
-// patch, verified against https://go.dev/dl/?mode=json&include=all on 2026-09-20.
-toolchain go1.27.1
+// The pinned build toolchain (ADR-001 § Go and HTTP). 1.27.4 is the newest 1.27
+// patch, verified against https://go.dev/dl/?mode=json&include=all on 2026-11-10.
+// Raised from 1.27.1 for the standard-library advisories govulncheck reported
+// (fixed in 1.27.2 and 1.27.3). The Dockerfile's golang digest and
+// fixtures/manifest.json move with it.
+toolchain go1.27.4
 
 require (
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/labstack/echo/v5 v5.3.1
+	github.com/labstack/echo/v5 v5.4.4
 	github.com/prometheus/client_golang v1.24.1
 	github.com/redis/go-redis/v9 v9.22.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0

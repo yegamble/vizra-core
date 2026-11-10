@@ -18,8 +18,8 @@
 #   * ffmpeg/ffprobe — video poster and probe only, added with VZ-MEDIA-005 (M3).
 
 # --- pinned inputs -----------------------------------------------------------
-# golang:1.27.1-trixie, digest resolved from registry-1.docker.io on 2026-09-20.
-FROM golang@sha256:433790e515d27dc6003e847e644cc0af956985cf315c1c58a3b73ee2dd305183 AS gobuild
+# golang:1.27.4-trixie, digest resolved from registry-1.docker.io on 2026-11-10.
+FROM golang@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS gobuild
 
 # debian:13-slim, digest resolved from registry-1.docker.io on 2026-09-20.
 FROM debian@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS vips

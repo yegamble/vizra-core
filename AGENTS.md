@@ -493,8 +493,8 @@ the live registry on 2026-09-20, not recalled.
 
 | Pin | Value | Where |
 |---|---|---|
-| Go toolchain | `go1.27.1` | `go.mod` `toolchain` |
-| Echo | `v5.3.1` | `go.mod` |
+| Go toolchain | `go1.27.4` (raised 2026-11-10 from `go1.27.1`; confirmed on go.dev/dl) | `go.mod` `toolchain`, `Dockerfile` golang digest, `fixtures/manifest.json` |
+| Echo | `v5.4.4` (raised 2026-11-10 from `v5.3.1`; confirmed on the module proxy) | `go.mod` |
 | pgx | `v5.11.0` | `go.mod` |
 | golang-migrate | `v4.20.1` | `go.mod` |
 | go-redis | `v9.22.0` | `go.mod` |
