@@ -45,6 +45,11 @@ func newProbeServer(t *testing.T, mutate func(*Deps)) *Server {
 	if mutate != nil {
 		mutate(&deps)
 	}
+	// A REAL directory and the REAL check: the storage component is exercised
+	// against the filesystem in every probe test, never stubbed green.
+	if deps.Config.StorageRoot == "" {
+		deps.Config.StorageRoot = t.TempDir()
+	}
 	return New(deps)
 }
 
@@ -108,13 +113,16 @@ func TestReadyzHealthy(t *testing.T) {
 	if code != http.StatusOK || body["status"] != "ok" {
 		t.Fatalf("/readyz = %d %v, want 200 ok", code, body["status"])
 	}
+	if got := componentStatus(t, body, "storage"); got != "ok" {
+		t.Fatalf("storage component = %q with a writable temp root, want ok", got)
+	}
 	// Search unconfigured is `off`, not a fault (Q-001).
 	if got := componentStatus(t, body, "search"); got != "off" {
 		t.Fatalf("search component = %q with no search configured, want off", got)
 	}
 }
 
-// The ONE condition that is 503.
+// PostgreSQL unreachable is 503 (the storage root is the other; see storage_probe_test.go).
 func TestReadyzDatabaseDownIs503(t *testing.T) {
 	s := newProbeServer(t, func(d *Deps) {
 		d.PingDatabase = func(context.Context) error { return errors.New("connection refused") }

@@ -48,6 +48,7 @@ var Registry = []Key{
 	{Name: "VIZRA_CACHE_URL", Secret: true, RequiredInProduction: true, Default: "redis://127.0.0.1:6379/0", Doc: "RESP server URL (Valkey managed, or any RESP >= 7.2 server). ADR-001 Q-004."},
 	{Name: "VIZRA_CACHE_NAMESPACE", Default: "default", Doc: "Cache key namespace. Supplied by the site resolver; never hardcoded (Q-008 item 4)."},
 	{Name: "VIZRA_STORAGE_PREFIX", Default: "default", Doc: "Storage key prefix. Supplied by the site resolver; never a hardcoded root (Q-008 item 3)."},
+	{Name: "VIZRA_STORAGE_ROOT", Default: "/var/lib/vizra/media", Doc: "Absolute path of the local media root (the default `local` storage location). The image creates it and the compose tree mounts a volume there; /readyz is 503 while it is missing, not a directory or not writable (VZ-FOUND-005)."},
 	{Name: "VIZRA_SESSION_SECRET", Secret: true, RequiredInProduction: true, Doc: "At least 32 bytes. Production refuses a known development value."},
 	{Name: "VIZRA_MFA_KEY_KEK", Secret: true, RequiredInProduction: true, Doc: "Key-encryption key wrapping TOTP secrets. Unset in production is a boot refusal, never a warning (ADR-003)."},
 	{Name: "VIZRA_SEARCH_MODE", Default: "off", Doc: "off | managed | external. Default off until M3 (ADR-002, Q-001)."},
