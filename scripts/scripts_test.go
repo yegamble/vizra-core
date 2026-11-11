@@ -110,6 +110,15 @@ func TestMigrateLintFixtures(t *testing.T) {
 		// The reviewed exception covers the new spellings too.
 		{dir: "allow-destructive-bare", wantFail: false},
 		{dir: "allow-destructive-split", wantFail: false},
+		// A marker directly before ONE multi-line column drop, nothing else on
+		// its lines.
+		{dir: "allow-destructive-split-alone", wantFail: false},
+		// PR#18 VERIFY F1: the marker exempts the statement it precedes and
+		// nothing else. Each of these has a second, unmarked destructive
+		// statement on the line of the marked statement's DROP.
+		{dir: "allow-destructive-other-drop-table", wantFail: true, wantText: "destructive"},
+		{dir: "allow-destructive-other-drop-column", wantFail: true, wantText: "destructive"},
+		{dir: "allow-destructive-other-rename", wantFail: true, wantText: "destructive"},
 
 		{dir: "bad-filename", wantFail: true, wantText: "filename"},
 		{dir: "sequence-gap", wantFail: true, wantText: "gap"},
@@ -125,6 +134,29 @@ func TestMigrateLintFixtures(t *testing.T) {
 			}
 			if tc.wantText != "" && !strings.Contains(strings.ToLower(out), tc.wantText) {
 				t.Fatalf("the failure does not mention %q, so an author would not know what to fix:\n%s", tc.wantText, out)
+			}
+		})
+	}
+}
+
+// Differential check (PR#18 VERIFY F1): the statement parser may reject more
+// than the per-line rule on main did, never less. Every fixture main's script
+// rejected, and the three files F1 showed it rejecting while the PR accepted
+// them, must still be rejected.
+func TestMigrateLintRejectsEverythingMainRejected(t *testing.T) {
+	rejectedOnMain := []string{
+		"drop-column", "drop-table", "drop-index", "drop-constraint", "rename",
+		"alter-type", "truncate", "bad-filename", "sequence-gap", "missing-down",
+		"empty-down",
+		"allow-destructive-other-drop-table",
+		"allow-destructive-other-drop-column",
+		"allow-destructive-other-rename",
+	}
+	for _, dir := range rejectedOnMain {
+		t.Run(dir, func(t *testing.T) {
+			out, code := run(t, "migrate-lint.sh", "--dir", filepath.Join("scripts", "testdata", "migratelint", dir))
+			if code == 0 {
+				t.Fatalf("migrate-lint accepts a tree that main's migrate-lint rejects:\n%s", out)
 			}
 		})
 	}

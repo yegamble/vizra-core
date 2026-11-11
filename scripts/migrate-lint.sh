@@ -96,7 +96,8 @@ destructive='DROP[[:space:]]+(TABLE|COLUMN|CONSTRAINT|INDEX|TYPE|SCHEMA|VIEW|SEQ
 # a column drop, and so is DROP on one line with COLUMN on the next. So column
 # drops are also found per STATEMENT.
 #
-# column_drops prints "<line of DROP> <line the statement starts on>" for every
+# column_drops prints "<line of DROP> <line the statement starts on> <number of
+# statements with a token on the line of DROP>" for every
 # `DROP [COLUMN] [IF EXISTS] name` action of an ALTER TABLE statement. It
 # tokenises the file: `--` and (nested) /* */ comments are dropped, 'strings',
 # "quoted identifiers" and $tag$ dollar-quoted bodies each become one opaque
@@ -120,7 +121,10 @@ destructive='DROP[[:space:]]+(TABLE|COLUMN|CONSTRAINT|INDEX|TYPE|SCHEMA|VIEW|SEQ
 #     per-line, exactly as they were.
 column_drops() {
   awk '
-    function emit(t) { n++; tok[n] = t; tl[n] = NR }
+    function emit(t) {
+      n++; tok[n] = t; tl[n] = NR
+      if (seen[NR] != sid + 1) { seen[NR] = sid + 1; stmts[NR]++ }
+    }
     function flush(   i, d, altering, nx) {
       if (n >= 2 && tok[1] == "ALTER" && tok[2] == "TABLE") {
         d = 0; altering = 0
@@ -135,12 +139,12 @@ column_drops() {
             if (nx == "CONSTRAINT") continue
             if (altering && (nx == "DEFAULT" || nx == "EXPRESSION" || nx == "IDENTITY")) continue
             if (altering && nx == "NOT" && i + 2 <= n && tok[i + 2] == "NULL") continue
-            print tl[i], tl[1]
+            m++; hit[m] = tl[i] " " tl[1]; hitline[m] = tl[i]
           }
         }
       }
       for (i = 1; i <= n; i++) { delete tok[i]; delete tl[i] }
-      n = 0
+      n = 0; sid++
     }
     {
       s = $0; L = length(s); p = 1
@@ -178,7 +182,7 @@ column_drops() {
         p++
       }
     }
-    END { flush() }
+    END { flush(); for (i = 1; i <= m; i++) print hit[i], stmts[hitline[i]] }
   ' "$1"
 }
 
@@ -198,11 +202,14 @@ for f in "${ups[@]}"; do
     # The reviewed exception sits on the line before the match, as it always
     # has; for a column drop found per statement it may equally sit on the line
     # before the statement, which is where an author of a multi-line ALTER
-    # TABLE writes it.
+    # TABLE writes it. That second form exempts ONLY that statement: it applies
+    # to a line that holds tokens of no other statement. `DROP handle; DROP
+    # TABLE users;` on one line is two statements, so the line is judged by the
+    # line before it alone, as it always was.
     exempt=0
     if allowed "$f" "$lineno"; then exempt=1; fi
-    while read -r dropline stmtline; do
-      if [ "${dropline:-}" = "$lineno" ] && allowed "$f" "$stmtline"; then exempt=1; fi
+    while read -r dropline stmtline onthisline; do
+      if [ "${dropline:-}" = "$lineno" ] && [ "$onthisline" = 1 ] && allowed "$f" "$stmtline"; then exempt=1; fi
     done <<EOF_HITS
 $stmt_hits
 EOF_HITS
