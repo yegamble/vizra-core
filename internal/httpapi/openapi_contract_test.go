@@ -80,18 +80,110 @@ func testServer(t *testing.T) *Server {
 	})
 }
 
-func serverOperations(t *testing.T) map[string]bool {
-	t.Helper()
+// contractOperations turns the registered routes into the "METHOD PATH" keys
+// the spec uses. STEP 0: the behaviour before the fix, extracted unchanged.
+func contractOperations(routes []RegisteredRoute) (map[string]bool, []string) {
 	out := map[string]bool{}
-	for _, r := range testServer(t).Routes() {
-		// Echo registers an automatic RouteNotFound entry; it is not an
-		// operation and has no spec.
+	for _, r := range routes {
 		if strings.Contains(r.Path, "*") {
 			continue
 		}
 		out[r.Method+" "+r.Path] = true
 	}
-	return out
+	return out, nil
+}
+
+func serverOperations(t *testing.T) map[string]bool {
+	t.Helper()
+	ops, problems := contractOperations(testServer(t).Routes())
+	if len(problems) > 0 {
+		t.Fatalf("cmd/api registers %d route(s) the contract gate cannot map to an OpenAPI path:\n  %s\n\n"+
+			"The gate fails closed: a route it cannot compare is a route nothing checks.",
+			len(problems), strings.Join(problems, "\n  "))
+	}
+	return ops
+}
+
+// contractDrift compares a route table with a set of spec operations and
+// returns both directions of drift plus the routes that could not be mapped.
+func contractDrift(routes []RegisteredRoute, spec map[string]bool) (unspecified, unserved, unmappable []string) {
+	ops, unmappable := contractOperations(routes)
+	for op := range ops {
+		if !spec[op] {
+			unspecified = append(unspecified, op)
+		}
+	}
+	for op := range spec {
+		if !ops[op] {
+			unserved = append(unserved, op)
+		}
+	}
+	sort.Strings(unspecified)
+	sort.Strings(unserved)
+	return unspecified, unserved, unmappable
+}
+
+// VZ-FOUND-002 S1 on synthetic route tables. The server has no wildcard or
+// parameter route today, so the real route table cannot show that such a route
+// is compared; these cases do.
+func TestContractDriftOnSyntheticRouteTables(t *testing.T) {
+	rt := func(method, path string) RegisteredRoute { return RegisteredRoute{Method: method, Path: path} }
+	cases := []struct {
+		name           string
+		routes         []RegisteredRoute
+		spec           []string
+		wantUnspec     []string
+		wantUnserved   []string
+		wantUnmappable int
+	}{
+		{name: "plain route and its operation", routes: []RegisteredRoute{rt("GET", "/healthz")}, spec: []string{"GET /healthz"}},
+		{name: "plain route without spec", routes: []RegisteredRoute{rt("GET", "/healthz")}, wantUnspec: []string{"GET /healthz"}},
+		{name: "spec without route", spec: []string{"GET /healthz"}, wantUnserved: []string{"GET /healthz"}},
+
+		{name: "wildcard route without spec", routes: []RegisteredRoute{rt("GET", "/files/*")}, wantUnspec: []string{"GET /files/{path}"}},
+		{name: "wildcard route with its mapped spec path", routes: []RegisteredRoute{rt("GET", "/files/*")}, spec: []string{"GET /files/{path}"}},
+		{name: "wildcard route, spec has another method",
+			routes: []RegisteredRoute{rt("GET", "/files/*")}, spec: []string{"PUT /files/{path}"},
+			wantUnspec: []string{"GET /files/{path}"}, wantUnserved: []string{"PUT /files/{path}"}},
+		{name: "wildcard route, spec names the parameter differently",
+			routes: []RegisteredRoute{rt("GET", "/files/*")}, spec: []string{"GET /files/{name}"},
+			wantUnspec: []string{"GET /files/{path}"}, wantUnserved: []string{"GET /files/{name}"}},
+		{name: "spec wildcard path without route", spec: []string{"GET /files/{path}"}, wantUnserved: []string{"GET /files/{path}"}},
+		{name: "root wildcard without spec", routes: []RegisteredRoute{rt("GET", "/*")}, wantUnspec: []string{"GET /{path}"}},
+
+		{name: "parameter route with its spec path", routes: []RegisteredRoute{rt("GET", "/photos/:id")}, spec: []string{"GET /photos/{id}"}},
+		{name: "parameter route without spec", routes: []RegisteredRoute{rt("GET", "/photos/:id")}, wantUnspec: []string{"GET /photos/{id}"}},
+		{name: "parameter and wildcard", routes: []RegisteredRoute{rt("GET", "/u/:user/files/*")}, spec: []string{"GET /u/{user}/files/{path}"}},
+
+		{name: "unmappable: wildcard in the middle", routes: []RegisteredRoute{rt("GET", "/files/*/meta")}, spec: []string{"GET /files/{path}/meta"},
+			wantUnserved: []string{"GET /files/{path}/meta"}, wantUnmappable: 1},
+		{name: "unmappable: wildcard glued to a segment", routes: []RegisteredRoute{rt("GET", "/files/img*")}, wantUnmappable: 1},
+		{name: "unmappable: two wildcards", routes: []RegisteredRoute{rt("GET", "/a/*/b/*")}, wantUnmappable: 1},
+		{name: "unmappable: parameter glued to a segment", routes: []RegisteredRoute{rt("GET", "/photos/:id.jpg")}, wantUnmappable: 1},
+		{name: "unmappable: parameter already named path next to a wildcard", routes: []RegisteredRoute{rt("GET", "/x/:path/*")}, wantUnmappable: 1},
+		{name: "unmappable: literal brace", routes: []RegisteredRoute{rt("GET", "/x/{id}")}, spec: []string{"GET /x/{id}"},
+			wantUnserved: []string{"GET /x/{id}"}, wantUnmappable: 1},
+		{name: "unmappable: not an HTTP method", routes: []RegisteredRoute{rt("echo_route_not_found", "/*")}, wantUnmappable: 1},
+		{name: "unmappable: no leading slash", routes: []RegisteredRoute{rt("GET", "files")}, wantUnmappable: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := map[string]bool{}
+			for _, op := range tc.spec {
+				spec[op] = true
+			}
+			unspec, unserved, unmappable := contractDrift(tc.routes, spec)
+			if strings.Join(unspec, ",") != strings.Join(tc.wantUnspec, ",") {
+				t.Errorf("routes without a spec operation: got %v, want %v", unspec, tc.wantUnspec)
+			}
+			if strings.Join(unserved, ",") != strings.Join(tc.wantUnserved, ",") {
+				t.Errorf("spec operations without a route: got %v, want %v", unserved, tc.wantUnserved)
+			}
+			if len(unmappable) != tc.wantUnmappable {
+				t.Errorf("unmappable routes: got %d %v, want %d", len(unmappable), unmappable, tc.wantUnmappable)
+			}
+		})
+	}
 }
 
 // Direction 1: a route the server serves with no operation in the spec.

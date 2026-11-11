@@ -84,6 +84,33 @@ func TestMigrateLintFixtures(t *testing.T) {
 		{dir: "alter-type", wantFail: true, wantText: "destructive"},
 		{dir: "truncate", wantFail: true, wantText: "destructive"},
 
+		// VZ-FOUND-003 N1, every spelling PostgreSQL accepts. The rule used to
+		// match per line and to need the literal COLUMN keyword, so each of
+		// these passed: `ALTER TABLE sites DROP handle;` is a column drop.
+		{dir: "drop-bare", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-if-exists", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-mixed-case", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-whitespace", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-quoted", wantFail: true, wantText: "destructive"},
+		// EXPRESSION and IDENTITY are not reserved: this drops a column.
+		{dir: "drop-bare-named-identity", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-split-lines", wantFail: true, wantText: "destructive"},
+		{dir: "drop-column-split-lines", wantFail: true, wantText: "destructive"},
+		{dir: "drop-multi-action", wantFail: true, wantText: "destructive"},
+		{dir: "drop-multi-action-split", wantFail: true, wantText: "destructive"},
+		{dir: "drop-column-comments-between", wantFail: true, wantText: "destructive"},
+		{dir: "drop-no-semicolon", wantFail: true, wantText: "destructive"},
+
+		// Not column drops, and not flagged by any other rule: unchanged.
+		{dir: "alter-drop-default", wantFail: false},
+		{dir: "alter-drop-not-null", wantFail: false},
+		{dir: "alter-drop-expression", wantFail: false},
+		{dir: "alter-drop-identity", wantFail: false},
+		{dir: "not-a-statement", wantFail: false},
+		// The reviewed exception covers the new spellings too.
+		{dir: "allow-destructive-bare", wantFail: false},
+		{dir: "allow-destructive-split", wantFail: false},
+
 		{dir: "bad-filename", wantFail: true, wantText: "filename"},
 		{dir: "sequence-gap", wantFail: true, wantText: "gap"},
 		{dir: "missing-down", wantFail: true, wantText: "no-down"},

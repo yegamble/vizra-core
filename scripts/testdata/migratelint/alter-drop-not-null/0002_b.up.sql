@@ -1,0 +1,3 @@
+ALTER TABLE widgets ALTER COLUMN handle DROP NOT NULL;
+ALTER TABLE widgets ADD COLUMN label text, ALTER handle
+  DROP NOT NULL;
