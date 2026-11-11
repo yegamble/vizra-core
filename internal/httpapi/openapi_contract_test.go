@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -81,16 +83,85 @@ func testServer(t *testing.T) *Server {
 }
 
 // contractOperations turns the registered routes into the "METHOD PATH" keys
-// the spec uses. STEP 0: the behaviour before the fix, extracted unchanged.
+// the spec uses, and reports every route it cannot translate.
+//
+// Echo and OpenAPI spell paths differently, so the comparison is on the
+// OpenAPI spelling:
+//
+//	/photos/:id   <->  /photos/{id}     a whole-segment parameter keeps its name
+//	/files/*      <->  /files/{path}    a trailing wildcard is the parameter "path"
+//
+// OpenAPI has no wildcard, so the rest of a path is one parameter, and its name
+// is fixed at "path" so that a route has exactly one spelling in the spec.
+// (OpenAPI 3.0 cannot say that {path} may contain "/"; the operation's
+// description has to. The gate compares the route table, not that prose.)
+//
+// Nothing is skipped. A shape with no single translation — a wildcard that is
+// not the whole last segment, a parameter that is only part of a segment, a
+// second parameter called "path" beside a wildcard, a literal brace, a method
+// that is not an HTTP method — is returned as unmappable and fails the gate.
+// This used to `continue` on any path containing "*", so a wildcard route
+// with no spec entry stayed green.
 func contractOperations(routes []RegisteredRoute) (map[string]bool, []string) {
 	out := map[string]bool{}
+	var unmappable []string
 	for _, r := range routes {
-		if strings.Contains(r.Path, "*") {
+		path, err := openAPIPath(r.Path)
+		if err == nil && !httpMethods[r.Method] {
+			err = fmt.Errorf("%q is not an HTTP method an OpenAPI operation can have", r.Method)
+		}
+		if err != nil {
+			unmappable = append(unmappable, fmt.Sprintf("%s %s: %v", r.Method, r.Path, err))
 			continue
 		}
-		out[r.Method+" "+r.Path] = true
+		out[r.Method+" "+path] = true
 	}
-	return out, nil
+	sort.Strings(unmappable)
+	return out, unmappable
+}
+
+// The methods an OpenAPI 3.0 path item can carry.
+var httpMethods = map[string]bool{
+	http.MethodGet: true, http.MethodPut: true, http.MethodPost: true, http.MethodDelete: true,
+	http.MethodOptions: true, http.MethodHead: true, http.MethodPatch: true, http.MethodTrace: true,
+}
+
+// wildcardParam is the OpenAPI parameter name a trailing Echo "*" maps to.
+const wildcardParam = "path"
+
+func openAPIPath(echoPath string) (string, error) {
+	if !strings.HasPrefix(echoPath, "/") {
+		return "", fmt.Errorf("the path does not start with /")
+	}
+	if strings.ContainsAny(echoPath, "{}") {
+		return "", fmt.Errorf("the path contains a literal brace, which OpenAPI reads as a parameter")
+	}
+	segments := strings.Split(echoPath[1:], "/")
+	seen := map[string]bool{}
+	for i, seg := range segments {
+		switch {
+		case seg == "*":
+			if i != len(segments)-1 {
+				return "", fmt.Errorf("a wildcard that is not the last segment has no OpenAPI spelling")
+			}
+			if seen[wildcardParam] {
+				return "", fmt.Errorf("the wildcard maps to {%s}, which this path already uses", wildcardParam)
+			}
+			segments[i] = "{" + wildcardParam + "}"
+		case strings.Contains(seg, "*"):
+			return "", fmt.Errorf("a wildcard that is only part of a segment has no OpenAPI spelling")
+		case strings.HasPrefix(seg, ":"):
+			name := seg[1:]
+			if name == "" || strings.ContainsAny(name, ":.-") || seen[name] {
+				return "", fmt.Errorf("parameter segment %q is empty, repeated, or more than one parameter name", seg)
+			}
+			seen[name] = true
+			segments[i] = "{" + name + "}"
+		case strings.Contains(seg, ":"):
+			return "", fmt.Errorf("a parameter that is only part of a segment (%q) is not translated", seg)
+		}
+	}
+	return "/" + strings.Join(segments, "/"), nil
 }
 
 func serverOperations(t *testing.T) map[string]bool {
