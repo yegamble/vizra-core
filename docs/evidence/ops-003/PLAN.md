@@ -8,7 +8,7 @@ Base: origin/main 33a7187. Branch feat/ops-003-status-logs.
 - [x] mutations: drop --env-file (red), accept unknown service (red), restored (green): this dir
 - [x] draft PR
 - [ ] test-floors entry for internal/ops; make ci via quiet.sh
-- [ ] real-binary transcript (transcript.txt)
+- [x] real-binary transcript (transcript.txt)
 - [ ] docs note; ready when ci-required green
 
 Open: per-service version uses the image reference from `compose ps`, not OCI image labels.

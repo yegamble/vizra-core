@@ -259,4 +259,3 @@ func runUpdate(args []string, e opsEnv) int {
 	fmt.Fprint(e.stdout, ops.UpdateReport(buildinfo.Release, v))
 	return 3
 }
-
