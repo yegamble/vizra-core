@@ -320,8 +320,9 @@ func TestManifestDetectsEveryClassOfDrift(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				dropped := m.Fixtures[len(m.Fixtures)-1]
-				m.Fixtures = m.Fixtures[:len(m.Fixtures)-1]
+				// Index 11 is ADR-009 item 12; the VZ-FOUND-007 supplement follows it.
+				dropped := m.Fixtures[11]
+				m.Fixtures = append(m.Fixtures[:11:11], m.Fixtures[12:]...)
 				if err := WriteManifest(root, m); err != nil {
 					t.Fatal(err)
 				}
@@ -475,8 +476,8 @@ func TestManifestRecordsWhatTheLedgerRequires(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Fixtures) != 12 {
-		t.Fatalf("the manifest lists %d fixtures, want 12", len(m.Fixtures))
+	if len(m.Fixtures) != 12+len(supplement()) {
+		t.Fatalf("the manifest lists %d fixtures, want the 12 of ADR-009 plus %d supplement", len(m.Fixtures), len(supplement()))
 	}
 	for _, e := range m.Fixtures {
 		if len(e.SHA256) != 64 {
@@ -605,7 +606,7 @@ func TestTheDeclaredSetCheckRefusesEveryShapeThatIsNotTheTwelve(t *testing.T) {
 		{
 			// The verifier's exact reproduction: `ok — 11 fixtures`.
 			name:     "eleven fixtures",
-			mutate:   func(m *Manifest) { m.Fixtures = m.Fixtures[:len(m.Fixtures)-1] },
+			mutate:   func(m *Manifest) { m.Fixtures = append(m.Fixtures[:11:11], m.Fixtures[12:]...) },
 			wantText: "11 fixture(s); ADR-009 names 12",
 		},
 		{
@@ -656,5 +657,87 @@ func TestTheDeclaredSetCheckRefusesEveryShapeThatIsNotTheTwelve(t *testing.T) {
 				t.Fatalf("the refusal does not say %q, so a developer would not know what is wrong:\n%s", tc.wantText, joined)
 			}
 		})
+	}
+}
+
+// TestAFixtureWithoutProvenanceIsRejected is the VZ-FOUND-007 negative case,
+// plus the other per-file fields of its success case and category coverage.
+func TestAFixtureWithoutProvenanceIsRejected(t *testing.T) {
+	base, err := ReadManifest(repoRoot(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if probs := checkLedgerRecord(base); len(probs) != 0 {
+		t.Fatalf("the committed manifest already fails the ledger record check: %v", probs)
+	}
+	clone := func() *Manifest {
+		m := *base
+		m.Fixtures = append([]Entry(nil), base.Fixtures...)
+		m.OpenCategories = map[string]string{}
+		for k, v := range base.OpenCategories {
+			m.OpenCategories[k] = v
+		}
+		return &m
+	}
+	cases := []struct {
+		name, want string
+		mutate     func(m *Manifest)
+	}{
+		{"provenance deleted", "has no provenance", func(m *Manifest) { m.Fixtures[13].Provenance = "" }},
+		{"provenance blank on an ADR fixture", "has no provenance", func(m *Manifest) { m.Fixtures[0].Provenance = "  " }},
+		{"licence deleted", "has no license", func(m *Manifest) { m.Fixtures[2].License = "" }},
+		{"sha256 deleted", "has no sha256", func(m *Manifest) { m.Fixtures[4].SHA256 = "" }},
+		{"dimensions deleted", "has no dimensions", func(m *Manifest) { m.Fixtures[5].Width = 0 }},
+		{"decode outcome deleted", "has no expected_decode", func(m *Manifest) { m.Fixtures[6].Decode = "" }},
+		{"an open category loses its reason", `"animated-avif" has no fixture`, func(m *Manifest) { delete(m.OpenCategories, "animated-avif") }},
+		{"a covered category loses its fixture", `"mov" has no fixture`, func(m *Manifest) {
+			for i := range m.Fixtures {
+				if m.Fixtures[i].ID == "mov-short" {
+					m.Fixtures[i].Categories = nil
+				}
+			}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := clone()
+			tc.mutate(m)
+			var joined string
+			for _, p := range checkLedgerRecord(m) {
+				joined += p.Detail + "\n"
+			}
+			if !strings.Contains(joined, tc.want) {
+				t.Fatalf("mutation %q not rejected with %q; got:\n%s", tc.name, tc.want, joined)
+			}
+		})
+	}
+}
+
+// TestEveryLedgerCategoryIsCoveredOrOpen: the supplement is in the manifest,
+// and nothing is listed both covered and open.
+func TestEveryLedgerCategoryIsCoveredOrOpen(t *testing.T) {
+	m, err := ReadManifest(repoRoot(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(LedgerCategories) != 18 {
+		t.Fatalf("the VZ-FOUND-007 outcome names 18 categories, LedgerCategories has %d", len(LedgerCategories))
+	}
+	covered := map[string]bool{}
+	for _, e := range m.Fixtures {
+		for _, c := range e.Categories {
+			covered[c] = true
+		}
+	}
+	for _, c := range LedgerCategories {
+		if covered[c] && m.OpenCategories[c] != "" {
+			t.Errorf("%s is both covered and listed open", c)
+		}
+		if !covered[c] && m.OpenCategories[c] == "" {
+			t.Errorf("%s is neither covered nor open", c)
+		}
+	}
+	if len(m.Fixtures) != len(All()) {
+		t.Fatalf("manifest lists %d fixtures, All() produces %d", len(m.Fixtures), len(All()))
 	}
 }

@@ -4,7 +4,7 @@
   "generator": {
     "name": "fixturegen",
     "version": "1",
-    "source_sha256": "4ff582ba6959ba9b1799530ba7b445d4f6e28d77ef9a157b6cc50db9f772e487",
+    "source_sha256": "823d8f9d2a4b1b459bd0b57153c155212144f9294dd2e930d299cba3fd5dcea3",
     "source_files": [
       "internal/fixtures/codec.go",
       "internal/fixtures/fixtures.go",
@@ -15,6 +15,7 @@
       "internal/fixtures/mp4.go",
       "internal/fixtures/png.go",
       "internal/fixtures/raster.go",
+      "internal/fixtures/supplement.go",
       "internal/fixtures/webp.go",
       "cmd/fixturegen/main.go"
     ]
@@ -112,7 +113,13 @@
         "a GPS IFD is present with GPSLatitude, GPSLongitude and both refs",
         "the stored pixel dimensions are 64x48, so an orientation-aware pipeline must report 48x64"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "landscape",
+        "exif-rotated",
+        "gps-tagged"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec jpeg-exif-orientation6-gps"
     },
     {
       "id": "png-alpha",
@@ -130,7 +137,11 @@
         "IHDR colour type 6 (truecolour with alpha), bit depth 8",
         "the image contains fully transparent, partially transparent and fully opaque pixels"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "transparent-png"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec png-alpha"
     },
     {
       "id": "jpeg-truncated",
@@ -149,7 +160,11 @@
         "has NO EOI marker",
         "image.Decode fails with a truncated-stream error (unexpected EOF, or image/jpeg's \"short Huffman data\")"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "truncated"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec jpeg-truncated"
     },
     {
       "id": "png-oversized-dimensions",
@@ -168,7 +183,11 @@
         "the file itself stays under 512 KiB, so size is not a usable proxy for the risk",
         "the PNG stream is valid: image.DecodeConfig succeeds and reports the declared dimensions"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "huge-dimensions"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec png-oversized-dimensions"
     },
     {
       "id": "png-decoder-bomb",
@@ -187,7 +206,9 @@
         "the IDAT stream inflates by a factor of at least 500",
         "the decompressed raster exceeds 64 MiB"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": null,
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec png-decoder-bomb"
     },
     {
       "id": "polyglot-gif-svg-active",
@@ -208,7 +229,11 @@
         "the tail after the GIF trailer is a well-formed XML svg document",
         "that document contains a \u003cscript\u003e element, an onload handler and a remote xlink:href (SSRF bait)"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "polyglot"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec polyglot-gif-svg-active"
     },
     {
       "id": "gif-animated",
@@ -228,7 +253,11 @@
         "a NETSCAPE2.0 application extension sets an infinite loop count",
         "the frames are not identical to each other"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "animated-gif"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec gif-animated"
     },
     {
       "id": "webp-animated",
@@ -249,7 +278,11 @@
         "3 ANMF frames, each with a non-zero duration and a VP8L sub-chunk",
         "each VP8L frame decodes to its declared solid colour (checked by an independent VP8L reader in the property test)"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "animated-webp"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec webp-animated"
     },
     {
       "id": "avif-still",
@@ -268,7 +301,9 @@
         "a meta box carries an ipco with an av1C configuration and an ispe declaring 64x64",
         "an mdat box carries the AV1 OBUs"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": null,
+      "provenance": "committed codec input internal/fixtures/codec/avif-still.avif (see codec_inputs), copied by fixturegen"
     },
     {
       "id": "jpeg-12mp-budget",
@@ -287,7 +322,9 @@
         "baseline (SOF0) JPEG, 3 components",
         "the encoded size is between 1 MiB and 8 MiB, so the budget run is not measuring a flat colour"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": null,
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec jpeg-12mp-budget"
     },
     {
       "id": "mp4-short",
@@ -308,7 +345,11 @@
         "12 samples over a 1.000 s declared duration",
         "every sample is an independently decodable JPEG"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "mp4"
+      ],
+      "provenance": "fixturegen: native Go synthesis in internal/fixtures, spec mp4-short"
     },
     {
       "id": "webm-short",
@@ -328,7 +369,148 @@
         "a video track whose CodecID is V_VP8",
         "at least one SimpleBlock cluster"
       ],
-      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "webm"
+      ],
+      "provenance": "committed codec input internal/fixtures/codec/webm-short.webm (see codec_inputs), copied by fixturegen"
+    },
+    {
+      "id": "jpeg-portrait",
+      "path": "jpeg-portrait.jpg",
+      "format": "jpeg",
+      "tier": "native",
+      "adr009_item": 0,
+      "sha256": "3e72aebfc5b043fc9a85fb0ae940f451ea1353f8a5ec969c21b2fd9682adfd64",
+      "bytes": 1439,
+      "width": 48,
+      "height": 64,
+      "expected_decode": "ok",
+      "purpose": "A portrait image with NO orientation tag: the stored dimensions are the display dimensions.",
+      "asserts": [
+        "baseline JPEG, 48x64 (height \u003e width)",
+        "no APP1 Exif segment"
+      ],
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "portrait"
+      ],
+      "provenance": "fixturegen: buildPortraitJPEG (internal/fixtures/supplement.go), scene seed 21, quality 85"
+    },
+    {
+      "id": "jpeg-icc-display-p3",
+      "path": "jpeg-icc-display-p3.jpg",
+      "format": "jpeg",
+      "tier": "native",
+      "adr009_item": 0,
+      "sha256": "f9a76c5e335853b4524e3b10b4c1a6187e57dd6c9a0c9882fc0491528b24d602",
+      "bytes": 1949,
+      "width": 64,
+      "height": 48,
+      "expected_decode": "ok",
+      "purpose": "A wide-gamut ICC profile must be honoured or converted, never silently dropped.",
+      "asserts": [
+        "an APP2 ICC_PROFILE segment, sequence 1 of 1",
+        "the profile header size equals the embedded length, signature acsp, class mntr, space RGB, PCS XYZ",
+        "the rXYZ colorant X exceeds sRGB's 0.4361 (Display P3 primaries, D50-adapted)"
+      ],
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "icc-wide-gamut"
+      ],
+      "provenance": "fixturegen: buildICCJPEG + displayP3Profile (internal/fixtures/supplement.go), synthesised ICC v4 profile, scene seed 22"
+    },
+    {
+      "id": "webp-alpha-still",
+      "path": "webp-alpha-still.webp",
+      "format": "webp",
+      "tier": "native",
+      "adr009_item": 0,
+      "sha256": "ac38b83d5fb9169d4e105d335bd85f874d20119b9dc5d5d95d7159c7af5d57de",
+      "bytes": 34,
+      "width": 24,
+      "height": 16,
+      "expected_decode": "ok",
+      "purpose": "Still lossless WebP with alpha: a different decoder path from the animated one.",
+      "asserts": [
+        "RIFF/WEBP with a single VP8L chunk and no ANIM",
+        "VP8L alpha_is_used is set and the pixel alpha is 0x80"
+      ],
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "transparent-webp"
+      ],
+      "provenance": "fixturegen: buildAlphaWebP (internal/fixtures/supplement.go), VP8L solid NRGBA{0x20,0x90,0xE0,0x80}"
+    },
+    {
+      "id": "png-corrupt-crc",
+      "path": "png-corrupt-crc.png",
+      "format": "png",
+      "tier": "native",
+      "adr009_item": 0,
+      "sha256": "65a0075017c8420aed5ec8432263b936da6c6c28448b7887c9ed4b6de6707c48",
+      "bytes": 2187,
+      "width": 32,
+      "height": 32,
+      "expected_decode": "reject:corrupt",
+      "purpose": "A complete file whose integrity check fails must be rejected, distinct from a truncated one.",
+      "asserts": [
+        "all chunks present through IEND",
+        "the IDAT CRC does not match its data",
+        "png.Decode fails with a checksum error"
+      ],
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "corrupt"
+      ],
+      "provenance": "fixturegen: buildCorruptPNG (internal/fixtures/supplement.go), scene seed 23, IDAT CRC xor 0xFFFFFFFF"
+    },
+    {
+      "id": "jpeg-equirectangular-360",
+      "path": "jpeg-equirectangular-360.jpg",
+      "format": "jpeg",
+      "tier": "native",
+      "adr009_item": 0,
+      "sha256": "f5d4625c2190eaccc5ea636390f2e8e09a9511b480a7c74d79913a52d5f4ecd5",
+      "bytes": 2803,
+      "width": 128,
+      "height": 64,
+      "expected_decode": "ok",
+      "purpose": "A 360 panorama must be recognised from its GPano XMP, not guessed from the 2:1 ratio alone.",
+      "asserts": [
+        "2:1 aspect ratio",
+        "an APP1 XMP packet with GPano:ProjectionType equirectangular and full-pano dimensions equal to the image"
+      ],
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "equirectangular-360"
+      ],
+      "provenance": "fixturegen: buildEquirectJPEG (internal/fixtures/supplement.go), scene seed 24, XMP written by the generator"
+    },
+    {
+      "id": "mov-short",
+      "path": "mov-short.mov",
+      "format": "mov",
+      "tier": "native",
+      "adr009_item": 0,
+      "sha256": "fd2db256bd4be95590100c4a159eb07346c2fa0a6da8c65f7de67b0e6e0b264d",
+      "bytes": 44729,
+      "width": 160,
+      "height": 120,
+      "expected_decode": "ok",
+      "purpose": "QuickTime is sniffed by its ftyp brand; it must take the MOV path, not be mislabelled MP4.",
+      "asserts": [
+        "ftyp major brand is \"qt  \" with only qt compatible brands",
+        "the same ftyp/moov/mdat tree as mp4-short: one vide trak, 12 JPEG samples"
+      ],
+      "license": "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches.",
+      "categories": [
+        "mov"
+      ],
+      "provenance": "fixturegen: buildMOV (internal/fixtures/supplement.go) = buildMP4 with a same-length QuickTime ftyp"
     }
-  ]
+  ],
+  "open_categories": {
+    "animated-avif": "needs an AV1 sequence (avis) encoder; no pure-Go encoder exists and no codec-tier input has been recorded yet"
+  }
 }

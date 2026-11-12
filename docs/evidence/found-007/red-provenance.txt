@@ -1,0 +1,17 @@
+FAIL red-provenance exit 1 (2s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/red-provenance-20261112-141113-36771.log
+--- failure lines (first 40)
+1:--- FAIL: TestAFixtureWithoutProvenanceIsRejected (0.00s)
+2:    --- FAIL: TestAFixtureWithoutProvenanceIsRejected/provenance_deleted (0.00s)
+4:    --- FAIL: TestAFixtureWithoutProvenanceIsRejected/provenance_blank_on_an_ADR_fixture (0.00s)
+6:FAIL
+7:FAIL	github.com/yegamble/vizra-core/internal/fixtures	0.290s
+8:FAIL
+--- last 40 lines
+--- FAIL: TestAFixtureWithoutProvenanceIsRejected (0.00s)
+    --- FAIL: TestAFixtureWithoutProvenanceIsRejected/provenance_deleted (0.00s)
+        fixtures_test.go:710: mutation "provenance deleted" not rejected with "has no provenance"; got:
+    --- FAIL: TestAFixtureWithoutProvenanceIsRejected/provenance_blank_on_an_ADR_fixture (0.00s)
+        fixtures_test.go:710: mutation "provenance blank on an ADR fixture" not rejected with "has no provenance"; got:
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/fixtures	0.290s
+FAIL
