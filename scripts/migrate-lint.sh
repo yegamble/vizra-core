@@ -12,6 +12,9 @@
 #   5. the append-only checksum manifest (scripts/migration-manifest.sh)
 #
 # Exit 1 on any violation. Every message names the file and says what to do.
+#
+# INVARIANT (rule 4): main's per-line detection and exemption run unchanged; the statement parser (4b) only adds
+# failures. So this script rejects (what main 5f615d7 rejects) UNION (new hits), and accepts a subset of what main accepts.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -91,13 +94,31 @@ done
 # line before, which makes it a reviewed decision rather than an accident.
 destructive='DROP[[:space:]]+(TABLE|COLUMN|CONSTRAINT|INDEX|TYPE|SCHEMA|VIEW|SEQUENCE)|ALTER[[:space:]]+TABLE[[:space:]]+[^;]*RENAME|ALTER[[:space:]]+TABLE[[:space:]]+[^;]*ALTER[[:space:]]+COLUMN[[:space:]]+[^;]*TYPE|TRUNCATE'
 
-# The pattern above is matched per line, and its column rule needs the literal
-# COLUMN keyword. PostgreSQL needs neither: `ALTER TABLE sites DROP handle;` is
-# a column drop, and so is DROP on one line with COLUMN on the next. So column
-# drops are also found per STATEMENT.
+for f in "${ups[@]}"; do
+  base=$(basename "$f")
+  while IFS=: read -r lineno line; do
+    [ -z "${lineno:-}" ] && continue
+    # Ignore matches inside a comment.
+    case "$(printf '%s' "$line" | sed 's/^[[:space:]]*//')" in --*) continue;; esac
+    prevline=$(sed -n "$((lineno - 1))p" "$f" || true)
+    if printf '%s' "$prevline" | grep -qE '^\s*--\s*allow-destructive:\s*\S'; then
+      ok "$base:$lineno destructive statement with a stated reason"
+      continue
+    fi
+    err "$base:$lineno destructive statement in an up migration: ${line#"${line%%[![:space:]]*}"}"
+    printf '        If this is deliberate, put '\''-- allow-destructive: <reason>'\'' on the line before.\n' >&2
+  done < <(grep -nEi "$destructive" "$f" || true)
+done
+
+# --- 4b. column drops the per-line pattern cannot see -------------------------
+# The loop above is main's (5f615d7), unchanged: detection and exemption per
+# line. Its column rule needs the literal COLUMN keyword on the line of DROP.
+# PostgreSQL needs neither: `ALTER TABLE sites DROP handle;` is a column drop,
+# and so is DROP on one line with COLUMN on the next. So column drops are ALSO
+# found per STATEMENT, and this part can only ADD failures: it never
+# suppresses, skips or exempts a hit of the loop above.
 #
-# column_drops prints "<line of DROP> <line the statement starts on> <number of
-# statements with a token on the line of DROP>" for every
+# column_drops prints the line of the DROP token of every
 # `DROP [COLUMN] [IF EXISTS] name` action of an ALTER TABLE statement. It
 # tokenises the file: `--` and (nested) /* */ comments are dropped, 'strings',
 # "quoted identifiers" and $tag$ dollar-quoted bodies each become one opaque
@@ -110,7 +131,13 @@ destructive='DROP[[:space:]]+(TABLE|COLUMN|CONSTRAINT|INDEX|TYPE|SCHEMA|VIEW|SEQ
 # IDENTITY are not reserved, so `ALTER TABLE t DROP identity` drops a column.
 # Anything the rule does not recognise is reported, not passed.
 #
-# Limits, stated rather than hidden:
+# The exemption for an added hit is the same as everywhere else and nothing
+# more: the marker on the line immediately before the line holding the DROP
+# token. A marker before a multi-line statement does NOT cover a DROP further
+# down; put the marker directly above the DROP line.
+#
+# Limits, stated rather than hidden. Each one can only cost an ADDED detection;
+# none can turn a failure of the loop above into a pass:
 #   - the inside of a dollar-quoted body or a string is not parsed, so dynamic
 #     SQL (DO $$ ... $$, EXECUTE 'ALTER TABLE ...') is seen only by the line
 #     pattern above, which still needs `DROP COLUMN` on one line;
@@ -123,7 +150,6 @@ column_drops() {
   awk '
     function emit(t) {
       n++; tok[n] = t; tl[n] = NR
-      if (seen[NR] != sid + 1) { seen[NR] = sid + 1; stmts[NR]++ }
     }
     function flush(   i, d, altering, nx) {
       if (n >= 2 && tok[1] == "ALTER" && tok[2] == "TABLE") {
@@ -139,12 +165,12 @@ column_drops() {
             if (nx == "CONSTRAINT") continue
             if (altering && (nx == "DEFAULT" || nx == "EXPRESSION" || nx == "IDENTITY")) continue
             if (altering && nx == "NOT" && i + 2 <= n && tok[i + 2] == "NULL") continue
-            m++; hit[m] = tl[i] " " tl[1]; hitline[m] = tl[i]
+            print tl[i]
           }
         }
       }
       for (i = 1; i <= n; i++) { delete tok[i]; delete tl[i] }
-      n = 0; sid++
+      n = 0
     }
     {
       s = $0; L = length(s); p = 1
@@ -182,44 +208,26 @@ column_drops() {
         p++
       }
     }
-    END { flush(); for (i = 1; i <= m; i++) print hit[i], stmts[hitline[i]] }
+    END { flush() }
   ' "$1"
-}
-
-allowed() { # $1 file, $2 line number: is `-- allow-destructive: <reason>` on the line before?
-  [ "$2" -gt 1 ] && sed -n "$(($2 - 1))p" "$1" | grep -qE '^\s*--\s*allow-destructive:\s*\S'
 }
 
 for f in "${ups[@]}"; do
   base=$(basename "$f")
-  line_hits=$(grep -nEi "$destructive" "$f" | cut -d: -f1 || true)
-  stmt_hits=$(column_drops "$f")
   while read -r lineno; do
     [ -z "${lineno:-}" ] && continue
     line=$(sed -n "${lineno}p" "$f")
-    # Ignore matches inside a comment.
-    case "$(printf '%s' "$line" | sed 's/^[[:space:]]*//')" in --*) continue;; esac
-    # The reviewed exception sits on the line before the match, as it always
-    # has; for a column drop found per statement it may equally sit on the line
-    # before the statement, which is where an author of a multi-line ALTER
-    # TABLE writes it. That second form exempts ONLY that statement: it applies
-    # to a line that holds tokens of no other statement. `DROP handle; DROP
-    # TABLE users;` on one line is two statements, so the line is judged by the
-    # line before it alone, as it always was.
-    exempt=0
-    if allowed "$f" "$lineno"; then exempt=1; fi
-    while read -r dropline stmtline onthisline; do
-      if [ "${dropline:-}" = "$lineno" ] && [ "$onthisline" = 1 ] && allowed "$f" "$stmtline"; then exempt=1; fi
-    done <<EOF_HITS
-$stmt_hits
-EOF_HITS
-    if [ $exempt -eq 1 ]; then
-      ok "$base:$lineno destructive statement with a stated reason"
+    # A line the per-line pattern matches was judged by the loop above, by the
+    # same rule (marker on the line before); do not report it twice.
+    if printf '%s\n' "$line" | grep -qEi "$destructive"; then continue; fi
+    prevline=$(sed -n "$((lineno - 1))p" "$f" || true)
+    if printf '%s' "$prevline" | grep -qE '^\s*--\s*allow-destructive:\s*\S'; then
+      ok "$base:$lineno column drop with a stated reason"
       continue
     fi
-    err "$base:$lineno destructive statement in an up migration: ${line#"${line%%[![:space:]]*}"}"
-    printf '        If this is deliberate, put '\''-- allow-destructive: <reason>'\'' on the line before.\n' >&2
-  done < <(printf '%s\n%s\n' "$line_hits" "$(printf '%s\n' "$stmt_hits" | cut -d' ' -f1)" | sort -un)
+    err "$base:$lineno destructive statement in an up migration (column drop): ${line#"${line%%[![:space:]]*}"}"
+    printf '        If this is deliberate, put '\''-- allow-destructive: <reason>'\'' on the line directly before this line.\n' >&2
+  done < <(column_drops "$f" | sort -un)
 done
 
 # --- 5. append-only checksum manifest ----------------------------------------

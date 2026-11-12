@@ -162,6 +162,64 @@ func TestMigrateLintRejectsEverythingMainRejected(t *testing.T) {
 	}
 }
 
+// The property itself, not a list (PR#18 VERIFY round 2, R2-F1): run the frozen
+// copy of main's script (testdata/migratelint/main-baseline, origin/main
+// 5f615d7) and the current script over every fixture tree and every tree in
+// testdata/migratelint/differential. Wherever main's script exits non-zero the
+// current one must too. The corpus holds the verifier's counter-examples
+// (d16: a second, unmarked DROP TABLE exempted by another statement's marker).
+func TestMigrateLintNeverAcceptsWhatMainRejects(t *testing.T) {
+	root := repoRoot(t)
+	base := filepath.Join(root, "scripts", "testdata", "migratelint")
+	baseline := filepath.Join(base, "main-baseline", "migrate-lint.sh")
+	var trees []string
+	for _, parent := range []string{base, filepath.Join(base, "differential")} {
+		entries, err := os.ReadDir(parent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if !e.IsDir() || (parent == base && (e.Name() == "main-baseline" || e.Name() == "differential")) {
+				continue
+			}
+			trees = append(trees, filepath.Join(parent, e.Name()))
+		}
+	}
+	if len(trees) < 50 {
+		t.Fatalf("only %d trees found; the corpus is not being collected", len(trees))
+	}
+	exit := func(script, dir string) (string, int) {
+		cmd := exec.Command(script, "--dir", dir)
+		cmd.Dir = root
+		out, err := cmd.CombinedOutput()
+		if ee, ok := err.(*exec.ExitError); ok {
+			return string(out), ee.ExitCode()
+		} else if err != nil {
+			t.Fatalf("%s: %v", script, err)
+		}
+		return string(out), 0
+	}
+	mainRejects := 0
+	for _, dir := range trees {
+		rel, _ := filepath.Rel(base, dir)
+		t.Run(rel, func(t *testing.T) {
+			_, mainCode := exit(baseline, dir)
+			out, code := exit(filepath.Join(root, "scripts", "migrate-lint.sh"), dir)
+			if mainCode != 0 {
+				mainRejects++
+			}
+			if mainCode != 0 && code == 0 {
+				t.Fatalf("main's migrate-lint rejects this tree (exit %d) and the current one accepts it:\n%s", mainCode, out)
+			}
+		})
+	}
+	// The baseline must really be rejecting: if it failed to run at all, or
+	// accepted everything, the comparison above would prove nothing.
+	if mainRejects < 20 {
+		t.Fatalf("the baseline rejected only %d of %d trees; it is not judging them", mainRejects, len(trees))
+	}
+}
+
 // The real migrations must pass, or every fixture above is checking a script
 // the repository does not actually run.
 func TestMigrateLintPassesOnTheRealMigrations(t *testing.T) {
