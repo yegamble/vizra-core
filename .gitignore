@@ -19,3 +19,4 @@ env/*.env
 # The declared load corpus (VZ-OPS-007) is gigabytes of generated photographs
 # and belongs nowhere near git. Run `make load-corpus LOAD_CORPUS_OUT=...`.
 /testdata/load-corpus/
+/vizra

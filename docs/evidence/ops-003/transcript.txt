@@ -1,0 +1,62 @@
+$ ./vizra setup --non-interactive --set domain=photos.example.org --set release=v0.1.0 --env /tmp/ops003.3Ieq/production.env --deploy-dir /tmp/ops003.3Ieq/deploy
+/tmp/ops003.3Ieq/production.env: wrote 15 keys (secrets not shown)
+/tmp/ops003.3Ieq/deploy/Caddyfile.local: written
+[exit 0]
+
+COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+COMPOSE_PROFILES=core,frontend,edge
+$ ./vizra restart --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra --dry-run api
+would run (in /Users/yosefgamble/github/vizra): docker compose --env-file /tmp/ops003.3Ieq/production.env -f docker-compose.yml -f docker-compose.prod.yml --profile core --profile frontend --profile edge restart -- api
+[exit 0]
+
+$ ./vizra logs api --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra --dry-run --tail 50 --since 30m
+would run (in /Users/yosefgamble/github/vizra): docker compose --env-file /tmp/ops003.3Ieq/production.env -f docker-compose.yml -f docker-compose.prod.yml --profile core --profile frontend --profile edge logs --no-color --tail 50 --since 30m -- api
+[exit 0]
+
+$ ./vizra restart --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra --dry-run postgres-nope
+unknown service "postgres-nope": the rendered chain has api, caddy, frontend, migrate, postgres, redis, worker
+[exit 2]
+
+$ ./vizra restart --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra --dry-run migrate
+refusing to restart one-shot service "migrate" (restart policy "no"): it runs to completion; re-running it is a deliberate `vizra migrate`/`vizra update` step
+[exit 2]
+
+$ ./vizra logs api --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra --dry-run --tail 999999
+--tail must be 1..10000, got 999999
+[exit 2]
+
+$ ./vizra logs api --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra --dry-run --since 400h
+--since must be in (0, 168h0m0s], got 400h
+[exit 2]
+
+$ ./vizra status --env /tmp/ops003.3Ieq/production.env --project-dir /Users/yosefgamble/github/vizra
+vizra dev (unknown)
+FAIL     api        ghcr.io/yegamble/vizra-core:v0.1.0 no container
+FAIL     caddy      caddy:2.11.4-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e no container
+FAIL     frontend   ghcr.io/yegamble/vizra-user:v0.1.0 no container
+FAIL     migrate    ghcr.io/yegamble/vizra-core:v0.1.0 no container
+FAIL     postgres   postgres:18@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae no container
+FAIL     redis      valkey/valkey:9.1.2@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d no container
+FAIL     worker     ghcr.io/yegamble/vizra-core:v0.1.0 no container
+BLOCKED  jobs       queue depth not measured: configuration is invalid (1 problem(s)):
+  - DATABASE_URL: must be set
+[exit 1]
+
+$ ./vizra update
+current release: dev
+release check: BLOCKED — no release feed or signed release record exists yet; refusing to claim this host is up to date
+compose floor: Docker Compose >= 2.24.4 is required (Q-017: the chain uses `!override`); detected: 5.6.1
+upgrade path:
+  1. vizra doctor --env ENV            (must exit 0)
+  2. back up (vizra backup, when it ships) — never skip
+  3. pin the new release tag in every component checkout
+  4. vizra migrate                     (the schema floor: a binary older than the
+                                        database schema must not be rolled out)
+  5. docker compose via vizra only: vizra restart <svc> per service, or
+     re-run the installer; bare `docker compose` on a prod host is wrong.
+[exit 3]
+
+$ ./vizra restart --env /tmp/ops003.3Ieq/nochain.env --dry-run api
+/tmp/ops003.3Ieq/nochain.env has no COMPOSE_FILE; re-run `vizra setup` — refusing to guess a compose chain
+[exit 1]
+

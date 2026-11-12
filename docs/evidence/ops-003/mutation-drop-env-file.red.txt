@@ -1,0 +1,16 @@
+--- FAIL: TestArgvIsExactEnvDerivedChain (0.00s)
+    ops_test.go:42: argv
+         got ["docker" "compose" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "ps" "--format" "json"]
+        want ["docker" "compose" "--env-file" "env/production.env" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "ps" "--format" "json"]
+--- FAIL: TestLogsArgsBoundedAndValidated (0.00s)
+    ops_test.go:64: argv
+         got ["docker" "compose" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "logs" "--no-color" "--tail" "50" "--since" "30m" "--" "api"]
+        want ["docker" "compose" "--env-file" "env/production.env" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "logs" "--no-color" "--tail" "50" "--since" "30m" "--" "api"]
+--- FAIL: TestRestartRefusesUnknownAndOneShot (0.00s)
+    ops_test.go:91: argv
+         got ["docker" "compose" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "restart" "--" "web"]
+        want ["docker" "compose" "--env-file" "env/production.env" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "restart" "--" "web"]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/ops	0.277s
+FAIL
+exit 1

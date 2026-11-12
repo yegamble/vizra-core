@@ -1,0 +1,15 @@
+=== RUN   TestArgvIsExactEnvDerivedChain
+--- PASS: TestArgvIsExactEnvDerivedChain (0.00s)
+=== RUN   TestLoadChainRefusesBareCompose
+--- PASS: TestLoadChainRefusesBareCompose (0.00s)
+=== RUN   TestLogsArgsBoundedAndValidated
+--- PASS: TestLogsArgsBoundedAndValidated (0.00s)
+=== RUN   TestRestartRefusesUnknownAndOneShot
+--- PASS: TestRestartRefusesUnknownAndOneShot (0.00s)
+=== RUN   TestParsePSBothShapesAndHealth
+--- PASS: TestParsePSBothShapesAndHealth (0.00s)
+=== RUN   TestUpdateReportIsBlockedNotUpToDate
+--- PASS: TestUpdateReportIsBlockedNotUpToDate (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/ops	0.229s
+exit 0
