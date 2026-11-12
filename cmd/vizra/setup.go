@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/yegamble/vizra-core/internal/setup"
 )
@@ -111,21 +114,46 @@ func isTTY() bool {
 }
 
 // readNoEcho reads one line with terminal echo off via stty (no new module
-// dependency: golang.org/x/term is not in go.mod).
+// dependency: golang.org/x/term is not in go.mod). Echo is restored on return
+// and on SIGINT/SIGTERM.
 func readNoEcho() (string, error) {
-	off := exec.Command("stty", "-echo")
-	off.Stdin = os.Stdin
-	if err := off.Run(); err != nil {
+	stty := func(arg string) func() error {
+		return func() error {
+			c := exec.Command("stty", arg)
+			c.Stdin = os.Stdin
+			return c.Run()
+		}
+	}
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigs)
+	return withEchoOff(stty("-echo"), stty("echo"), sigs, os.Exit, func() (string, error) {
+		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil && line == "" {
+			return "", err
+		}
+		return strings.TrimRight(line, "\r\n"), nil
+	})
+}
+
+// withEchoOff runs read with echo disabled. restore runs exactly once: when
+// read returns, or when a signal arrives first (then exit(130) is called).
+func withEchoOff(disable, restore func() error, sigs <-chan os.Signal, exit func(int), read func() (string, error)) (string, error) {
+	if err := disable(); err != nil {
 		return "", fmt.Errorf("cannot disable terminal echo: %w", err)
 	}
-	defer func() {
-		on := exec.Command("stty", "echo")
-		on.Stdin = os.Stdin
-		_ = on.Run()
+	var once sync.Once
+	restoreOnce := func() { once.Do(func() { _ = restore() }) }
+	defer restoreOnce()
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		select {
+		case <-sigs:
+			restoreOnce()
+			exit(130)
+		case <-stop:
+		}
 	}()
-	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
-	if err != nil && line == "" {
-		return "", err
-	}
-	return strings.TrimRight(line, "\r\n"), nil
+	return read()
 }
