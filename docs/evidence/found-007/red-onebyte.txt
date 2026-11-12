@@ -1,0 +1,15 @@
+FAIL red-onebyte exit 2 (1s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/red-onebyte-20261112-141116-36935.log
+--- failure lines (first 40)
+5:      mov-short.mov in testdata/fixtures has sha256 0502588158218a3c12d3cfb3cccb7ec956657f351eb75fb73e517785be4a0ca5, the manifest records fd2db256bd4be95590100c4a159eb07346c2fa0a6da8c65f7de67b0e6e0b264d — the corpus on disk is not the corpus the manifest describes
+--- last 40 lines
+==> fixtures-verify
+fixtures-verify: FAILED with 2 problem(s)
+
+  fixture-on-disk
+      mov-short.mov in testdata/fixtures has sha256 0502588158218a3c12d3cfb3cccb7ec956657f351eb75fb73e517785be4a0ca5, the manifest records fd2db256bd4be95590100c4a159eb07346c2fa0a6da8c65f7de67b0e6e0b264d — the corpus on disk is not the corpus the manifest describes
+  not-compared
+      the fixture bytes were NOT regenerated and compared, because something cheaper already disagrees with the manifest. Fix the problems above and run again; a byte comparison made under a different pin, a different generator source or beside a stale corpus is not evidence about anything.
+
+fixturegen: the corpus does not match the committed manifest
+exit status 1
+make: *** [fixtures-verify] Error 1

@@ -92,7 +92,7 @@ jobs:
           # a photograph would put someone else's copyright in the repository.
           if grep -rnE 'http://|https://' --include='*.go' internal/fixtures cmd/fixturegen cmd/loadcorpusgen \
              | grep -v '_test.go' \
-             | grep -vE 'www\.w3\.org|169\.254\.169\.254' ; then
+             | grep -vE 'www\.w3\.org|169\.254\.169\.254|ns\.adobe\.com/xap/1\.0/|ns\.google\.com/photos/1\.0/panorama/' ; then
             echo "::error::the fixture generator references a URL. Fixtures are synthesised, never fetched."
             exit 1
           fi

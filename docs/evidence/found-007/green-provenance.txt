@@ -1,0 +1,4 @@
+PASS green-provenance (1s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/green-provenance-20261112-141115-36889.log
+--- PASS: TestEveryLedgerCategoryIsCoveredOrOpen (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/fixtures	0.243s
