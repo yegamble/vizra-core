@@ -70,6 +70,9 @@ var Registry = []Key{
 	{Name: "VIZRA_JOB_TIMEOUT", Default: "5m", Doc: "Per-job wall-clock timeout, applied as a context deadline."},
 	{Name: "VIZRA_SHUTDOWN_GRACE", Default: "20s", Doc: "Time allowed for in-flight requests after SIGTERM."},
 	{Name: "VIZRA_OWNER_CLAIM_ANNOUNCE", Default: "off", Doc: "Where an unclaimed instance announces its owner-claim token: 'off' (default) prints only the command that mints one; 'stderr' WRITES A LIVE CREDENTIAL to the container log, which every log driver captures, ships and retains. Use 'stderr' only on a single host with no log aggregation."},
+	// OpenTelemetry's own spelling, so standard collectors and docs apply.
+	{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Doc: "OTLP/HTTP base URL traces are exported to (for example http://otel-collector:4318). Empty (default) disables tracing export: no exporter, no batch goroutine."},
+	{Name: "OTEL_SERVICE_NAME", Default: "vizra-core", Doc: "service.name resource attribute on exported spans."},
 	{Name: "VIZRA_OWNER_CLAIM_TTL", Default: "1h", Doc: "How long an owner-claim token stays redeemable. It is minted on demand by `vizra claim-token`, so this only has to cover one claim attempt."},
 }
 

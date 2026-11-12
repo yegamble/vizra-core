@@ -53,7 +53,7 @@ func (r *otlpReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func tracingConfig(t *testing.T, endpoint string) *config.Config {
 	t.Helper()
-	env := map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": endpoint, "OTEL_SERVICE_NAME": "vizra-api-test"}
+	env := map[string]string{"DATABASE_URL": "postgres://u@localhost/db", "OTEL_EXPORTER_OTLP_ENDPOINT": endpoint, "OTEL_SERVICE_NAME": "vizra-api-test"}
 	cfg, err := config.LoadFrom(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
 	if err != nil {
 		t.Fatalf("config: %v", err)
@@ -91,6 +91,7 @@ func TestTracesExportedWhenEnabled(t *testing.T) {
 		req.Header.Set("User-Agent", "secret-agent/1.0")
 		req.Header.Set("Authorization", "Bearer secretbearertoken")
 		req.RemoteAddr = "203.0.113.7:4444"
+		req.Host = "localhost:8080" // the configured site; any other host is refused before routing
 		h.ServeHTTP(httptest.NewRecorder(), req)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

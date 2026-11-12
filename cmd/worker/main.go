@@ -49,6 +49,17 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	shutdownTracing, err := obs.SetupTracing(ctx, cfg.OTLPEndpoint, cfg.OTelServiceName)
+	if err != nil {
+		return fmt.Errorf("vizra-worker: tracing: %w", err)
+	}
+	defer func() {
+		// Bounded flush on the SIGTERM path.
+		tctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTracing(tctx)
+	}()
+
 	resolver := site.NewResolver(cfg)
 	pools, err := db.Open(ctx, resolver)
 	if err != nil {

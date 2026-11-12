@@ -221,7 +221,14 @@ func (s *Server) Handler() http.Handler {
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 			// A placeholder until the route middleware refines it; see
 			// routeAttributeMiddleware.
-			return r.Method + " " + r.URL.Path
+			// Never the raw path: it carries per-asset IDs and is unbounded.
+			// otelhttp calls this again after serving when r.Pattern is set
+			// (Echo sets it to the matched route template), so it must name the
+			// template there too, or it would undo routeAttributeMiddleware.
+			if r.Pattern != "" {
+				return r.Method + " " + r.Pattern
+			}
+			return "HTTP " + r.Method
 		}),
 	)
 }

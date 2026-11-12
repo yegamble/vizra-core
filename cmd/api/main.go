@@ -79,6 +79,14 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Tracing is installed globally BEFORE srv.Handler() builds the otelhttp
+	// wrapper, so the wrapper picks up the SDK provider. No-op when
+	// OTEL_EXPORTER_OTLP_ENDPOINT is empty.
+	shutdownTracing, err := obs.SetupTracing(ctx, cfg.OTLPEndpoint, cfg.OTelServiceName)
+	if err != nil {
+		return fmt.Errorf("vizra-api: tracing: %w", err)
+	}
+
 	resolver := site.NewResolver(cfg)
 
 	pools, err := db.Open(ctx, resolver)
@@ -179,6 +187,8 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownGrace)
 	defer cancel()
 	_ = metricsSrv.Shutdown(shutdownCtx)
+	// Flush buffered spans inside the same bounded grace; then the API server.
+	defer func() { _ = shutdownTracing(shutdownCtx) }()
 	if err := apiSrv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("vizra-api: shutdown did not finish within the grace period: %w", err)
 	}

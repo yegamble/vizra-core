@@ -45,7 +45,10 @@ type Config struct {
 	PublicOrigin string
 	ListenAddr   string
 	MetricsAddr  string
-	SiteHandle   string
+	// OTLPEndpoint enables trace export when non-empty; OTelServiceName names it.
+	OTLPEndpoint    string
+	OTelServiceName string
+	SiteHandle      string
 
 	DatabaseURL    string
 	CacheURL       string
@@ -222,21 +225,23 @@ func LoadFrom(lookup Lookup) (*Config, error) {
 	bad := func(k, msg string) { probs = append(probs, Problem{Key: k, Message: msg}) }
 
 	c := &Config{
-		Mode:           Mode(strings.ToLower(get("VIZRA_MODE"))),
-		PublicOrigin:   strings.TrimRight(get("VIZRA_PUBLIC_ORIGIN"), "/"),
-		ListenAddr:     get("VIZRA_LISTEN_ADDR"),
-		MetricsAddr:    get("VIZRA_METRICS_ADDR"),
-		SiteHandle:     get("VIZRA_SITE_HANDLE"),
-		DatabaseURL:    get("DATABASE_URL"),
-		CacheURL:       get("VIZRA_CACHE_URL"),
-		CacheNamespace: get("VIZRA_CACHE_NAMESPACE"),
-		StoragePrefix:  get("VIZRA_STORAGE_PREFIX"),
-		StorageRoot:    get("VIZRA_STORAGE_ROOT"),
-		SessionSecret:  get("VIZRA_SESSION_SECRET"),
-		MFAKeyKEK:      get("VIZRA_MFA_KEY_KEK"),
-		SearchMode:     SearchMode(strings.ToLower(get("VIZRA_SEARCH_MODE"))),
-		SearchURL:      strings.TrimRight(get("VIZRA_SEARCH_URL"), "/"),
-		SearchHMACKey:  get("SEARCH_HMAC_KEY"),
+		Mode:            Mode(strings.ToLower(get("VIZRA_MODE"))),
+		PublicOrigin:    strings.TrimRight(get("VIZRA_PUBLIC_ORIGIN"), "/"),
+		ListenAddr:      get("VIZRA_LISTEN_ADDR"),
+		MetricsAddr:     get("VIZRA_METRICS_ADDR"),
+		OTLPEndpoint:    get("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		OTelServiceName: get("OTEL_SERVICE_NAME"),
+		SiteHandle:      get("VIZRA_SITE_HANDLE"),
+		DatabaseURL:     get("DATABASE_URL"),
+		CacheURL:        get("VIZRA_CACHE_URL"),
+		CacheNamespace:  get("VIZRA_CACHE_NAMESPACE"),
+		StoragePrefix:   get("VIZRA_STORAGE_PREFIX"),
+		StorageRoot:     get("VIZRA_STORAGE_ROOT"),
+		SessionSecret:   get("VIZRA_SESSION_SECRET"),
+		MFAKeyKEK:       get("VIZRA_MFA_KEY_KEK"),
+		SearchMode:      SearchMode(strings.ToLower(get("VIZRA_SEARCH_MODE"))),
+		SearchURL:       strings.TrimRight(get("VIZRA_SEARCH_URL"), "/"),
+		SearchHMACKey:   get("SEARCH_HMAC_KEY"),
 	}
 
 	switch c.Mode {
