@@ -74,8 +74,9 @@ func (s *Server) handleHealthz(c *echo.Context) error {
 // ---------------------------------------------------------------------------
 // /readyz — drain-aware, with a 2 s single-flight cache (ADR-002 § Probes).
 //
-// Two conditions yield 503 (besides draining): PostgreSQL unreachable, and the
-// storage root missing, not a directory or not writable (VZ-FOUND-005).
+// Three conditions yield 503 (besides draining): PostgreSQL unreachable, the
+// storage root missing, not a directory or not writable, and the migration
+// ledger not current for this binary (VZ-FOUND-005).
 // Everything else — cache down, search misconfigured or unreachable, queue age
 // above the Q-028 threshold — yields 200 `degraded` with the component named,
 // so a degraded instance keeps serving reads instead of being removed from
@@ -174,6 +175,20 @@ func (s *Server) computeReadiness(ctx context.Context) readinessResponse {
 		demote(statusUnavailable)
 	}
 	resp.Components = append(resp.Components, stc)
+
+	// schema — 503 unless the applied migration version equals the binary's
+	// embedded latest (VZ-FOUND-005: readiness fails closed when the schema is
+	// behind). Behind, dirty and an unreadable ledger are all "this binary's
+	// queries may hit columns that do not exist"; ahead is the rollback-floor
+	// case ADR-002 refuses at deploy time, and is equally not ready. /schemaz
+	// stays 200 and carries the versions; this component carries the state.
+	sch := readinessComponent{Name: "schema", Status: statusOK}
+	if st := s.deps.SchemaState(ctx); st.State != migrate.StateCurrent {
+		sch.Status = statusUnavailable
+		sch.Detail = schemaReadinessDetail(st.State)
+		demote(statusUnavailable)
+	}
+	resp.Components = append(resp.Components, sch)
 
 	// owner claim — degraded, never fatal. An unclaimed instance whose boot
 	// bootstrap failed cannot be claimed until the operator acts, and silence
@@ -299,3 +314,18 @@ func (s *Server) handleSchemaz(c *echo.Context) error {
 // modeString keeps config imported where it is used, and documents that the
 // probe body never reveals the mode's secrets.
 var _ = config.ModeProduction
+
+// schemaReadinessDetail is a fixed sentence per state; it never carries a DSN
+// or a driver error.
+func schemaReadinessDetail(st migrate.State) string {
+	switch st {
+	case migrate.StateBehind:
+		return "the database schema is behind this binary; run `vizra migrate`"
+	case migrate.StateDirty:
+		return "a previous migration failed part-way; resolve it deliberately"
+	case migrate.StateAhead:
+		return "the database schema is newer than this binary"
+	default:
+		return "the migration ledger could not be read"
+	}
+}

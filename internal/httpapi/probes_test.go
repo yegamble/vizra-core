@@ -13,6 +13,7 @@ import (
 
 	"github.com/yegamble/vizra-core/internal/config"
 	"github.com/yegamble/vizra-core/internal/jobs"
+	"github.com/yegamble/vizra-core/internal/migrate"
 	"github.com/yegamble/vizra-core/internal/site"
 )
 
@@ -35,6 +36,12 @@ func newProbeServer(t *testing.T, mutate func(*Deps)) *Server {
 		EmbeddedSchemaVersion: 4,
 		PingDatabase:          func(context.Context) error { return nil },
 		PingCache:             func(context.Context) error { return nil },
+		// A current ledger by default; the schema tests below drive the other
+		// states through this seam, and the integration suite drives the real
+		// migrate.Probe against PostgreSQL.
+		SchemaState: func(context.Context) migrate.Status {
+			return migrate.Status{AppliedVersion: 4, EmbeddedVersion: 4, State: migrate.StateCurrent}
+		},
 		// These tests exercise routing and probe behaviour on a CLAIMED
 		// instance. The unclaimed guard is structural and would otherwise refuse
 		// every non-allowlisted route, including the 404 path, which is its
@@ -449,5 +456,52 @@ func TestMetricsAreNotOnThePublicServer(t *testing.T) {
 		if code != http.StatusNotFound {
 			t.Errorf("%s returned %d on the public listener; metrics bind their own address", p, code)
 		}
+	}
+}
+
+// VZ-FOUND-005: readiness fails closed when the schema is not current, with
+// the component named. Every non-current state is 503; current is 200.
+func TestReadyzSchemaNotCurrentIs503WithComponentNamed(t *testing.T) {
+	cases := []struct {
+		state migrate.State
+		want  int
+	}{
+		{migrate.StateCurrent, http.StatusOK},
+		{migrate.StateBehind, http.StatusServiceUnavailable},
+		{migrate.StateDirty, http.StatusServiceUnavailable},
+		{migrate.StateAhead, http.StatusServiceUnavailable},
+		{migrate.StateUnknown, http.StatusServiceUnavailable},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.state), func(t *testing.T) {
+			s := newProbeServer(t, func(d *Deps) {
+				d.SchemaState = func(context.Context) migrate.Status {
+					return migrate.Status{AppliedVersion: 3, EmbeddedVersion: 4, State: tc.state}
+				}
+			})
+			code, body := get(t, s, "/readyz")
+			if code != tc.want {
+				t.Fatalf("/readyz = %d, want %d: %+v", code, tc.want, body)
+			}
+			want := "ok"
+			if tc.want != http.StatusOK {
+				want = "unavailable"
+			}
+			if got := componentStatus(t, body, "schema"); got != want {
+				t.Fatalf("schema component = %q, want %q", got, want)
+			}
+			if body["status"] != want {
+				t.Fatalf("status = %v, want %q", body["status"], want)
+			}
+		})
+	}
+}
+
+// With no pool the real default seam must fail closed, never report current.
+func TestReadyzSchemaDefaultWithoutPoolFailsClosed(t *testing.T) {
+	s := newProbeServer(t, func(d *Deps) { d.SchemaState = nil })
+	code, body := get(t, s, "/readyz")
+	if code != http.StatusServiceUnavailable || componentStatus(t, body, "schema") != "unavailable" {
+		t.Fatalf("/readyz = %d %+v, want 503 with schema unavailable", code, body)
 	}
 }

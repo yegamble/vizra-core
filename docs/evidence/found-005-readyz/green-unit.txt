@@ -1,0 +1,17 @@
+=== RUN   TestReadyzSchemaNotCurrentIs503WithComponentNamed
+=== RUN   TestReadyzSchemaNotCurrentIs503WithComponentNamed/current
+=== RUN   TestReadyzSchemaNotCurrentIs503WithComponentNamed/behind
+=== RUN   TestReadyzSchemaNotCurrentIs503WithComponentNamed/dirty
+=== RUN   TestReadyzSchemaNotCurrentIs503WithComponentNamed/ahead
+=== RUN   TestReadyzSchemaNotCurrentIs503WithComponentNamed/unknown
+--- PASS: TestReadyzSchemaNotCurrentIs503WithComponentNamed (0.00s)
+    --- PASS: TestReadyzSchemaNotCurrentIs503WithComponentNamed/current (0.00s)
+    --- PASS: TestReadyzSchemaNotCurrentIs503WithComponentNamed/behind (0.00s)
+    --- PASS: TestReadyzSchemaNotCurrentIs503WithComponentNamed/dirty (0.00s)
+    --- PASS: TestReadyzSchemaNotCurrentIs503WithComponentNamed/ahead (0.00s)
+    --- PASS: TestReadyzSchemaNotCurrentIs503WithComponentNamed/unknown (0.00s)
+=== RUN   TestReadyzSchemaDefaultWithoutPoolFailsClosed
+--- PASS: TestReadyzSchemaDefaultWithoutPoolFailsClosed (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/httpapi	0.406s
+green exit=0

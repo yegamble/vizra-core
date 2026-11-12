@@ -1,0 +1,13 @@
+=== RUN   TestReadyzGoesNon200WhenPostgresStopsAndRecoversWithoutRestart
+    readyz_test.go:210: PostgreSQL stopped: /readyz 503 unavailable after 2.016s
+    readyz_test.go:220: PostgreSQL returned: /readyz 200 ok after 2.05s
+    readyz_test.go:210: PostgreSQL stopped: /readyz 503 unavailable after 2.019s
+    readyz_test.go:220: PostgreSQL returned: /readyz 200 ok after 2.048s
+--- PASS: TestReadyzGoesNon200WhenPostgresStopsAndRecoversWithoutRestart (23.84s)
+=== RUN   TestReadyzFailsClosedWhenTheSchemaIsBehind
+    readyz_test.go:252: schema behind: /readyz 503 unavailable after 2.018s
+    readyz_test.go:282: schema current again: /readyz 200 ok after 2.022s
+--- PASS: TestReadyzFailsClosedWhenTheSchemaIsBehind (4.49s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/integration	28.903s
+exit=0

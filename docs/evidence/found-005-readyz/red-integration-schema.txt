@@ -1,0 +1,21 @@
+=== RUN   TestReadyzFailsClosedWhenTheSchemaIsBehind
+    readyz_test.go:252: schema behind: not reached within the declared 10s (last 200 {Status:ok Components:[{Name:database Status:ok Detail:} {Name:storage Status:ok Detail:} {Name:schema Status:ok Detail:} {Name:cache Status:ok Detail:} {Name:search Status:off Detail:} {Name:worker Status:ok Detail:}]}, err <nil>)
+        api log:
+        time=2026-11-12T12:03:47.769-05:00 level=INFO msg="vizra-api starting" release=dev commit=unknown go=go1.27.4 mode=development
+        
+        vizra: this instance is unclaimed. Get a claim token with:
+            docker compose exec api vizra claim-token
+        
+        time=2026-11-12T12:03:47.792-05:00 level=INFO msg="vizra-api listening" addr=127.0.0.1:58578 metrics_addr=127.0.0.1:58579
+    healthcheck_test.go:276: vizra-api log:
+        time=2026-11-12T12:03:47.769-05:00 level=INFO msg="vizra-api starting" release=dev commit=unknown go=go1.27.4 mode=development
+        
+        vizra: this instance is unclaimed. Get a claim token with:
+            docker compose exec api vizra claim-token
+        
+        time=2026-11-12T12:03:47.792-05:00 level=INFO msg="vizra-api listening" addr=127.0.0.1:58578 metrics_addr=127.0.0.1:58579
+--- FAIL: TestReadyzFailsClosedWhenTheSchemaIsBehind (24.14s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	24.784s
+FAIL
+exit=1

@@ -1,0 +1,10 @@
+Lane: make test-integration equivalent (exact Makefile recipe, plus -json for counting)
+Command: VIZRA_TEST_DATABASE_URL=postgres://vizra@127.0.0.1:55532/vizra_test?sslmode=disable \
+  VIZRA_TEST_CACHE_URL=redis://127.0.0.1:56479/0 \
+  quiet.sh test-integration go test -race -count=1 -timeout 8m -tags=integration -json ./...
+Source SHA: 5582ba2125f47e55826e66d5c852c32051fd710e
+Env: darwin arm64, postgres:18-alpine (vz-f005-pg), redis:8-alpine (vz-f005-redis)
+Result: PASS exit 0 (218s)
+Tests: 1911 pass, 0 fail, 0 skip
+Packages: 20 pass, 8 "no test files", 0 fail
+Log (local, not committed, 2.3M): $TMPDIR/vizra-gate-logs/test-integration-20261112-122436-98358.log

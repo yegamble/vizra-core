@@ -26,6 +26,7 @@ import (
 	"github.com/yegamble/vizra-core/internal/credential"
 	"github.com/yegamble/vizra-core/internal/db"
 	"github.com/yegamble/vizra-core/internal/jobs"
+	"github.com/yegamble/vizra-core/internal/migrate"
 	"github.com/yegamble/vizra-core/internal/search"
 	"github.com/yegamble/vizra-core/internal/site"
 )
@@ -71,6 +72,11 @@ type Deps struct {
 	// the real filesystem check against Config.StorageRoot; with no root
 	// configured it fails closed.
 	CheckStorage func(ctx context.Context) error
+
+	// SchemaState is the same kind of seam for the migration ledger. New
+	// installs migrate.Probe against the default pool and EmbeddedSchemaVersion;
+	// with no pool it reports "unknown", which readiness treats as not ready.
+	SchemaState func(ctx context.Context) migrate.Status
 
 	// InstanceClaimed reports whether this instance has an owner yet. It is the
 	// same kind of seam as PingDatabase: New installs the real lookup, and a
@@ -146,6 +152,16 @@ func New(deps Deps) *Server {
 		}
 		probe := &storageProbe{check: func() error { return checkStorageRoot(root) }}
 		deps.CheckStorage = probe.Check
+	}
+
+	if deps.SchemaState == nil {
+		pools, embedded := deps.Pools, deps.EmbeddedSchemaVersion
+		deps.SchemaState = func(ctx context.Context) migrate.Status {
+			if pools == nil {
+				return migrate.Status{EmbeddedVersion: embedded, State: migrate.StateUnknown, Detail: "no database pool"}
+			}
+			return migrate.Probe(ctx, pools.Default(), embedded)
+		}
 	}
 
 	e := echo.New()

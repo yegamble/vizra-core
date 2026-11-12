@@ -1,0 +1,13 @@
+--- FAIL: TestReadyzSchemaNotCurrentIs503WithComponentNamed (0.01s)
+    --- FAIL: TestReadyzSchemaNotCurrentIs503WithComponentNamed/behind (0.00s)
+        probes_test.go:484: /readyz = 200, want 503: map[checked_at:2026-11-12T17:00:53.170547Z components:[map[name:database status:ok] map[name:storage status:ok] map[name:schema status:ok] map[name:cache status:ok] map[name:search status:off]] status:ok]
+    --- FAIL: TestReadyzSchemaNotCurrentIs503WithComponentNamed/ahead (0.00s)
+        probes_test.go:484: /readyz = 200, want 503: map[checked_at:2026-11-12T17:00:53.173141Z components:[map[name:database status:ok] map[name:storage status:ok] map[name:schema status:ok] map[name:cache status:ok] map[name:search status:off]] status:ok]
+    --- FAIL: TestReadyzSchemaNotCurrentIs503WithComponentNamed/unknown (0.00s)
+        probes_test.go:484: /readyz = 200, want 503: map[checked_at:2026-11-12T17:00:53.173804Z components:[map[name:database status:ok] map[name:storage status:ok] map[name:schema status:ok] map[name:cache status:ok] map[name:search status:off]] status:ok]
+--- FAIL: TestReadyzSchemaDefaultWithoutPoolFailsClosed (0.00s)
+    probes_test.go:505: /readyz = 200 map[checked_at:2026-11-12T17:00:53.174581Z components:[map[name:database status:ok] map[name:storage status:ok] map[name:schema status:ok] map[name:cache status:ok] map[name:search status:off]] status:ok], want 503 with schema unavailable
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/httpapi	0.468s
+FAIL
+red exit=1
