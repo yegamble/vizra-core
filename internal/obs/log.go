@@ -35,6 +35,9 @@ var secretKeys = map[string]bool{
 	"api_key": true, "apikey": true, "session": true, "session_id": true,
 	"dsn": true, "database_url": true, "cache_url": true, "hmac_key": true,
 	"kek": true, "mfa_key_kek": true, "signature": true, "private_key": true,
+	"claim_token": true, "x-amz-signature": true, "x-goog-signature": true,
+	"x-amz-credential": true, "x-amz-security-token": true, "signed_url": true,
+	"presigned_url": true, "access_token": true, "refresh_token": true,
 }
 
 // redaction is one pattern and what replaces its match.

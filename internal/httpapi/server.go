@@ -13,6 +13,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"log/slog"
 	"net/http"
 	"time"
@@ -39,6 +40,10 @@ type Deps struct {
 	Limiter  cache.Limiter
 	Search   *search.Service
 	Logger   *slog.Logger
+
+	// Metrics receives the HTTP request families (VZ-OPS-005). Nil disables
+	// them; the api binary always passes the registry its metrics listener serves.
+	Metrics prometheus.Registerer
 
 	// EmbeddedSchemaVersion is the highest migration compiled into this binary.
 	EmbeddedSchemaVersion int64
@@ -158,6 +163,9 @@ func New(deps Deps) *Server {
 	e.Use(securityHeadersMiddleware())
 	e.Use(siteMiddleware(deps.Resolver, deps.Logger))
 	e.Use(routeAttributeMiddleware())
+	if deps.Metrics != nil {
+		e.Use(httpMetricsMiddleware(deps.Metrics))
+	}
 	// The unclaimed guard is STRUCTURAL, not a decorator a future author must
 	// remember to attach: while the instance has no owner, only an explicit
 	// allowlist is reachable and everything else — including the router's 404
@@ -213,7 +221,14 @@ func (s *Server) Handler() http.Handler {
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 			// A placeholder until the route middleware refines it; see
 			// routeAttributeMiddleware.
-			return r.Method + " " + r.URL.Path
+			// Never the raw path: it carries per-asset IDs and is unbounded.
+			// otelhttp calls this again after serving when r.Pattern is set
+			// (Echo sets it to the matched route template), so it must name the
+			// template there too, or it would undo routeAttributeMiddleware.
+			if r.Pattern != "" {
+				return r.Method + " " + r.Pattern
+			}
+			return "HTTP " + r.Method
 		}),
 	)
 }

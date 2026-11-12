@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/yegamble/vizra-core/internal/buildinfo"
 	"github.com/yegamble/vizra-core/internal/cache"
@@ -80,6 +79,14 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Tracing is installed globally BEFORE srv.Handler() builds the otelhttp
+	// wrapper, so the wrapper picks up the SDK provider. No-op when
+	// OTEL_EXPORTER_OTLP_ENDPOINT is empty.
+	shutdownTracing, err := obs.SetupTracing(ctx, cfg.OTLPEndpoint, cfg.OTelServiceName)
+	if err != nil {
+		return fmt.Errorf("vizra-api: tracing: %w", err)
+	}
+
 	resolver := site.NewResolver(cfg)
 
 	pools, err := db.Open(ctx, resolver)
@@ -133,6 +140,7 @@ func run() error {
 		Limiter:               limiter,
 		Search:                searchSvc,
 		Logger:                log,
+		Metrics:               registry,
 		EmbeddedSchemaVersion: embedded,
 		QueueSnapshot: func(ctx context.Context) (jobs.Snapshot, error) {
 			return jobs.Collect(ctx, pools.Default(), jobMetrics)
@@ -145,7 +153,7 @@ func run() error {
 	// would otherwise have to carry /metrics, which no client should see.
 	metricsSrv := &http.Server{
 		Addr:              cfg.MetricsAddr,
-		Handler:           promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}),
+		Handler:           obs.MetricsHandler(registry),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {
@@ -179,6 +187,8 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownGrace)
 	defer cancel()
 	_ = metricsSrv.Shutdown(shutdownCtx)
+	// Flush buffered spans inside the same bounded grace; then the API server.
+	defer func() { _ = shutdownTracing(shutdownCtx) }()
 	if err := apiSrv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("vizra-api: shutdown did not finish within the grace period: %w", err)
 	}
