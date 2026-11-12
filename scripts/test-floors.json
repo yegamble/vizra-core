@@ -97,20 +97,22 @@
     "",
     "VZ-INSTALL-002 (core PR #22, 2026-11-12) adds internal/setup (`vizra setup` engine). Measured at e2dbc6b, darwin/arm64,",
     "`go test -count=1 -json ./internal/setup ./cmd/vizra`: internal/setup 16 executed, cmd/vizra 14, 0 skipped.",
-    "The generator gives internal/setup 14 (new) and cmd/vizra 10 -> 12, in both suites; applied. Nothing was lowered."
+    "The generator gives internal/setup 14 (new) and cmd/vizra 10 -> 12, in both suites; applied. Nothing was lowered.",
+    "VZ-OPS-002 (core PR #27, 2026-11-12) adds doctor host checks. Measured `go test -count=1 -json ./internal/doctor ./cmd/vizra`:",
+    "internal/doctor 56 executed (subtests counted), cmd/vizra 21, 0 skipped. Generator: doctor 33 -> 48, cmd/vizra 12 -> 18, both suites; applied."
   ],
   "suites": {
     "unit": {
       "min_tests": 1070,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
-        "github.com/yegamble/vizra-core/cmd/vizra": 12,
+        "github.com/yegamble/vizra-core/cmd/vizra": 18,
         "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 7,
         "github.com/yegamble/vizra-core/internal/config": 86,
         "github.com/yegamble/vizra-core/internal/credential": 4,
-        "github.com/yegamble/vizra-core/internal/doctor": 33,
+        "github.com/yegamble/vizra-core/internal/doctor": 48,
         "github.com/yegamble/vizra-core/internal/fixtures": 37,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
         "github.com/yegamble/vizra-core/internal/httpapi": 85,
@@ -129,13 +131,13 @@
       "min_tests": 1214,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
-        "github.com/yegamble/vizra-core/cmd/vizra": 12,
+        "github.com/yegamble/vizra-core/cmd/vizra": 18,
         "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 7,
         "github.com/yegamble/vizra-core/internal/config": 86,
         "github.com/yegamble/vizra-core/internal/credential": 4,
-        "github.com/yegamble/vizra-core/internal/doctor": 33,
+        "github.com/yegamble/vizra-core/internal/doctor": 48,
         "github.com/yegamble/vizra-core/internal/fixtures": 37,
         "github.com/yegamble/vizra-core/internal/healthcheck": 10,
         "github.com/yegamble/vizra-core/internal/httpapi": 85,

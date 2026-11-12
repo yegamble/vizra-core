@@ -1,0 +1,6 @@
+--- FAIL: TestCheckDockerEngine (0.00s)
+    --- FAIL: TestCheckDockerEngine/daemon_unreachable (0.00s)
+        host_test.go:31: status = OK (x), want FAIL
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.440s
+FAIL

@@ -27,16 +27,29 @@ import (
 // that removing a call site cannot also remove the expectation.
 var everyCheckDoctorMustReport = []string{
 	"configuration",
+	"env file",
+	"docker engine",
 	"docker compose",
+	"rendered topology",
+	"dns/tls",
+	"closed ports",
+	"backup freshness",
 	"database",
 	"database version",
 	"schema",
 	"owner claim",
-	"public origin",
 	"cache",
 	"cache version floor",
+	"public origin",
 	"search",
+	"storage root",
+	"disk free",
+	"api readiness",
 }
+
+// notYetCheckable are the ledger checks whose subject does not exist yet. They
+// are BLOCKED on every instance, so a healthy instance exits ExitBlocked today.
+var notYetCheckable = map[string]bool{"dns/tls": true, "closed ports": true, "backup freshness": true}
 
 type fakePool struct{ pingErr error }
 
@@ -93,6 +106,14 @@ func healthyProbes(t *testing.T) probes {
 		ownerClaim: func(context.Context, pooler) doctor.OwnerClaimState {
 			return doctor.OwnerClaimState{Claimed: true}
 		},
+		envFile:      func() doctor.Result { return doctor.CheckEnvFile("prod.env", nil, nil) },
+		dockerEngine: func(context.Context) doctor.Result { return doctor.CheckDockerEngine("29.9.2", nil, nil) },
+		topology: func(context.Context) doctor.Result {
+			return doctor.CheckTopology(doctor.TopologyInput{EnvFile: "prod.env", ComposeFile: "docker-compose.yml"})
+		},
+		disk:     func(*config.Config) doctor.Result { return doctor.CheckDisk("/data", 50<<30, nil) },
+		storage:  func(*config.Config) doctor.Result { return doctor.CheckStorage("/data", nil) },
+		apiReady: func(context.Context) doctor.Result { return doctor.CheckAPIReadiness(0, "ready") },
 	}
 }
 
@@ -134,17 +155,39 @@ func TestDoctorReportsEveryCheck(t *testing.T) {
 	}
 }
 
-// A healthy instance exits 0, and every check reads OK. (Search is `off`, which
-// is the M0 default and an OK, not a fault.)
-func TestDoctorOnAHealthyInstanceExitsZero(t *testing.T) {
+// On a healthy instance every check that CAN run reads OK; the three whose
+// subject does not exist yet read BLOCKED, so the run exits ExitBlocked — never
+// 0, which would claim DNS/TLS, ports and backups were verified.
+func TestDoctorOnAHealthyInstanceIsOKExceptTheUncheckable(t *testing.T) {
 	results := collect(context.Background(), healthyProbes(t))
 	for _, r := range results {
-		if r.Status != doctor.StatusOK {
-			t.Errorf("%s = %s (%s) on a healthy instance", r.Name, r.Status, r.Detail)
+		want := doctor.StatusOK
+		if notYetCheckable[r.Name] {
+			want = doctor.StatusBlocked
+		}
+		if r.Status != want {
+			t.Errorf("%s = %s (%s) on a healthy instance, want %s", r.Name, r.Status, r.Detail, want)
 		}
 	}
-	if code := doctor.ExitCode(results); code != 0 {
-		t.Fatalf("exit code %d on a healthy instance", code)
+	if code := doctor.ExitCode(results); code != doctor.ExitBlocked {
+		t.Fatalf("exit code %d on a healthy instance, want ExitBlocked (%d)", code, doctor.ExitBlocked)
+	}
+}
+
+// A host check that cannot run reports BLOCKED and the run exits 3, not 0.
+func TestDoctorHostCheckThatCannotRunIsBlocked(t *testing.T) {
+	p := healthyProbes(t)
+	p.dockerEngine = func(context.Context) doctor.Result {
+		return doctor.CheckDockerEngine("", errors.New("docker: not found"), nil)
+	}
+	results := collect(context.Background(), p)
+	for _, r := range results {
+		if r.Name == "docker engine" && r.Status != doctor.StatusBlocked {
+			t.Fatalf("docker engine = %s, want BLOCKED", r.Status)
+		}
+	}
+	if code := doctor.ExitCode(results); code != doctor.ExitBlocked {
+		t.Fatalf("exit %d, want ExitBlocked", code)
 	}
 }
 
@@ -218,6 +261,52 @@ func TestDoctorFailsAndExitsNonZeroOnEachRealDefect(t *testing.T) {
 			},
 			wantBad: "config: VIZRA_SESSION_SECRET",
 		},
+		{
+			name: "env file fails setup --check",
+			mutate: func(p *probes) {
+				p.envFile = func() doctor.Result { return doctor.CheckEnvFile("prod.env", nil, []string{"COMPOSE_FILE: mismatch"}) }
+			},
+			wantBad: "env file",
+		},
+		{
+			name: "docker daemon down",
+			mutate: func(p *probes) {
+				p.dockerEngine = func(context.Context) doctor.Result { return doctor.CheckDockerEngine("", nil, errors.New("exit 1")) }
+			},
+			wantBad: "docker engine",
+		},
+		{
+			name: "compose chain does not render",
+			mutate: func(p *probes) {
+				p.topology = func(context.Context) doctor.Result {
+					return doctor.CheckTopology(doctor.TopologyInput{EnvFile: "prod.env", ComposeFile: "x.yml", RunErr: errors.New("exit 1"), Stderr: "no such file"})
+				}
+			},
+			wantBad: "rendered topology",
+		},
+		{
+			name: "disk nearly full",
+			mutate: func(p *probes) {
+				p.disk = func(*config.Config) doctor.Result { return doctor.CheckDisk("/data", 10<<20, nil) }
+			},
+			wantBad: "disk free",
+		},
+		{
+			name: "storage root read-only",
+			mutate: func(p *probes) {
+				p.storage = func(*config.Config) doctor.Result {
+					return doctor.CheckStorage("/data", errors.New("read-only file system"))
+				}
+			},
+			wantBad: "storage root",
+		},
+		{
+			name: "api not ready",
+			mutate: func(p *probes) {
+				p.apiReady = func(context.Context) doctor.Result { return doctor.CheckAPIReadiness(1, "HTTP 503") }
+			},
+			wantBad: "api readiness",
+		},
 	}
 
 	for _, tc := range cases {
@@ -270,6 +359,9 @@ func TestRealProbesWiresEveryCheck(t *testing.T) {
 	p := realProbes("")
 	if p.ownerClaim == nil {
 		t.Error("realProbes does not wire ownerClaim, so `vizra doctor` would SKIP the owner-claim check in production")
+	}
+	if p.dockerEngine == nil || p.envFile == nil || p.topology == nil || p.disk == nil || p.storage == nil || p.apiReady == nil {
+		t.Error("realProbes left a VZ-OPS-002 host probe unwired")
 	}
 	if p.loadConfig == nil || p.openPools == nil || p.schema == nil || p.openCache == nil || p.searchReachable == nil {
 		t.Error("realProbes left a probe unwired")

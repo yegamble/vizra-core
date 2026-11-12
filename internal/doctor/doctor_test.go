@@ -69,7 +69,7 @@ func TestCheckSchema(t *testing.T) {
 			// Unreadable was NOT checked. It must never be OK.
 			name: "unknown: the ledger could not be read",
 			st:   migrate.Status{State: migrate.StateUnknown, EmbeddedVersion: 4},
-			want: doctor.StatusSkip,
+			want: doctor.StatusBlocked,
 		},
 	}
 	for _, tc := range cases {
@@ -275,7 +275,7 @@ func TestCheckCompose(t *testing.T) {
 		{name: "empty", raw: "", want: doctor.StatusFail},
 		{name: "command failed", runErr: errors.New("exit 1"), want: doctor.StatusFail},
 		// NOT INSTALLED is SKIP, never OK: nothing was verified.
-		{name: "docker absent", lookErr: errors.New("not found"), want: doctor.StatusSkip},
+		{name: "docker absent", lookErr: errors.New("not found"), want: doctor.StatusBlocked},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -316,27 +316,27 @@ func TestCheckSearch(t *testing.T) {
 // Reporting and exit codes
 // ---------------------------------------------------------------------------
 
-func TestSkipIsNeverAPassButDoesNotFailTheRun(t *testing.T) {
+// VZ-OPS-002 supersedes the M0 rule that an unchecked item exits 0: a
+// BLOCKED check is never a pass, and it exits ExitBlocked, distinct from FAIL.
+func TestBlockedIsNeverAPassAndExitsDistinctly(t *testing.T) {
 	results := []doctor.Result{
 		{Name: "a", Status: doctor.StatusOK},
-		{Name: "b", Status: doctor.StatusSkip, Detail: "docker is not on PATH"},
+		{Name: "b", Status: doctor.StatusBlocked, Detail: "docker is not on PATH"},
 	}
-	if doctor.ExitCode(results) != 0 {
-		t.Error("a SKIP failed the run; it was not checked, but it is not broken either")
+	if got := doctor.ExitCode(results); got != doctor.ExitBlocked {
+		t.Errorf("exit = %d, want ExitBlocked (%d)", got, doctor.ExitBlocked)
 	}
 	c := doctor.Summarise(results)
 	if c.Skipped != 1 {
-		t.Errorf("skipped = %d, want 1", c.Skipped)
+		t.Errorf("blocked = %d, want 1", c.Skipped)
 	}
 
 	var sb strings.Builder
-	if err := doctor.Report(&sb, results); err != nil {
-		t.Fatalf("Report returned an error for a run with no failures: %v", err)
+	if err := doctor.Report(&sb, results); err == nil {
+		t.Fatal("Report returned nil for a run with a BLOCKED check")
 	}
-	// The summary must state the skips. "2 checks, 0 failed" while one never
-	// ran is the lie this line exists to prevent.
-	if !strings.Contains(sb.String(), "1 not run") {
-		t.Fatalf("the summary hides the skipped check:\n%s", sb.String())
+	if !strings.Contains(sb.String(), "1 blocked") || !strings.Contains(sb.String(), "BLOCKED") {
+		t.Fatalf("the report hides the blocked check:\n%s", sb.String())
 	}
 }
 

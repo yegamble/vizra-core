@@ -1,0 +1,6 @@
+--- FAIL: TestProbeStorageWritable (0.01s)
+    host_test.go:95: missing root: OK, want FAIL
+    host_test.go:106: read-only root: OK, want FAIL
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.961s
+FAIL

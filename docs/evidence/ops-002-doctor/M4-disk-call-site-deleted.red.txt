@@ -1,0 +1,10 @@
+--- FAIL: TestDoctorReportsEveryCheck (0.00s)
+    doctor_test.go:143: `vizra doctor` does not report "disk free".
+        Its call site in cmd/vizra/doctor.go is missing, so the check has silently vanished from what an operator sees — whatever internal/doctor's own tests say.
+        reported: configuration, env file, docker engine, docker compose, rendered topology, dns/tls, closed ports, backup freshness, database, database version, schema, owner claim, cache, cache version floor, public origin, search, storage root, api readiness
+--- FAIL: TestDoctorFailsAndExitsNonZeroOnEachRealDefect (0.00s)
+    --- FAIL: TestDoctorFailsAndExitsNonZeroOnEachRealDefect/disk_nearly_full (0.00s)
+        doctor_test.go:328: no check named "disk free" in [configuration env file docker engine docker compose rendered topology dns/tls closed ports backup freshness database database version schema owner claim cache cache version floor public origin search storage root api readiness]
+FAIL
+FAIL	github.com/yegamble/vizra-core/cmd/vizra	0.955s
+FAIL

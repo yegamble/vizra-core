@@ -3,7 +3,7 @@
 // `migrate`; setup, backup and restore arrive with VZ-ISSUE-002…004.
 //
 // `doctor` performs REAL checks only. A check whose prerequisite is missing
-// reports SKIP with the reason; it never reports OK for something it did not
+// reports BLOCKED with the reason; it never reports OK for something it did not
 // test. That rule is why doctor is worth running at all.
 package main
 
@@ -16,7 +16,10 @@ const usage = `vizra — the Vizra operator CLI
 
 Usage:
   vizra version            Print build identity, including the libvips loader list.
-  vizra doctor [--env F]   Check configuration, database, cache and search. Exit 1 on any FAIL.
+  vizra doctor [--env F] [--project-dir D]
+                           Check host, env file, rendered compose chain, database,
+                           migrations, cache, storage, disk and api readiness.
+                           Exit 0 all checked, 1 any FAIL, 3 BLOCKED (not run).
   vizra migrate [--dry-run]
                            Apply embedded migrations to every configured site.
   vizra healthcheck TARGET Probe a local process for READINESS. TARGET is api or
@@ -43,7 +46,7 @@ func main() {
 	case "version":
 		err = runVersion(os.Args[2:])
 	case "doctor":
-		err = runDoctor(os.Args[2:])
+		os.Exit(runDoctor(os.Args[2:]))
 	case "migrate":
 		err = runMigrate(os.Args[2:])
 	case "healthcheck":

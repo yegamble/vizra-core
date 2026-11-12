@@ -16,9 +16,11 @@ import (
 	"github.com/yegamble/vizra-core/internal/config"
 	"github.com/yegamble/vizra-core/internal/db"
 	"github.com/yegamble/vizra-core/internal/doctor"
+	"github.com/yegamble/vizra-core/internal/healthcheck"
 	"github.com/yegamble/vizra-core/internal/migrate"
 	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/search"
+	"github.com/yegamble/vizra-core/internal/setup"
 	"github.com/yegamble/vizra-core/internal/site"
 	"github.com/yegamble/vizra-core/internal/store/sqlcgen"
 )
@@ -49,6 +51,14 @@ type probes struct {
 	searchReachable func(context.Context, *config.Config) bool
 	ownerClaim      func(context.Context, pooler) doctor.OwnerClaimState
 	rawPublicOrigin func() string
+
+	// VZ-OPS-002 host checks.
+	dockerEngine func(context.Context) doctor.Result
+	envFile      func() doctor.Result
+	topology     func(context.Context) doctor.Result
+	disk         func(*config.Config) doctor.Result
+	storage      func(*config.Config) doctor.Result
+	apiReady     func(context.Context) doctor.Result
 }
 
 // pooler and cacher are the narrow views collect() needs, so a fake is three
@@ -64,18 +74,27 @@ type cacher interface {
 	Close() error
 }
 
-func runDoctor(args []string) error {
+// runDoctor returns the process exit code: doctor.ExitOK (0), ExitFail (1) on
+// any FAIL, ExitBlocked (3) when nothing failed but a check could not run, and
+// 2 on a usage error.
+func runDoctor(args []string) int {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	envFile := fs.String("env", "", "validate this env file instead of the process environment")
+	projectDir := fs.String("project-dir", ".", "directory holding the compose files named by COMPOSE_FILE")
 	if err := fs.Parse(args); err != nil {
-		return err
+		return 2
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	results := collect(ctx, realProbes(*envFile))
-	return doctor.Report(os.Stdout, results)
+	p := realProbes(*envFile)
+	p.topology = func(ctx context.Context) doctor.Result { return topologyCheck(ctx, *envFile, *projectDir) }
+	results := collect(ctx, p)
+	if err := doctor.Report(os.Stdout, results); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+	}
+	return doctor.ExitCode(results)
 }
 
 // realProbes is the production wiring.
@@ -128,7 +147,23 @@ func realProbes(envFile string) probes {
 			}
 			return c, nil
 		},
-		ownerClaim: realOwnerClaim,
+		ownerClaim:   realOwnerClaim,
+		dockerEngine: dockerEngineCheck,
+		envFile:      func() doctor.Result { return envFileCheck(envFile) },
+		topology:     func(ctx context.Context) doctor.Result { return topologyCheck(ctx, envFile, ".") },
+		disk:         diskCheck,
+		storage: func(cfg *config.Config) doctor.Result {
+			return doctor.CheckStorage(cfg.StorageRoot, doctor.ProbeWritable(cfg.StorageRoot))
+		},
+		apiReady: func(ctx context.Context) doctor.Result {
+			l, err := source()
+			if err != nil {
+				return doctor.CheckAPIReadiness(healthcheck.ExitUsage, err.Error())
+			}
+			var out, errb strings.Builder
+			code := healthcheck.Run(ctx, []string{"api", "--timeout", "5s"}, l, &out, &errb)
+			return doctor.CheckAPIReadiness(code, out.String()+errb.String())
+		},
 		rawPublicOrigin: func() string {
 			l, err := source()
 			if err != nil {
@@ -186,8 +221,12 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 	cfg, cfgErr := p.loadConfig()
 	results = append(results, doctor.CheckConfig(cfg, cfgErr)...)
 
-	// --- compose ------------------------------------------------------------
+	// --- host -----------------------------------------------------------------
+	results = append(results, run(p.envFile, "env file"))
+	results = append(results, runCtx(ctx, p.dockerEngine, "docker engine"))
 	results = append(results, p.compose())
+	results = append(results, runCtx(ctx, p.topology, "rendered topology"))
+	results = append(results, doctor.NotYetCheckable()...)
 
 	// Everything below needs a valid configuration.
 	if cfg == nil {
@@ -221,7 +260,7 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 			// TestRealProbesWiresEveryCheck asserts production wires this one.
 			if p.ownerClaim == nil {
 				results = append(results, doctor.Result{Name: "owner claim",
-					Status: doctor.StatusSkip, Detail: "no owner-claim probe was configured"})
+					Status: doctor.StatusBlocked, Detail: "no owner-claim probe was configured"})
 			} else {
 				results = append(results, doctor.CheckOwnerClaim(p.ownerClaim(ctx, pool)))
 			}
@@ -255,7 +294,88 @@ func collect(ctx context.Context, p probes) []doctor.Result {
 
 	results = append(results, doctor.CheckSearch(cfg.SearchMode, p.searchReachable(ctx, cfg)))
 
+	// --- storage, disk and the api process ------------------------------------
+	results = append(results, runCfg(cfg, p.storage, "storage root"))
+	results = append(results, runCfg(cfg, p.disk, "disk free"))
+	results = append(results, runCtx(ctx, p.apiReady, "api readiness"))
+
 	return results
+}
+
+// A probe a test did not wire reports BLOCKED, never OK.
+func unwired(name string) doctor.Result {
+	return doctor.Result{Name: name, Status: doctor.StatusBlocked, Detail: "no probe was configured for this check"}
+}
+
+func run(f func() doctor.Result, name string) doctor.Result {
+	if f == nil {
+		return unwired(name)
+	}
+	return f()
+}
+
+func runCtx(ctx context.Context, f func(context.Context) doctor.Result, name string) doctor.Result {
+	if f == nil {
+		return unwired(name)
+	}
+	return f(ctx)
+}
+
+func runCfg(cfg *config.Config, f func(*config.Config) doctor.Result, name string) doctor.Result {
+	if f == nil {
+		return unwired(name)
+	}
+	return f(cfg)
+}
+
+func dockerEngineCheck(ctx context.Context) doctor.Result {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return doctor.CheckDockerEngine("", err, nil)
+	}
+	out, err := exec.CommandContext(ctx, "docker", "version", "--format", "{{.Server.Version}}").Output()
+	return doctor.CheckDockerEngine(string(out), nil, err)
+}
+
+// envFileCheck runs `vizra setup --check`'s rules (setup.Check) on the file.
+func envFileCheck(path string) doctor.Result {
+	if path == "" {
+		return doctor.CheckEnvFile("", nil, nil)
+	}
+	env, err := setup.ReadEnvFile(path)
+	if err != nil {
+		return doctor.CheckEnvFile(path, err, nil)
+	}
+	return doctor.CheckEnvFile(path, nil, setup.Check(env))
+}
+
+// topologyCheck renders the env-derived chain: COMPOSE_FILE and
+// COMPOSE_PROFILES come from the env file `vizra setup` wrote, never from a
+// bare `docker compose` default.
+func topologyCheck(ctx context.Context, envFile, projectDir string) doctor.Result {
+	in := doctor.TopologyInput{EnvFile: envFile}
+	if envFile == "" {
+		return doctor.CheckTopology(in)
+	}
+	env, err := setup.ReadEnvFile(envFile)
+	if err != nil {
+		return doctor.CheckTopology(in) // env file check reports the read error
+	}
+	in.ComposeFile, in.Profiles = env["COMPOSE_FILE"], env["COMPOSE_PROFILES"]
+	if in.ComposeFile == "" {
+		return doctor.CheckTopology(in)
+	}
+	if _, err := exec.LookPath("docker"); err != nil {
+		in.LookErr = err
+		return doctor.CheckTopology(in)
+	}
+	cmd := exec.CommandContext(ctx, "docker", "compose", "--env-file", envFile, "config", "--quiet")
+	cmd.Dir = projectDir
+	cmd.Env = append(os.Environ(), "COMPOSE_FILE="+in.ComposeFile, "COMPOSE_PROFILES="+in.Profiles)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	in.RunErr = cmd.Run()
+	in.Stderr = stderr.String()
+	return doctor.CheckTopology(in)
 }
 
 // envSource is the lookup doctor reads configuration through: the process
