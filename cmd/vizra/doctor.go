@@ -18,6 +18,7 @@ import (
 	"github.com/yegamble/vizra-core/internal/doctor"
 	"github.com/yegamble/vizra-core/internal/healthcheck"
 	"github.com/yegamble/vizra-core/internal/migrate"
+	"github.com/yegamble/vizra-core/internal/ops"
 	"github.com/yegamble/vizra-core/internal/ownerclaim"
 	"github.com/yegamble/vizra-core/internal/search"
 	"github.com/yegamble/vizra-core/internal/setup"
@@ -368,14 +369,29 @@ func topologyCheck(ctx context.Context, envFile, projectDir string) doctor.Resul
 		in.LookErr = err
 		return doctor.CheckTopology(in)
 	}
-	cmd := exec.CommandContext(ctx, "docker", "compose", "--env-file", envFile, "config", "--quiet")
+	argv, err := topologyArgv(envFile, env)
+	if err != nil {
+		in.RunErr = err
+		return doctor.CheckTopology(in)
+	}
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = projectDir
-	cmd.Env = append(os.Environ(), "COMPOSE_FILE="+in.ComposeFile, "COMPOSE_PROFILES="+in.Profiles)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	in.RunErr = cmd.Run()
 	in.Stderr = stderr.String()
 	return doctor.CheckTopology(in)
+}
+
+// topologyArgv is the doctor's `compose config` argv: one explicit -f per
+// COMPOSE_FILE entry (ops.Chain), never compose's default file discovery,
+// which would auto-load docker-compose.override.yml (VZ-TOPOLOGY-007).
+func topologyArgv(envFile string, env map[string]string) ([]string, error) {
+	c, err := ops.LoadChain(envFile, env)
+	if err != nil {
+		return nil, err
+	}
+	return c.Argv("config", "--quiet"), nil
 }
 
 // envSource is the lookup doctor reads configuration through: the process

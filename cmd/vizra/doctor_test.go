@@ -392,3 +392,23 @@ func TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig(t *testing.T)
 		t.Errorf("no --env: raw public origin = %q, want the process environment's %q", got, want)
 	}
 }
+
+// VZ-TOPOLOGY-007 negative: the doctor's compose invocation names its chain
+// with explicit -f entries, so compose never falls back to auto-loading
+// docker-compose.override.yml.
+func TestDoctorTopologyArgvHasExplicitFiles(t *testing.T) {
+	argv, err := topologyArgv("/srv/vizra/.env", map[string]string{
+		"COMPOSE_FILE":     "docker-compose.yml:docker-compose.prod.yml",
+		"COMPOSE_PROFILES": "core,frontend,edge",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "docker compose --env-file /srv/vizra/.env -f docker-compose.yml -f docker-compose.prod.yml --profile core --profile frontend --profile edge config --quiet"
+	if got := strings.Join(argv, " "); got != want {
+		t.Fatalf("argv\n got %s\nwant %s", got, want)
+	}
+	if _, err := topologyArgv("/srv/vizra/.env", map[string]string{}); err == nil {
+		t.Fatal("empty COMPOSE_FILE must be refused, not left to compose's default (override auto-load)")
+	}
+}

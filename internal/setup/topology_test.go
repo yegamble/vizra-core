@@ -85,3 +85,46 @@ func TestRemovedQuestionsNotAsked(t *testing.T) {
 		}
 	}
 }
+
+// VZ-TOPOLOGY-007 negative: no answer combination, and no supported shape,
+// ever puts docker-compose.override.yml (or any dev file) into the
+// production COMPOSE_FILE that `vizra setup` writes.
+func TestProductionChainNeverIncludesOverride(t *testing.T) {
+	forbidden := []string{"docker-compose.override.yml", "docker-compose.dev.yml"}
+	check := func(where, file string) {
+		t.Helper()
+		for _, f := range strings.Split(file, ":") {
+			for _, bad := range forbidden {
+				if f == bad {
+					t.Errorf("%s: COMPOSE_FILE %q includes %s", where, file, bad)
+				}
+			}
+		}
+		if !strings.HasPrefix(file, composeBase) {
+			t.Errorf("%s: COMPOSE_FILE %q does not start with the explicit prod base", where, file)
+		}
+	}
+	for n, s := range supportedShapes {
+		check(n, s[0])
+	}
+	vals := map[string][]string{
+		"postgres": {"managed", "external"}, "redis": {"managed", "external"},
+		"analytics": {"off", "managed", "external"}, "ipfs": {"off", "managed", "external"},
+		"tls": {"managed", "external"}, "search": {"off", "managed"},
+	}
+	keys := []string{"postgres", "redis", "analytics", "ipfs", "tls", "search"}
+	var walk func(i int, a map[string]string)
+	walk = func(i int, a map[string]string) {
+		if i == len(keys) {
+			if file, _, err := composeFor(a); err == nil {
+				check("answers", file)
+			}
+			return
+		}
+		for _, v := range vals[keys[i]] {
+			a[keys[i]] = v
+			walk(i+1, a)
+		}
+	}
+	walk(0, map[string]string{})
+}
