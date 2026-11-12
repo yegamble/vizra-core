@@ -1,0 +1,15 @@
+--- FAIL: TestN1ExternalWithoutDSNRefused (0.00s)
+    setup_test.go:121: redis=external without DSN: err=postgres_password: must be at least 24 bytes, want refusal
+--- FAIL: TestSecretsMintedNeverBlank (0.00s)
+    setup_test.go:158: postgres_password: must be at least 24 bytes
+--- FAIL: TestP1IndirectionsModeAndNoLeak (0.00s)
+    setup_test.go:187: postgres_password: must be at least 24 bytes
+--- FAIL: TestP1InteractiveSecretNotEchoed (0.00s)
+    setup_test.go:231: postgres_password: must be at least 24 bytes
+--- FAIL: TestR1RerunPreservesAndRefusesRewrite (0.00s)
+    setup_test.go:244: postgres_password: must be at least 24 bytes
+--- FAIL: TestCheckNamesBadKeys (0.00s)
+    setup_test.go:288: clean env: [VIZRA_DOMAIN: missing VIZRA_TLS_MODE: missing VIZRA_SITE_HANDLE: missing VIZRA_CORE_TAG: missing VIZRA_S3_ENDPOINT: missing VIZRA_STORAGE_BACKEND: missing VIZRA_POSTGRES_MODE: missing VIZRA_REDIS_MODE: missing VIZRA_ANALYTICS_MODE: missing VIZRA_IPFS_MODE: missing VIZRA_SEARCH_MODE: missing VIZRA_SMTP_MODE: missing VIZRA_REGISTRATION_MODE: missing VIZRA_IMPORT_MODE: missing VIZRA_SESSION_SECRET: missing VIZRA_MFA_KEY_KEK: missing SEARCH_HMAC_KEY: missing]
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/setup	0.246s
+FAIL

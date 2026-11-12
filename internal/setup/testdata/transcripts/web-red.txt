@@ -1,0 +1,9 @@
+# github.com/yegamble/vizra-core/internal/setup [github.com/yegamble/vizra-core/internal/setup.test]
+internal/setup/web_test.go:15:33: undefined: Web
+internal/setup/web_test.go:18:12: undefined: NewWeb
+internal/setup/web_test.go:174:11: undefined: NewWeb
+internal/setup/web_test.go:190:11: undefined: NewWeb
+internal/setup/web_test.go:212:13: undefined: CheckLoopback
+internal/setup/web_test.go:217:13: undefined: CheckLoopback
+FAIL	github.com/yegamble/vizra-core/internal/setup [build failed]
+FAIL

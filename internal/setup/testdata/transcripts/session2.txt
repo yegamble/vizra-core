@@ -1,0 +1,9 @@
+Session 2 red-first evidence (2026-11-12, vizra-core feat/install-002-vizra-setup)
+1. go test ./internal/setup -run TestRotate  (before engine.go change, head 49b27f1 + test)
+   setup_test.go:317: rotate mfa_kek with --yes --yes-i-know accepted   -> exit 1
+2. go test ./cmd/vizra -run WithEcho (before withEchoOff existed)
+   setup_echo_test.go:35:15: undefined: withEchoOff  -> exit 1 (build failed)
+3. go test ./internal/setup -run Edge (before edge.go)  -> exit 1 (build failed: RenderEdge/WriteEdge undefined)
+4. Mutation: untouched() forced to return true
+   edge_test.go:71: operator-edited file overwritten without --yes: <nil>  -> FAIL; restored -> ok
+5. caddy:2.11.4-alpine@sha256:de23def3... caddy adapt on acme/internal/plain-http goldens: exit 0 each

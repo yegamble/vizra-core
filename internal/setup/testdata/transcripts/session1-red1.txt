@@ -1,0 +1,14 @@
+# github.com/yegamble/vizra-core/internal/setup [github.com/yegamble/vizra-core/internal/setup.test]
+internal/setup/setup_test.go:25:9: undefined: Resolve
+internal/setup/setup_test.go:59:20: undefined: Questions
+internal/setup/setup_test.go:97:20: undefined: PendingTemplateKeys
+internal/setup/setup_test.go:103:20: undefined: Questions
+internal/setup/setup_test.go:128:12: undefined: Run
+internal/setup/setup_test.go:128:16: undefined: Options
+internal/setup/setup_test.go:138:7: undefined: Lookup
+internal/setup/setup_test.go:185:9: undefined: Run
+internal/setup/setup_test.go:185:13: undefined: Options
+internal/setup/setup_test.go:189:12: undefined: ReadEnvFile
+internal/setup/setup_test.go:189:12: too many errors
+FAIL	github.com/yegamble/vizra-core/internal/setup [build failed]
+FAIL

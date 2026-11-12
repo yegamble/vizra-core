@@ -26,7 +26,11 @@ Usage:
   vizra claim-token        Mint a one-time owner-claim token and print it to
                            stdout. Refuses once the instance has accounts.
 
-Commands arriving with later slices: setup, backup, restore, update, jobs.
+  vizra setup [--non-interactive [--answers F] [--set id=v]] [--check]
+              [--rotate ID --yes [--yes-i-know]] [--yes] [--env F]
+                           Interview and write env/production.env (0600).
+
+Commands arriving with later slices: backup, restore, update, jobs.
 `
 
 func main() {
@@ -47,6 +51,8 @@ func main() {
 		// container runtime reads, and main's generic "error → exit 1" would
 		// flatten a usage mistake into a verdict about the service.
 		os.Exit(runHealthcheck(os.Args[2:]))
+	case "setup":
+		err = runSetup(os.Args[2:])
 	case "claim-token":
 		err = runClaimToken(os.Args[2:])
 	case "help", "-h", "--help":

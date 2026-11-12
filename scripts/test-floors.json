@@ -93,14 +93,18 @@
     "and shuffled), 0 skipped. The generator's formula gives internal/fixtures 36 -> 37 (measured 43) in",
     "both suites and internal/integration 144 -> 145 (measured 171); applied. The same run's generator",
     "output also proposes scripts 161 -> 419 and min_tests 1070 -> 1331 / 1214 -> 1476, from tests other",
-    "slices added; those are left to the floor owner (core #14 is changing this file too). Nothing was lowered."
+    "slices added; those are left to the floor owner (core #14 is changing this file too). Nothing was lowered.",
+    "",
+    "VZ-INSTALL-002 (core PR #22, 2026-11-12) adds internal/setup (`vizra setup` engine). Measured at e2dbc6b, darwin/arm64,",
+    "`go test -count=1 -json ./internal/setup ./cmd/vizra`: internal/setup 16 executed, cmd/vizra 14, 0 skipped.",
+    "The generator gives internal/setup 14 (new) and cmd/vizra 10 -> 12, in both suites; applied. Nothing was lowered."
   ],
   "suites": {
     "unit": {
       "min_tests": 1070,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
-        "github.com/yegamble/vizra-core/cmd/vizra": 10,
+        "github.com/yegamble/vizra-core/cmd/vizra": 12,
         "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 7,
@@ -115,6 +119,7 @@
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
         "github.com/yegamble/vizra-core/internal/search": 112,
         "github.com/yegamble/vizra-core/internal/site": 4,
+        "github.com/yegamble/vizra-core/internal/setup": 14,
         "github.com/yegamble/vizra-core/internal/testtmp": 1,
         "github.com/yegamble/vizra-core/scripts": 161
       },
@@ -124,7 +129,7 @@
       "min_tests": 1214,
       "min_package_tests": {
         "github.com/yegamble/vizra-core/cmd/api": 1,
-        "github.com/yegamble/vizra-core/cmd/vizra": 10,
+        "github.com/yegamble/vizra-core/cmd/vizra": 12,
         "github.com/yegamble/vizra-core/internal/audit": 14,
         "github.com/yegamble/vizra-core/internal/authz": 427,
         "github.com/yegamble/vizra-core/internal/cache": 7,
@@ -140,6 +145,7 @@
         "github.com/yegamble/vizra-core/internal/ownerclaim": 16,
         "github.com/yegamble/vizra-core/internal/search": 112,
         "github.com/yegamble/vizra-core/internal/site": 4,
+        "github.com/yegamble/vizra-core/internal/setup": 14,
         "github.com/yegamble/vizra-core/internal/testtmp": 1,
         "github.com/yegamble/vizra-core/scripts": 161
       },
