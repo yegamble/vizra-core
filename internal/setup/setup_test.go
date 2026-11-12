@@ -14,9 +14,8 @@ import (
 func base() map[string]string {
 	return map[string]string{
 		"domain": "photos.example.org", "tls": "acme", "instance_name": "main",
-		"release": "v0.1.0", "storage": "local", "postgres": "managed", "redis": "managed",
-		"analytics": "off", "ipfs": "off", "search": "off", "smtp": "off",
-		"registration": "invite", "import": "off",
+		"release": "v0.1.0", "postgres": "managed", "redis": "managed",
+		"analytics": "off", "ipfs": "off", "search": "off",
 	}
 }
 
@@ -32,11 +31,6 @@ func TestQuestionsValidAndInvalid(t *testing.T) {
 		"tls":                 {"internal", "letsencrypt"},
 		"instance_name":       {"main-site", "Main Site!"},
 		"release":             {"v1.2.3", "latest"},
-		"storage":             {"local", "ftp"},
-		"s3_endpoint":         {"https://s3.example.org", "not a url"},
-		"s3_bucket":           {"media", ""},
-		"s3_access_key":       {"AKIA123", ""},
-		"s3_secret_key":       {"abcdefgh", ""},
 		"postgres":            {"external", "yes"},
 		"postgres_dsn":        {"postgres://u:p@db:5432/v?sslmode=require", ""},
 		"redis":               {"external", "maybe"},
@@ -44,11 +38,6 @@ func TestQuestionsValidAndInvalid(t *testing.T) {
 		"analytics":           {"managed", "on"},
 		"ipfs":                {"external", "public"},
 		"search":              {"managed", "elastic"},
-		"smtp":                {"smtp", "sendmail"},
-		"smtp_url":            {"smtps://u:p@mail.example.org:465", "mail.example.org"},
-		"smtp_from":           {"Vizra <noreply@example.org>", "noreply"},
-		"registration":        {"open", "public"},
-		"import":              {"off", "on"},
 		"session_secret":      {strings.Repeat("a", 32), "short"},
 		"mfa_kek":             {strings.Repeat("b", 32), ""},
 		"search_hmac":         {strings.Repeat("c", 32), "x"},
@@ -93,6 +82,9 @@ func TestS1EveryAnswerLandsOnATemplateKey(t *testing.T) {
 	for _, k := range config.Registry {
 		known[k.Name] = true
 	}
+	for _, k := range ComposeKeys {
+		known[k] = true
+	}
 	pending := map[string]bool{}
 	for _, k := range PendingTemplateKeys {
 		if known[k] {
@@ -130,22 +122,6 @@ func TestN1ExternalWithoutDSNRefused(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatal("refused run still wrote a file")
-	}
-}
-
-// N2: s3 is never the offered default without credentials.
-func TestN2StorageDefaultNeverS3WithoutCredentials(t *testing.T) {
-	q := Lookup("storage")
-	if d := q.Default(map[string]string{}); d != "local" {
-		t.Fatalf("default without credentials = %q, want local", d)
-	}
-	full := map[string]string{"s3_endpoint": "https://s3", "s3_bucket": "b", "s3_access_key": "k", "s3_secret_key": "s"}
-	if d := q.Default(full); d != "s3" {
-		t.Fatalf("default with full credentials = %q, want s3", d)
-	}
-	delete(full, "s3_secret_key")
-	if d := q.Default(full); d != "local" {
-		t.Fatalf("default with partial credentials = %q, want local", d)
 	}
 }
 
@@ -257,17 +233,16 @@ func TestR1RerunPreservesAndRefusesRewrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	b2 := base()
-	b2["registration"] = "open" // existing value wins over a new answer
+	b2["search"] = "external" // existing value wins over a new answer
 	if err := Run(Options{Path: path, Answers: b2}); err != nil {
 		t.Fatal(err)
 	}
 	env, _ := ReadEnvFile(path)
-	if env["CUSTOM_KEY"] != "keep" || env["VIZRA_REGISTRATION_MODE"] != "invite" {
+	if env["CUSTOM_KEY"] != "keep" || env["VIZRA_SEARCH_MODE"] != "off" {
 		t.Fatalf("values not preserved: %v", env)
 	}
 	// a change (missing key to fill) without --yes is refused
-	delete(env, "VIZRA_SMTP_FROM")
-	delete(env, "VIZRA_SMTP_MODE")
+	delete(env, "VIZRA_SITE_HANDLE")
 	os.WriteFile(path, []byte(Render(env)), 0o600)
 	before, _ := os.ReadFile(path)
 	if err := Run(Options{Path: path, Answers: a}); err == nil {

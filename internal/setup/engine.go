@@ -31,7 +31,7 @@ func Resolve(existing, answers map[string]string, ask Asker, stdin io.Reader) (m
 		if q.When != nil && !q.When(a) {
 			continue
 		}
-		if v, ok := existing[q.Keys[0]]; ok {
+		if v, ok := q.answerFrom(existing); ok {
 			a[q.ID] = v
 			continue
 		}
@@ -71,6 +71,13 @@ func Resolve(existing, answers map[string]string, ask Asker, stdin io.Reader) (m
 		} else {
 			env[q.Keys[0]] = v
 		}
+	}
+	file, profiles, err := composeFor(a)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := existing["COMPOSE_FILE"]; !ok {
+		env["COMPOSE_FILE"], env["COMPOSE_PROFILES"] = file, profiles
 	}
 	return env, nil
 }
@@ -114,7 +121,7 @@ func Check(env map[string]string) []string {
 		if q.When != nil && !q.When(a) {
 			continue
 		}
-		v, ok := env[q.Keys[0]]
+		v, ok := q.answerFrom(env)
 		if !ok {
 			errs = append(errs, q.Keys[0]+": missing")
 			continue
@@ -123,6 +130,11 @@ func Check(env map[string]string) []string {
 			errs = append(errs, q.Keys[0]+": "+strings.TrimPrefix(err.Error(), q.ID+": "))
 		}
 		a[q.ID] = v
+	}
+	if file, profiles, err := composeFor(a); err != nil {
+		errs = append(errs, err.Error())
+	} else if env["COMPOSE_FILE"] != file || env["COMPOSE_PROFILES"] != profiles {
+		errs = append(errs, "COMPOSE_FILE/COMPOSE_PROFILES: do not match the topology answers; want "+file+" / "+profiles)
 	}
 	return errs
 }

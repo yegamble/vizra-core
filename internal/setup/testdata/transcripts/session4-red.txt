@@ -1,0 +1,15 @@
+    topology_test.go:75: question "s3_access_key" is still asked; no core reader exists
+    topology_test.go:75: question "s3_secret_key" is still asked; no core reader exists
+    topology_test.go:75: question "smtp" is still asked; no core reader exists
+    topology_test.go:75: question "smtp_url" is still asked; no core reader exists
+    topology_test.go:75: question "smtp_from" is still asked; no core reader exists
+    topology_test.go:75: question "registration" is still asked; no core reader exists
+    topology_test.go:75: question "import" is still asked; no core reader exists
+    topology_test.go:84: dead key VIZRA_S3_ENDPOINT written
+    topology_test.go:84: dead key VIZRA_STORAGE_BACKEND written
+    topology_test.go:84: dead key VIZRA_SMTP_MODE written
+    topology_test.go:84: dead key VIZRA_REGISTRATION_MODE written
+    topology_test.go:84: dead key VIZRA_IMPORT_MODE written
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/setup	0.302s
+FAIL

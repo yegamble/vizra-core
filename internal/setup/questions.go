@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/mail"
 	"net/url"
 	"regexp"
 	"slices"
@@ -33,7 +32,23 @@ type Question struct {
 	validate func(string) error
 	// Write maps the answer to keys; nil writes it to Keys[0].
 	Write func(v string, a map[string]string) map[string]string
+	// derive recovers the answer from an existing env when Keys[0] does not
+	// hold it verbatim (topology answers live in COMPOSE_FILE/PROFILES).
+	derive func(id string, env map[string]string) (string, bool)
 }
+
+// answerFrom returns q's answer as recorded in env.
+func (q Question) answerFrom(env map[string]string) (string, bool) {
+	if q.derive != nil {
+		return q.derive(q.ID, env)
+	}
+	v, ok := env[q.Keys[0]]
+	return v, ok
+}
+
+var topoKeys = []string{"COMPOSE_FILE", "COMPOSE_PROFILES"}
+
+func noKeys(string, map[string]string) map[string]string { return nil }
 
 // Validate checks one answer.
 func (q Question) Validate(v string) error {
@@ -49,15 +64,13 @@ func (q Question) Validate(v string) error {
 }
 
 // PendingTemplateKeys are keys the interview writes that neither core's
-// config.Registry nor the meta env/production.env.example carries yet. The
-// meta template must add them (meta follow-up); TestS1 fails on any key that
+// config.Registry nor the meta env/production.env.example carries yet; each
+// has a merged reader (internal/setup/edge.go). TestS1 fails on any key that
 // is in no template and not listed here, and on a listed key that has landed.
-var PendingTemplateKeys = []string{
-	"VIZRA_DOMAIN", "VIZRA_TLS_MODE", "VIZRA_STORAGE_BACKEND",
-	"VIZRA_S3_ENDPOINT", "VIZRA_S3_BUCKET", "VIZRA_S3_ACCESS_KEY_ID", "VIZRA_S3_SECRET_ACCESS_KEY",
-	"VIZRA_POSTGRES_MODE", "VIZRA_REDIS_MODE", "VIZRA_ANALYTICS_MODE", "VIZRA_IPFS_MODE",
-	"VIZRA_SMTP_MODE", "VIZRA_SMTP_URL", "VIZRA_SMTP_FROM", "VIZRA_REGISTRATION_MODE", "VIZRA_IMPORT_MODE",
-}
+var PendingTemplateKeys = []string{"VIZRA_DOMAIN", "VIZRA_TLS_MODE"}
+
+// ComposeKeys are read by Docker Compose itself from the `--env-file` file.
+var ComposeKeys = topoKeys
 
 var (
 	hostRe   = regexp.MustCompile(`^(?i)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$`)
@@ -94,15 +107,6 @@ func urlWith(schemes ...string) func(string) error {
 		}
 		return nil
 	}
-}
-
-func s3Complete(a map[string]string) bool {
-	for _, k := range []string{"s3_endpoint", "s3_bucket", "s3_access_key", "s3_secret_key"} {
-		if a[k] == "" {
-			return false
-		}
-	}
-	return true
 }
 
 // Questions returns the interview in order.
@@ -144,40 +148,17 @@ func Questions() []Question {
 			Write: func(v string, _ map[string]string) map[string]string {
 				return map[string]string{"VIZRA_CORE_TAG": v, "VIZRA_USER_TAG": v, "VIZRA_SEARCH_TAG": v}
 			}},
-		{ID: "s3_endpoint", Prompt: "S3 endpoint URL (blank to skip S3)", Keys: []string{"VIZRA_S3_ENDPOINT"}, validate: optional(urlWith("https", "http"))},
-		{ID: "s3_bucket", Prompt: "S3 bucket", Keys: []string{"VIZRA_S3_BUCKET"}, When: has("s3_endpoint"), validate: nonEmpty},
-		{ID: "s3_access_key", Prompt: "S3 access key id", Keys: []string{"VIZRA_S3_ACCESS_KEY_ID"}, When: has("s3_endpoint"), validate: nonEmpty},
-		{ID: "s3_secret_key", Prompt: "S3 secret access key", Keys: []string{"VIZRA_S3_SECRET_ACCESS_KEY"}, Secret: true, When: has("s3_endpoint"), validate: nonEmpty},
-		{ID: "storage", Prompt: "Media storage: local | s3", Keys: []string{"VIZRA_STORAGE_BACKEND"}, Choices: []string{"local", "s3"},
-			// N2: s3 is offered as the default only with complete credentials.
-			Default: func(a map[string]string) string {
-				if s3Complete(a) {
-					return "s3"
-				}
-				return "local"
-			}},
-		{ID: "postgres", Prompt: "PostgreSQL: managed (bundled) | external", Keys: []string{"VIZRA_POSTGRES_MODE"}, Choices: []string{"managed", "external"}, Default: fixed("managed")},
+		{ID: "postgres", Prompt: "PostgreSQL: managed (bundled) | external", Keys: topoKeys, Write: noKeys, derive: topologyAnswer, Choices: []string{"managed", "external"}, Default: fixed("managed")},
 		{ID: "postgres_dsn", Prompt: "External PostgreSQL DSN", Keys: []string{"DATABASE_URL"}, Secret: true, When: is("postgres", "external"), validate: urlWith("postgres", "postgresql")},
 		{ID: "postgres_password", Prompt: "Bundled PostgreSQL password (blank = generate)", Keys: []string{"POSTGRES_PASSWORD"}, Secret: true, Mint: true, When: is("postgres", "managed"), validate: minLen(24)},
-		{ID: "redis", Prompt: "Redis/Valkey: managed (bundled) | external", Keys: []string{"VIZRA_REDIS_MODE"}, Choices: []string{"managed", "external"}, Default: fixed("managed")},
+		{ID: "redis", Prompt: "Redis/Valkey: managed (bundled) | external", Keys: topoKeys, Write: noKeys, derive: topologyAnswer, Choices: []string{"managed", "external"}, Default: fixed("managed")},
 		{ID: "redis_url", Prompt: "External Redis URL", Keys: []string{"VIZRA_CACHE_URL"}, Secret: true, When: is("redis", "external"), validate: urlWith("redis", "rediss")},
 		// Analytics (ClickHouse) and IPFS: the components are not built yet;
 		// the values are the ones the meta compose overlays define today.
-		{ID: "analytics", Prompt: "Analytics (ClickHouse): off | managed | external", Keys: []string{"VIZRA_ANALYTICS_MODE"}, Choices: modes, Default: fixed("off")},
+		{ID: "analytics", Prompt: "Analytics (ClickHouse): off | managed | external", Keys: topoKeys, Write: noKeys, derive: topologyAnswer, Choices: modes, Default: fixed("off")},
 		{ID: "clickhouse_password", Prompt: "ClickHouse password (blank = generate)", Keys: []string{"CLICKHOUSE_PASSWORD"}, Secret: true, Mint: true, When: is("analytics", "managed"), validate: minLen(24)},
-		{ID: "ipfs", Prompt: "IPFS pinning: off | managed | external (public media only)", Keys: []string{"VIZRA_IPFS_MODE"}, Choices: modes, Default: fixed("off")},
+		{ID: "ipfs", Prompt: "IPFS pinning: off | managed | external (public media only)", Keys: topoKeys, Write: noKeys, derive: topologyAnswer, Choices: modes, Default: fixed("off")},
 		{ID: "search", Prompt: "Search: off | managed | external", Keys: []string{"VIZRA_SEARCH_MODE"}, Choices: modes, Default: fixed("off")},
-		{ID: "smtp", Prompt: "Outgoing mail: off | smtp", Keys: []string{"VIZRA_SMTP_MODE"}, Choices: []string{"off", "smtp"}, Default: fixed("off")},
-		{ID: "smtp_url", Prompt: "SMTP URL (smtp:// or smtps://, credentials included)", Keys: []string{"VIZRA_SMTP_URL"}, Secret: true, When: is("smtp", "smtp"), validate: urlWith("smtp", "smtps")},
-		{ID: "smtp_from", Prompt: "From address", Keys: []string{"VIZRA_SMTP_FROM"}, When: is("smtp", "smtp"), validate: func(v string) error {
-			if _, err := mail.ParseAddress(v); err != nil {
-				return errors.New("must be an email address")
-			}
-			return nil
-		}},
-		{ID: "registration", Prompt: "Registration: open | invite | closed", Keys: []string{"VIZRA_REGISTRATION_MODE"}, Choices: []string{"open", "invite", "closed"}, Default: fixed("invite")},
-		// Import: no importer exists yet, so off is the only value today.
-		{ID: "import", Prompt: "Bulk import: off (importers arrive with a later release)", Keys: []string{"VIZRA_IMPORT_MODE"}, Choices: []string{"off"}, Default: fixed("off")},
 		{ID: "session_secret", Prompt: "Session secret (blank = generate)", Keys: []string{"VIZRA_SESSION_SECRET"}, Secret: true, Mint: true, validate: minLen(32)},
 		{ID: "mfa_kek", Prompt: "MFA key-encryption key (blank = generate)", Keys: []string{"VIZRA_MFA_KEY_KEK"}, Secret: true, Mint: true, validate: minLen(32)},
 		{ID: "search_hmac", Prompt: "Search HMAC key (blank = generate)", Keys: []string{"SEARCH_HMAC_KEY"}, Secret: true, Mint: true, validate: minLen(32)},
