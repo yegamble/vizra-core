@@ -32,17 +32,18 @@ import (
 //	OK   — checked, and it passed.
 //	WARN — checked, not fatal, but an operator should know.
 //	FAIL — checked, and it is broken. Exit code 1.
-//	SKIP — NOT CHECKED, with the reason. Never counted as a pass.
+//	BLOCKED — COULD NOT BE CHECKED, with the reason. Never counted as a
+//	         pass: on its own it exits ExitBlocked (3), not 0.
 //
 // A doctor that reports OK for something it could not test converts an unknown
 // into a false assurance.
 type Status string
 
 const (
-	StatusOK   Status = "OK"
-	StatusWarn Status = "WARN"
-	StatusFail Status = "FAIL"
-	StatusSkip Status = "SKIP"
+	StatusOK      Status = "OK"
+	StatusWarn    Status = "WARN"
+	StatusFail    Status = "FAIL"
+	StatusBlocked Status = "BLOCKED"
 )
 
 // Result is one check.
@@ -76,7 +77,7 @@ func CheckConfig(cfg *config.Config, err error) []Result {
 	if cfg == nil {
 		// Neither a config nor an error is a programming mistake in the caller.
 		// SKIP, not OK: nothing was verified.
-		return []Result{{"configuration", StatusSkip, "the configuration was not loaded"}}
+		return []Result{{"configuration", StatusBlocked, "the configuration was not loaded"}}
 	}
 	return []Result{{"configuration", StatusOK,
 		fmt.Sprintf("%d keys validated, mode=%s", len(config.AllKeys()), cfg.Mode)}}
@@ -118,7 +119,7 @@ func CheckSchema(st migrate.Status) Result {
 		return Result{"schema", StatusFail, st.Detail}
 	default:
 		// Unreadable is SKIP: it was not checked. It is not OK.
-		return Result{"schema", StatusSkip, "the migration ledger could not be read"}
+		return Result{"schema", StatusBlocked, "the migration ledger could not be read"}
 	}
 }
 
@@ -183,7 +184,7 @@ var ComposeFloor = [3]int{2, 24, 4}
 func CheckCompose(raw string, lookErr, runErr error) Result {
 	if lookErr != nil {
 		// Not installed is SKIP, not OK: nothing was verified.
-		return Result{"docker compose", StatusSkip, "docker is not on PATH, so the Compose floor was not checked"}
+		return Result{"docker compose", StatusBlocked, "docker is not on PATH, so the Compose floor was not checked"}
 	}
 	if runErr != nil {
 		return Result{"docker compose", StatusFail,
@@ -276,7 +277,7 @@ func Summarise(results []Result) Counts {
 		switch r.Status {
 		case StatusFail:
 			c.Failed++
-		case StatusSkip:
+		case StatusBlocked:
 			c.Skipped++
 		case StatusWarn:
 			c.Warned++
@@ -285,14 +286,25 @@ func Summarise(results []Result) Counts {
 	return c
 }
 
-// ExitCode is 1 when any check FAILED, 0 otherwise. A SKIP does not fail the
-// run — it was not checked — but it is always reported in the summary so
-// "8 OK" can never be printed when three checks never ran.
+// Exit codes of `vizra doctor`. 2 is the CLI's usage error, so BLOCKED takes 3.
+const (
+	ExitOK      = 0 // every check ran; none failed (WARN allowed)
+	ExitFail    = 1 // at least one check FAILED
+	ExitBlocked = 3 // nothing failed, but at least one check could not run
+)
+
+// ExitCode is ExitFail when any check FAILED, else ExitBlocked when any check
+// was BLOCKED, else ExitOK. A BLOCKED check is never a pass: a run in which
+// three checks could not execute must not exit as if they had passed.
 func ExitCode(results []Result) int {
-	if Summarise(results).Failed > 0 {
-		return 1
+	c := Summarise(results)
+	switch {
+	case c.Failed > 0:
+		return ExitFail
+	case c.Skipped > 0:
+		return ExitBlocked
 	}
-	return 0
+	return ExitOK
 }
 
 // Report writes the results and returns a non-nil error when any check FAILED,
@@ -303,9 +315,12 @@ func Report(w io.Writer, results []Result) error {
 	}
 	c := Summarise(results)
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%d check(s): %d failed, %d not run.\n", c.Total, c.Failed, c.Skipped)
+	fmt.Fprintf(w, "%d check(s): %d failed, %d blocked (not run).\n", c.Total, c.Failed, c.Skipped)
 	if c.Failed > 0 {
 		return fmt.Errorf("vizra doctor: %d check(s) failed", c.Failed)
+	}
+	if c.Skipped > 0 {
+		return fmt.Errorf("vizra doctor: %d check(s) blocked; nothing failed, but they were not verified", c.Skipped)
 	}
 	return nil
 }
@@ -369,7 +384,7 @@ func CheckPublicOrigin(raw, normalized string, production bool) Result {
 	const name = "public origin"
 	switch {
 	case raw == "":
-		return Result{Name: name, Status: StatusSkip, Detail: "no VIZRA_PUBLIC_ORIGIN is configured"}
+		return Result{Name: name, Status: StatusBlocked, Detail: "no VIZRA_PUBLIC_ORIGIN is configured"}
 	case normalized == "":
 		return Result{Name: name, Status: StatusFail,
 			Detail: "VIZRA_PUBLIC_ORIGIN cannot be compared with a browser Origin header; " +
