@@ -1,0 +1,64 @@
+diff --git a/internal/obs/log.go b/internal/obs/log.go
+index 8c6fb97..2febd80 100644
+--- a/internal/obs/log.go
++++ b/internal/obs/log.go
+@@ -68,7 +68,7 @@ var valuePatterns = []redaction{
+ 	// secret, token, session, credential or api_key/apikey is matched, so
+ 	// "db_password=" and "csrf_token=" are too. The value runs to "&",
+ 	// whitespace, a quote or "<>"; a quoted value is taken whole.
+-	{regexp.MustCompile(`(?i)(^|[^a-z0-9_-])((?:[a-z0-9_-]*(?:password|passwd|secret|token|session|credential|api[_-]?key)[a-z0-9_-]*|key|sig|signature|awsaccesskeyid|x-(?:amz|goog)-signature)=)('[^']*'|"[^"]*"|[^&\s"'<>]+)`), "${1}${2}" + redacted},
++//MUTATION 	{regexp.MustCompile(`(?i)(^|[^a-z0-9_-])((?:[a-z0-9_-]*(?:password|passwd|secret|token|session|credential|api[_-]?key)[a-z0-9_-]*|key|sig|signature|awsaccesskeyid|x-(?:amz|goog)-signature)=)('[^']*'|"[^"]*"|[^&\s"'<>]+)`), "${1}${2}" + redacted},
+ 	// bearer tokens and Vizra API keys
+ 	{regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`), redacted},
+ 	{regexp.MustCompile(`\bvzk_[A-Za-z0-9._~+/=-]{8,}`), redacted},
+=== RUN   TestDenylistEveryKeyClass
+--- PASS: TestDenylistEveryKeyClass (0.00s)
+=== RUN   TestDenylistErrorStrings
+    denylist_test.go:46: "sigval9" leaked: {"time":"2026-11-12T12:46:44.587394-05:00","level":"ERROR","msg":"db","error":"dial postgres://[redacted]@db:5432/x failed"}
+        {"time":"2026-11-12T12:46:44.58742-05:00","level":"ERROR","msg":"s3","error":"GET https://b.s3.amazonaws.com/o?X-Amz-Signature=sigval9&X-Amz-Credential=credval9 403"}
+        {"time":"2026-11-12T12:46:44.587447-05:00","level":"ERROR","msg":"gcs","err":"https://x/o?Signature=gsig9&token=tokval9"}
+    denylist_test.go:46: "credval9" leaked: {"time":"2026-11-12T12:46:44.587394-05:00","level":"ERROR","msg":"db","error":"dial postgres://[redacted]@db:5432/x failed"}
+        {"time":"2026-11-12T12:46:44.58742-05:00","level":"ERROR","msg":"s3","error":"GET https://b.s3.amazonaws.com/o?X-Amz-Signature=sigval9&X-Amz-Credential=credval9 403"}
+        {"time":"2026-11-12T12:46:44.587447-05:00","level":"ERROR","msg":"gcs","err":"https://x/o?Signature=gsig9&token=tokval9"}
+    denylist_test.go:46: "gsig9" leaked: {"time":"2026-11-12T12:46:44.587394-05:00","level":"ERROR","msg":"db","error":"dial postgres://[redacted]@db:5432/x failed"}
+        {"time":"2026-11-12T12:46:44.58742-05:00","level":"ERROR","msg":"s3","error":"GET https://b.s3.amazonaws.com/o?X-Amz-Signature=sigval9&X-Amz-Credential=credval9 403"}
+        {"time":"2026-11-12T12:46:44.587447-05:00","level":"ERROR","msg":"gcs","err":"https://x/o?Signature=gsig9&token=tokval9"}
+    denylist_test.go:46: "tokval9" leaked: {"time":"2026-11-12T12:46:44.587394-05:00","level":"ERROR","msg":"db","error":"dial postgres://[redacted]@db:5432/x failed"}
+        {"time":"2026-11-12T12:46:44.58742-05:00","level":"ERROR","msg":"s3","error":"GET https://b.s3.amazonaws.com/o?X-Amz-Signature=sigval9&X-Amz-Credential=credval9 403"}
+        {"time":"2026-11-12T12:46:44.587447-05:00","level":"ERROR","msg":"gcs","err":"https://x/o?Signature=gsig9&token=tokval9"}
+--- FAIL: TestDenylistErrorStrings (0.00s)
+=== RUN   TestDenylistSignedURLs
+    signedurl_test.go:35: signed-URL value "awssig7Q" leaked: {"time":"2026-11-12T12:46:44.587563-05:00","level":"INFO","msg":"fetch","url":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}
+        {"time":"2026-11-12T12:46:44.587625-05:00","level":"INFO","msg":"fetch","req":{"location":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}}
+        {"time":"2026-11-12T12:46:44.587739-05:00","level":"INFO","msg":"with","g":{"redirect":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}}
+        {"time":"2026-11-12T12:46:44.587745-05:00","level":"INFO","msg":"fetching https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}
+        {"time":"2026-11-12T12:46:44.587801-05:00","level":"ERROR","msg":"fetch","error":"GET https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q: 403"}
+    signedurl_test.go:35: signed-URL value "awscred7Q" leaked: {"time":"2026-11-12T12:46:44.587563-05:00","level":"INFO","msg":"fetch","url":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}
+        {"time":"2026-11-12T12:46:44.587625-05:00","level":"INFO","msg":"fetch","req":{"location":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}}
+        {"time":"2026-11-12T12:46:44.587739-05:00","level":"INFO","msg":"with","g":{"redirect":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}}
+        {"time":"2026-11-12T12:46:44.587745-05:00","level":"INFO","msg":"fetching https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}
+        {"time":"2026-11-12T12:46:44.587801-05:00","level":"ERROR","msg":"fetch","error":"GET https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q: 403"}
+    signedurl_test.go:35: signed-URL value "awstok7Q" leaked: {"time":"2026-11-12T12:46:44.587563-05:00","level":"INFO","msg":"fetch","url":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}
+        {"time":"2026-11-12T12:46:44.587625-05:00","level":"INFO","msg":"fetch","req":{"location":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}}
+        {"time":"2026-11-12T12:46:44.587739-05:00","level":"INFO","msg":"with","g":{"redirect":"https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}}
+        {"time":"2026-11-12T12:46:44.587745-05:00","level":"INFO","msg":"fetching https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q"}
+        {"time":"2026-11-12T12:46:44.587801-05:00","level":"ERROR","msg":"fetch","error":"GET https://bucket.s3.us-east-1.amazonaws.com/private/o.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=awscred7Q&X-Amz-Date=20261112T000000Z&X-Amz-Expires=300&X-Amz-Security-Token=awstok7Q&X-Amz-SignedHeaders=host&X-Amz-Signature=awssig7Q: 403"}
+    signedurl_test.go:35: signed-URL value "goosig7Q" leaked: {"time":"2026-11-12T12:46:44.587935-05:00","level":"INFO","msg":"fetch","url":"https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}
+        {"time":"2026-11-12T12:46:44.587975-05:00","level":"INFO","msg":"fetch","req":{"location":"https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}}
+        {"time":"2026-11-12T12:46:44.588042-05:00","level":"INFO","msg":"with","g":{"redirect":"https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}}
+        {"time":"2026-11-12T12:46:44.588045-05:00","level":"INFO","msg":"fetching https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}
+        {"time":"2026-11-12T12:46:44.588081-05:00","level":"ERROR","msg":"fetch","error":"GET https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q: 403"}
+    signedurl_test.go:35: signed-URL value "goocred7Q" leaked: {"time":"2026-11-12T12:46:44.587935-05:00","level":"INFO","msg":"fetch","url":"https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}
+        {"time":"2026-11-12T12:46:44.587975-05:00","level":"INFO","msg":"fetch","req":{"location":"https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}}
+        {"time":"2026-11-12T12:46:44.588042-05:00","level":"INFO","msg":"with","g":{"redirect":"https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}}
+        {"time":"2026-11-12T12:46:44.588045-05:00","level":"INFO","msg":"fetching https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q"}
+        {"time":"2026-11-12T12:46:44.588081-05:00","level":"ERROR","msg":"fetch","error":"GET https://storage.googleapis.com/b/o.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=goocred7Q&X-Goog-Expires=300&X-Goog-Signature=goosig7Q: 403"}
+    signedurl_test.go:35: signed-URL value "cfsig7Q" leaked: {"time":"2026-11-12T12:46:44.58817-05:00","level":"INFO","msg":"fetch","url":"https://d111.cloudfront.net/o.jpg?Expires=1&Signature=cfsig7Q&Key-Pair-Id=K1"}
+        {"time":"2026-11-12T12:46:44.588192-05:00","level":"INFO","msg":"fetch","req":{"location":"https://d111.cloudfront.net/o.jpg?Expires=1&Signature=cfsig7Q&Key-Pair-Id=K1"}}
+        {"time":"2026-11-12T12:46:44.588231-05:00","level":"INFO","msg":"with","g":{"redirect":"https://d111.cloudfront.net/o.jpg?Expires=1&Signature=cfsig7Q&Key-Pair-Id=K1"}}
+        {"time":"2026-11-12T12:46:44.588234-05:00","level":"INFO","msg":"fetching https://d111.cloudfront.net/o.jpg?Expires=1&Signature=cfsig7Q&Key-Pair-Id=K1"}
+        {"time":"2026-11-12T12:46:44.588256-05:00","level":"ERROR","msg":"fetch","error":"GET https://d111.cloudfront.net/o.jpg?Expires=1&Signature=cfsig7Q&Key-Pair-Id=K1: 403"}
+--- FAIL: TestDenylistSignedURLs (0.00s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/obs	1.042s
+FAIL

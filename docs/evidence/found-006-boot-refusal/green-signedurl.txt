@@ -1,0 +1,8 @@
+=== RUN   TestDenylistEveryKeyClass
+--- PASS: TestDenylistEveryKeyClass (0.00s)
+=== RUN   TestDenylistErrorStrings
+--- PASS: TestDenylistErrorStrings (0.00s)
+=== RUN   TestDenylistSignedURLs
+--- PASS: TestDenylistSignedURLs (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/obs	1.066s

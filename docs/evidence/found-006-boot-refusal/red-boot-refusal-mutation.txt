@@ -1,0 +1,54 @@
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 04d8b14..3bc574a 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -350,7 +350,7 @@ func LoadFrom(lookup Lookup) (*Config, error) {
+ 	}
+ 
+ 	// ---- Fail-secure production block (ADR-002 § Configuration ownership) ----
+-	if production {
++	if false && production {
+ 		for _, k := range []struct {
+ 			name string
+ 			val  string
+=== RUN   TestProductionBootRefusesDevSecrets
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-api/dev_session_secret
+    bootrefusal_test.go:50: vizra-api exit=-1 stderr=""
+    bootrefusal_test.go:55: vizra-api refusal did not name VIZRA_SESSION_SECRET ("known development value"): 
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-api/blank_session_secret
+    bootrefusal_test.go:50: vizra-api exit=-1 stderr=""
+    bootrefusal_test.go:55: vizra-api refusal did not name VIZRA_SESSION_SECRET ("must be set in production"): 
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-api/blank_MFA_KEK
+    bootrefusal_test.go:50: vizra-api exit=-1 stderr=""
+    bootrefusal_test.go:55: vizra-api refusal did not name VIZRA_MFA_KEY_KEK ("must be set in production"): 
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-api/plain-http_origin
+    bootrefusal_test.go:50: vizra-api exit=1 stderr="vizra-api refused to start.\nconfiguration is invalid (1 problem(s)):\n  - VIZRA_PUBLIC_ORIGIN: production refuses a plain-http origin; set VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN=true only behind a trusted TLS terminator\n"
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-api/control
+    bootrefusal_test.go:66: vizra-api control stderr=""
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-worker/dev_session_secret
+    bootrefusal_test.go:50: vizra-worker exit=-1 stderr=""
+    bootrefusal_test.go:55: vizra-worker refusal did not name VIZRA_SESSION_SECRET ("known development value"): 
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-worker/blank_session_secret
+    bootrefusal_test.go:50: vizra-worker exit=-1 stderr=""
+    bootrefusal_test.go:55: vizra-worker refusal did not name VIZRA_SESSION_SECRET ("must be set in production"): 
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-worker/blank_MFA_KEK
+    bootrefusal_test.go:50: vizra-worker exit=-1 stderr=""
+    bootrefusal_test.go:55: vizra-worker refusal did not name VIZRA_MFA_KEY_KEK ("must be set in production"): 
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-worker/plain-http_origin
+    bootrefusal_test.go:50: vizra-worker exit=1 stderr="vizra-worker refused to start.\nconfiguration is invalid (1 problem(s)):\n  - VIZRA_PUBLIC_ORIGIN: production refuses a plain-http origin; set VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN=true only behind a trusted TLS terminator\n"
+=== RUN   TestProductionBootRefusesDevSecrets/vizra-worker/control
+    bootrefusal_test.go:66: vizra-worker control stderr=""
+--- FAIL: TestProductionBootRefusesDevSecrets (177.33s)
+    --- FAIL: TestProductionBootRefusesDevSecrets/vizra-api/dev_session_secret (20.00s)
+    --- FAIL: TestProductionBootRefusesDevSecrets/vizra-api/blank_session_secret (20.00s)
+    --- FAIL: TestProductionBootRefusesDevSecrets/vizra-api/blank_MFA_KEK (20.00s)
+    --- PASS: TestProductionBootRefusesDevSecrets/vizra-api/plain-http_origin (0.03s)
+    --- PASS: TestProductionBootRefusesDevSecrets/vizra-api/control (20.07s)
+    --- FAIL: TestProductionBootRefusesDevSecrets/vizra-worker/dev_session_secret (20.00s)
+    --- FAIL: TestProductionBootRefusesDevSecrets/vizra-worker/blank_session_secret (20.01s)
+    --- FAIL: TestProductionBootRefusesDevSecrets/vizra-worker/blank_MFA_KEK (20.00s)
+    --- PASS: TestProductionBootRefusesDevSecrets/vizra-worker/plain-http_origin (0.03s)
+    --- PASS: TestProductionBootRefusesDevSecrets/vizra-worker/control (20.00s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/integration	178.709s
+FAIL
