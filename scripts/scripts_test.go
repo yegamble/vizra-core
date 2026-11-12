@@ -84,6 +84,42 @@ func TestMigrateLintFixtures(t *testing.T) {
 		{dir: "alter-type", wantFail: true, wantText: "destructive"},
 		{dir: "truncate", wantFail: true, wantText: "destructive"},
 
+		// VZ-FOUND-003 N1, every spelling PostgreSQL accepts. The rule used to
+		// match per line and to need the literal COLUMN keyword, so each of
+		// these passed: `ALTER TABLE sites DROP handle;` is a column drop.
+		{dir: "drop-bare", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-if-exists", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-mixed-case", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-whitespace", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-quoted", wantFail: true, wantText: "destructive"},
+		// EXPRESSION and IDENTITY are not reserved: this drops a column.
+		{dir: "drop-bare-named-identity", wantFail: true, wantText: "destructive"},
+		{dir: "drop-bare-split-lines", wantFail: true, wantText: "destructive"},
+		{dir: "drop-column-split-lines", wantFail: true, wantText: "destructive"},
+		{dir: "drop-multi-action", wantFail: true, wantText: "destructive"},
+		{dir: "drop-multi-action-split", wantFail: true, wantText: "destructive"},
+		{dir: "drop-column-comments-between", wantFail: true, wantText: "destructive"},
+		{dir: "drop-no-semicolon", wantFail: true, wantText: "destructive"},
+
+		// Not column drops, and not flagged by any other rule: unchanged.
+		{dir: "alter-drop-default", wantFail: false},
+		{dir: "alter-drop-not-null", wantFail: false},
+		{dir: "alter-drop-expression", wantFail: false},
+		{dir: "alter-drop-identity", wantFail: false},
+		{dir: "not-a-statement", wantFail: false},
+		// The reviewed exception covers the new spellings too.
+		{dir: "allow-destructive-bare", wantFail: false},
+		{dir: "allow-destructive-split", wantFail: false},
+		// A marker directly before ONE multi-line column drop, nothing else on
+		// its lines.
+		{dir: "allow-destructive-split-alone", wantFail: false},
+		// PR#18 VERIFY F1: the marker exempts the statement it precedes and
+		// nothing else. Each of these has a second, unmarked destructive
+		// statement on the line of the marked statement's DROP.
+		{dir: "allow-destructive-other-drop-table", wantFail: true, wantText: "destructive"},
+		{dir: "allow-destructive-other-drop-column", wantFail: true, wantText: "destructive"},
+		{dir: "allow-destructive-other-rename", wantFail: true, wantText: "destructive"},
+
 		{dir: "bad-filename", wantFail: true, wantText: "filename"},
 		{dir: "sequence-gap", wantFail: true, wantText: "gap"},
 		{dir: "missing-down", wantFail: true, wantText: "no-down"},
@@ -100,6 +136,87 @@ func TestMigrateLintFixtures(t *testing.T) {
 				t.Fatalf("the failure does not mention %q, so an author would not know what to fix:\n%s", tc.wantText, out)
 			}
 		})
+	}
+}
+
+// Differential check (PR#18 VERIFY F1): the statement parser may reject more
+// than the per-line rule on main did, never less. Every fixture main's script
+// rejected, and the three files F1 showed it rejecting while the PR accepted
+// them, must still be rejected.
+func TestMigrateLintRejectsEverythingMainRejected(t *testing.T) {
+	rejectedOnMain := []string{
+		"drop-column", "drop-table", "drop-index", "drop-constraint", "rename",
+		"alter-type", "truncate", "bad-filename", "sequence-gap", "missing-down",
+		"empty-down",
+		"allow-destructive-other-drop-table",
+		"allow-destructive-other-drop-column",
+		"allow-destructive-other-rename",
+	}
+	for _, dir := range rejectedOnMain {
+		t.Run(dir, func(t *testing.T) {
+			out, code := run(t, "migrate-lint.sh", "--dir", filepath.Join("scripts", "testdata", "migratelint", dir))
+			if code == 0 {
+				t.Fatalf("migrate-lint accepts a tree that main's migrate-lint rejects:\n%s", out)
+			}
+		})
+	}
+}
+
+// The property itself, not a list (PR#18 VERIFY round 2, R2-F1): run the frozen
+// copy of main's script (testdata/migratelint/main-baseline, origin/main
+// 5f615d7) and the current script over every fixture tree and every tree in
+// testdata/migratelint/differential. Wherever main's script exits non-zero the
+// current one must too. The corpus holds the verifier's counter-examples
+// (d16: a second, unmarked DROP TABLE exempted by another statement's marker).
+func TestMigrateLintNeverAcceptsWhatMainRejects(t *testing.T) {
+	root := repoRoot(t)
+	base := filepath.Join(root, "scripts", "testdata", "migratelint")
+	baseline := filepath.Join(base, "main-baseline", "migrate-lint.sh")
+	var trees []string
+	for _, parent := range []string{base, filepath.Join(base, "differential")} {
+		entries, err := os.ReadDir(parent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if !e.IsDir() || (parent == base && (e.Name() == "main-baseline" || e.Name() == "differential")) {
+				continue
+			}
+			trees = append(trees, filepath.Join(parent, e.Name()))
+		}
+	}
+	if len(trees) < 50 {
+		t.Fatalf("only %d trees found; the corpus is not being collected", len(trees))
+	}
+	exit := func(script, dir string) (string, int) {
+		cmd := exec.Command(script, "--dir", dir)
+		cmd.Dir = root
+		out, err := cmd.CombinedOutput()
+		if ee, ok := err.(*exec.ExitError); ok {
+			return string(out), ee.ExitCode()
+		} else if err != nil {
+			t.Fatalf("%s: %v", script, err)
+		}
+		return string(out), 0
+	}
+	mainRejects := 0
+	for _, dir := range trees {
+		rel, _ := filepath.Rel(base, dir)
+		t.Run(rel, func(t *testing.T) {
+			_, mainCode := exit(baseline, dir)
+			out, code := exit(filepath.Join(root, "scripts", "migrate-lint.sh"), dir)
+			if mainCode != 0 {
+				mainRejects++
+			}
+			if mainCode != 0 && code == 0 {
+				t.Fatalf("main's migrate-lint rejects this tree (exit %d) and the current one accepts it:\n%s", mainCode, out)
+			}
+		})
+	}
+	// The baseline must really be rejecting: if it failed to run at all, or
+	// accepted everything, the comparison above would prove nothing.
+	if mainRejects < 20 {
+		t.Fatalf("the baseline rejected only %d of %d trees; it is not judging them", mainRejects, len(trees))
 	}
 }
 
