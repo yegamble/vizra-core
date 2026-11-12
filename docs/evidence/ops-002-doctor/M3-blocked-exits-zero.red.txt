@@ -1,0 +1,7 @@
+--- FAIL: TestBlockedIsNeverAPassAndExitsDistinctly (0.00s)
+    doctor_test.go:327: exit = 0, want ExitBlocked (3)
+--- FAIL: TestExitCodeDistinguishesBlockedFromFail (0.00s)
+    host_test.go:144: OK+BLOCKED: 0, want 3
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.475s
+FAIL

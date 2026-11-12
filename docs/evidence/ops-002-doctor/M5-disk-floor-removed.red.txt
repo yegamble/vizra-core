@@ -1,0 +1,5 @@
+--- FAIL: TestCheckDisk (0.00s)
+    host_test.go:78: below floor: OK, want FAIL
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.611s
+FAIL

@@ -1,0 +1,6 @@
+--- FAIL: TestCheckTopology (0.00s)
+    --- FAIL: TestCheckTopology/no_env_file (0.00s)
+        host_test.go:67: status = OK (), want BLOCKED
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/doctor	0.359s
+FAIL
