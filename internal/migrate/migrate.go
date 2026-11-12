@@ -168,10 +168,7 @@ func applyOne(ctx context.Context, dsn string) (bool, int64, error) {
 	if verr != nil && !errors.Is(verr, migrate.ErrNilVersion) {
 		return false, 0, fmt.Errorf("migrate: reading the ledger: %w", verr)
 	}
-	if dirty { // CONTROLLED MUTATION (VZ-FOUND-003 R1 red): auto-repair
-		_ = m.Force(int(before))
-	}
-	if false {
+	if dirty {
 		// Reported, never auto-repaired.
 		return false, int64(before), fmt.Errorf(
 			"migrate: the ledger is dirty at version %d; a previous migration failed part-way. "+
