@@ -1,0 +1,26 @@
+# scratch module (mktemp, deleted afterwards): golang.org/x/text v0.3.7 + call to language.ParseAcceptLanguage; same tool pin as `make govulncheck`
+$ go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+=== Symbol Results ===
+
+Vulnerability #1: GO-2022-1059
+    Denial of service via crafted Accept-Language header in
+    golang.org/x/text/language
+  More info: https://pkg.go.dev/vuln/GO-2022-1059
+  Module: golang.org/x/text
+    Found in: golang.org/x/text@v0.3.7
+    Fixed in: golang.org/x/text@v0.3.8
+    Example traces found:
+      #1: main.go:5:53: vulnprobe.main calls language.ParseAcceptLanguage
+
+Your code is affected by 1 vulnerability from 1 module.
+This scan also found 2 vulnerabilities in packages you import and 36
+exit=141 (SIGPIPE from `| head`; unpiped rerun below)
+
+# restored: go get golang.org/x/text@v0.3.8 (fixed)
+$ go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+=== Symbol Results ===
+
+No vulnerabilities found.
+
+exit=0
+# unpiped rerun of the vulnerable case: govulncheck exit=1

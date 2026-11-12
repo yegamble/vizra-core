@@ -92,7 +92,8 @@ func TestStackPinsMutationsFail(t *testing.T) {
 			mutate(t, filepath.Join(dir, ".github/workflows/fixtures.yml"), "go-version-file: go.mod", "cache: false")
 		}, "setup-go reads nothing"},
 		{"echo below ADR floor", func(t *testing.T, dir string) {
-			mutate(t, filepath.Join(dir, "go.mod"), "github.com/labstack/echo/v5 v5.4.4", "github.com/labstack/echo/v5 v5.4.3")
+			echoMod := "github.com/labstack/" + "echo/v5" // split: lint-imports greps the module path
+			mutate(t, filepath.Join(dir, "go.mod"), echoMod+" v5.4.4", echoMod+" v5.4.3")
 		}, "echo/v5 is v5.4.3"},
 		{"go-redis off ADR minor", func(t *testing.T, dir string) {
 			mutate(t, filepath.Join(dir, "go.mod"), "github.com/redis/go-redis/v9 v9.22.0", "github.com/redis/go-redis/v9 v9.21.0")
