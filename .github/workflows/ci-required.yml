@@ -46,6 +46,10 @@ jobs:
       # the floor: a pull request cannot shrink its own gate by deleting a line
       # from .github/required-checks.txt.
       - name: Guard the manifest
+        env:
+          # The tombstone check compares the manifest with the one at the base;
+          # the guard fetches this SHA (depth 1) if the shallow checkout lacks it.
+          CI_REQUIRED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: ./scripts/ci-required-guard.sh
 
       - name: Wait for every required check and fail on anything but success

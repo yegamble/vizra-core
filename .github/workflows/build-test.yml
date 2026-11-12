@@ -116,6 +116,10 @@ jobs:
       VIZRA_TEST_DATABASE_URL: postgres://vizra@127.0.0.1:5432/vizra_test?sslmode=disable
       VIZRA_TEST_CACHE_URL: redis://127.0.0.1:6379/0
       VIZRA_TEST_CACHE_FLAVOUR: valkey
+      # `make ci` runs ci-guard, whose tombstone check reads the manifest at the
+      # base; this shallow checkout has no origin/main, so the base SHA is passed
+      # as ci-required.yml does (on push to main, HEAD is origin/main itself).
+      CI_REQUIRED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
     # GitHub-hosted ubuntu-24.04 is the clean target (ADR-009). The owner's
     # machine is arm64 and is not a substitute.
     runs-on: ubuntu-24.04

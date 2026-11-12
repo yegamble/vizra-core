@@ -13,6 +13,14 @@
 # Deleting a required line therefore turns the guard red with a named error,
 # rather than quietly shrinking the gate — see
 # docs/evidence/warroom/2026-09-20-vizra-user-pr1-skeleton-SECURITY.md Finding 2.
+#
+# RETIRING a lane (VZ-CI-001): deleting or commenting out a line, compared with
+# this file at the PR's merge base, fails ci-required-guard unless the same
+# change adds, for that exact lane, a comment of the form
+#   # tombstone: <lane> retired <YYYY-MM-DD> because <reason>
+# A tombstone with no date or reason, for a lane the base never listed, for a
+# lane still listed, or for a floor lane is rejected. Tombstones are permanent:
+# deleting one later is rejected too.
 
 append-only
 build-test

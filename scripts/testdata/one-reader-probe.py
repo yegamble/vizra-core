@@ -265,6 +265,8 @@ NAMED_READS = {
         ("load_pins", "read_text"): ".github/pinned-steps.yml",
         ("main", "read_text"): ".github/required-checks.txt",
         ("main", "splitlines"): ".github/required-checks.txt",
+        ("read_manifest", "read_text"): ".github/required-checks.txt (head and merge-base copies)",
+        ("read_manifest", "splitlines"): ".github/required-checks.txt (head and merge-base copies)",
     },
 }
 for f, named in NAMED_READS.items():

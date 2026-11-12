@@ -1148,6 +1148,64 @@ def check_makefile_pin(g: Guard, pin_path: Path) -> None:
         )
 
 
+TOMBSTONE = re.compile(r"^#\s*tombstone:\s*(\S+)\s+retired\s+(\d{4}-\d{2}-\d{2})\s+because\s+(\S.*)$")
+
+
+def read_manifest(path: Path) -> tuple[list[str], dict[str, str], list[str]]:
+    """(required lanes, {lane: tombstone line}, malformed tombstone lines)."""
+    required: list[str] = []
+    tombs: dict[str, str] = {}
+    bad: list[str] = []
+    for line in path.read_text().splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if s.startswith("#"):
+            if re.match(r"^#\s*tombstone\b", s, re.IGNORECASE):
+                m = TOMBSTONE.match(s)
+                if m:
+                    tombs[m.group(1)] = s
+                else:
+                    bad.append(s)
+            continue
+        required.append(s)
+    return required, tombs, bad
+
+
+def check_tombstones(g: Guard, manifest: Path, base, required: list[str]) -> None:
+    """TOMBSTONE (VZ-CI-001): a lane may leave the manifest only with
+    `# tombstone: <lane> retired <YYYY-MM-DD> because <reason>`, judged against
+    the manifest at the merge base (ci-required-guard.sh reads it from git)."""
+    _, tombs, bad = read_manifest(manifest)
+    for line in bad:
+        g.fail(f"malformed tombstone {line!r}.",
+               "Format: `# tombstone: <lane> retired <YYYY-MM-DD> because <reason>`.")
+    for lane in sorted(tombs):
+        if lane in required:
+            g.fail(f"tombstone for {lane!r}, which is still required: a lane is either required or retired.")
+        if lane in FLOOR_LANES:
+            g.fail(f"tombstone for floor lane {lane!r}: floor lanes (FLOOR_LANES) cannot be retired by a manifest edit.")
+    if base is None:
+        g.ok("tombstones: well-formed (no --base-manifest given, so removals were not compared; "
+             "ci-required-guard.sh always supplies one)")
+        return
+    if not base.is_file():
+        g.fail(f"BASE MANIFEST UNAVAILABLE: {base} is unreadable; removals cannot be checked, so this fails closed")
+        return
+    base_req, base_tombs, _ = read_manifest(base)
+    for lane in sorted(set(tombs) - set(base_req) - set(base_tombs)):
+        g.fail(f"tombstone for {lane!r}, a lane that never existed in the base manifest.")
+    for lane in sorted(set(base_tombs) - set(tombs)):
+        g.fail(f"the tombstone for {lane!r} was deleted; tombstones are permanent records.")
+    removed = sorted(set(base_req) - set(required))
+    for lane in removed:
+        if lane not in tombs:
+            g.fail(f"required lane {lane!r} was removed from the manifest without a tombstone.",
+                   f"Add `# tombstone: {lane} retired <YYYY-MM-DD> because <reason>` in the same change.")
+    retired = [lane for lane in removed if lane in tombs]
+    g.ok(f"tombstones: compared with the base manifest ({len(base_req)} lane(s)); retired by tombstone: {retired}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     root = Path(__file__).resolve().parent.parent
@@ -1158,6 +1216,8 @@ def main() -> int:
     ap.add_argument("--makefile-pins", type=Path, default=root / ".github" / "pinned-makefiles.yml")
     ap.add_argument("--skip-makefile", action="store_true",
                     help="for fixture runs that ship no Makefile: skips checks 5 and 11")
+    ap.add_argument("--base-manifest", type=Path, default=None,
+                    help="the manifest at the merge base; ci-required-guard.sh supplies it from git")
     args = ap.parse_args()
 
     g = Guard()
@@ -1181,6 +1241,8 @@ def main() -> int:
     if not required:
         g.fail(f"{args.manifest} lists no checks; ci-required would pass with nothing verified")
         return 1
+
+    check_tombstones(g, args.manifest, args.base_manifest, required)
 
     load_makefile_env_names(args.makefile)
     make_pins, direct_pins, required_inv = load_pins(args.pins)

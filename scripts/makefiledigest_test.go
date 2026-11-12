@@ -650,7 +650,7 @@ func TestCIRequiredGuardMakefilePin(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.pin, func(t *testing.T) {
 			t.Parallel()
-			out, code := run(t, "ci-required-guard.sh", "--makefile-pins",
+			out, code := run(t, "ci-required-guard.sh", sameBaseManifest, "--makefile-pins",
 				filepath.Join("scripts", "testdata", "makefilepin", tc.pin, ".github", "pinned-makefiles.yml"))
 			if (code != 0) != tc.wantFail {
 				t.Fatalf("exit %d, want failed=%v\n%s", code, tc.wantFail, out)
@@ -1021,7 +1021,7 @@ func TestAnUnreadablePinnedFileIsRefusedByName(t *testing.T) {
 	if strings.Contains(out, "Traceback") {
 		t.Fatalf("the anchor refused with a traceback, not by name:\n%s", out)
 	}
-	gout, code := run(t, "ci-required-guard.sh", "--makefile-pins", filepath.Join(dir, ".github", "pinned-makefiles.yml"))
+	gout, code := run(t, "ci-required-guard.sh", sameBaseManifest, "--makefile-pins", filepath.Join(dir, ".github", "pinned-makefiles.yml"))
 	if code != 1 || !strings.Contains(gout, "Makefile is pinned but cannot be read") || strings.Contains(gout, "Traceback") {
 		t.Fatalf("check 11: exit %d; want exit 1 naming the Makefile, no traceback:\n%s", code, gout)
 	}

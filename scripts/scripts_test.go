@@ -40,6 +40,12 @@ func repoRoot(t *testing.T) string {
 
 // run executes a script from the repository root and returns combined output
 // and exit code.
+// sameBaseManifest makes the tree's own manifest the tombstone base, for
+// fixture calls whose subject is another check (e.g. check 11): no removal,
+// and no git lookup of the merge base, which a shallow CI checkout without
+// origin/main cannot resolve (the wrapper fails closed there by design).
+const sameBaseManifest = "--base-manifest=.github/required-checks.txt"
+
 func run(t *testing.T, name string, args ...string) (string, int) {
 	t.Helper()
 	root := repoRoot(t)
@@ -363,7 +369,13 @@ func TestCIRequiredGuardFixtures(t *testing.T) {
 // The guard must pass on the repository's own .github, or the fixtures are
 // checking something the gate does not run.
 func TestCIRequiredGuardPassesOnTheRealWorkflows(t *testing.T) {
-	out, code := run(t, "ci-required-guard.sh")
+	// The base is HEAD explicitly: a shallow CI checkout has no origin/main and
+	// the guard fails CLOSED without a base (TestTheGuardFailsClosedWithoutABaseManifest).
+	head, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, code := runEnv(t, []string{"CI_REQUIRED_BASE_SHA=" + strings.TrimSpace(string(head))}, "ci-required-guard.sh")
 	if code != 0 {
 		t.Fatalf("the guard fails on the repository's own workflows:\n%s", out)
 	}
@@ -1036,5 +1048,101 @@ func TestLintImportsPassesOnTheRealTree(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("lint-imports did not report on %q; a check that silently stopped running still prints nothing:\n%s", want, out)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// VZ-CI-001 — retiring a lane needs a tombstone, judged against the base manifest
+// ---------------------------------------------------------------------------
+
+// runEnv is run with extra environment entries appended.
+func runEnv(t *testing.T, env []string, name string, args ...string) (string, int) {
+	t.Helper()
+	root := repoRoot(t)
+	cmd := exec.Command(filepath.Join(root, "scripts", name), args...)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), env...)
+	out, err := cmd.CombinedOutput()
+	code := 0
+	if ee, ok := err.(*exec.ExitError); ok {
+		code = ee.ExitCode()
+	} else if err != nil {
+		t.Fatalf("%s: %v", name, err)
+	}
+	return string(out), code
+}
+
+// Every lane in core's real manifest is a floor lane, so the tombstone rule is
+// exercised with a NON-floor lane, `extra-lane`, present in the base manifest.
+func TestRemovingAManifestLaneNeedsATombstone(t *testing.T) {
+	fixture := filepath.Join("scripts", "testdata", "guard", "good")
+	good, err := os.ReadFile(filepath.Join(repoRoot(t), fixture, "required-checks.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const tomb = "# tombstone: extra-lane retired 2026-11-12 because folded into build-test\n"
+	baseWith := string(good) + "extra-lane\n"
+	cases := []struct {
+		name, base, head string
+		wantFail         bool
+		want             string
+	}{
+		{"line deleted, no tombstone", baseWith, string(good), true, "removed from the manifest without a tombstone"},
+		{"line commented out, no tombstone", baseWith, string(good) + "# extra-lane\n", true, "removed from the manifest without a tombstone"},
+		{"tombstone with no reason", baseWith, string(good) + "# tombstone: extra-lane retired 2026-11-12 because\n", true, "malformed tombstone"},
+		{"tombstone with no date", baseWith, string(good) + "# tombstone: extra-lane because folded\n", true, "malformed tombstone"},
+		{"tombstone for a lane the base never had", string(good), string(good) + tomb, true, "never existed"},
+		{"tombstone for a lane still listed", baseWith, baseWith + tomb, true, "still required"},
+		{"tombstone for a floor lane", string(good), strings.Replace(string(good), "\ndocker-build\n", "\n", 1) +
+			"# tombstone: docker-build retired 2026-11-12 because reasons\n", true, "floor lane"},
+		{"earlier tombstone deleted", string(good) + tomb, string(good), true, "tombstone for 'extra-lane' was deleted"},
+		{"valid tombstone retires the lane", baseWith, string(good) + tomb, false, "retired by tombstone: ['extra-lane']"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			base, head := filepath.Join(dir, "base.txt"), filepath.Join(dir, "head.txt")
+			if err := os.WriteFile(base, []byte(tc.base), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(head, []byte(tc.head), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			out, code := run(t, "ci-required-guard.sh",
+				"--workflows", filepath.Join(fixture, "workflows"),
+				"--manifest", head, "--base-manifest", base, "--skip-makefile")
+			if (code != 0) != tc.wantFail || !strings.Contains(out, tc.want) {
+				t.Fatalf("exit %d, wantFail=%v with %q:\n%s", code, tc.wantFail, tc.want, out)
+			}
+		})
+	}
+}
+
+// R1: with no base manifest from git — no merge base, or a stale/unknown base
+// SHA — the shell guard fails CLOSED instead of skipping the comparison.
+func TestTheGuardFailsClosedWithoutABaseManifest(t *testing.T) {
+	for _, env := range [][]string{
+		{"CI_REQUIRED_BASE_SHA=0123456789012345678901234567890123456789"},
+		{"CI_REQUIRED_BASE_SHA=not-a-sha"},
+	} {
+		out, code := runEnv(t, env, "ci-required-guard.sh")
+		if code == 0 || !strings.Contains(out, "BASE MANIFEST UNAVAILABLE") {
+			t.Fatalf("%v: exit %d, want BASE MANIFEST UNAVAILABLE:\n%s", env, code, out)
+		}
+	}
+}
+
+// R1: an empty selection — a manifest with no lanes — is red, not vacuously green.
+func TestTheGuardRejectsAnEmptyManifest(t *testing.T) {
+	head := filepath.Join(t.TempDir(), "empty.txt")
+	if err := os.WriteFile(head, []byte("# only comments\n\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, code := run(t, "ci-required-guard.sh",
+		"--workflows", filepath.Join("scripts", "testdata", "guard", "good", "workflows"),
+		"--manifest", head, "--skip-makefile")
+	if code == 0 || !strings.Contains(out, "lists no checks") {
+		t.Fatalf("exit %d, want red 'lists no checks':\n%s", code, out)
 	}
 }
