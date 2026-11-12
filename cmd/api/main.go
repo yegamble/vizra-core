@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/yegamble/vizra-core/internal/buildinfo"
 	"github.com/yegamble/vizra-core/internal/cache"
@@ -133,6 +132,7 @@ func run() error {
 		Limiter:               limiter,
 		Search:                searchSvc,
 		Logger:                log,
+		Metrics:               registry,
 		EmbeddedSchemaVersion: embedded,
 		QueueSnapshot: func(ctx context.Context) (jobs.Snapshot, error) {
 			return jobs.Collect(ctx, pools.Default(), jobMetrics)
@@ -145,7 +145,7 @@ func run() error {
 	// would otherwise have to carry /metrics, which no client should see.
 	metricsSrv := &http.Server{
 		Addr:              cfg.MetricsAddr,
-		Handler:           promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}),
+		Handler:           obs.MetricsHandler(registry),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {

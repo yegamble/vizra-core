@@ -18,7 +18,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/yegamble/vizra-core/internal/buildinfo"
 	"github.com/yegamble/vizra-core/internal/config"
@@ -89,7 +88,7 @@ func run() error {
 		pingers[handle] = pool
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/", promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
+	mux.Handle("/", obs.MetricsHandler(registry))
 	mux.Handle("/readyz", jobs.HealthHandler(w.Health(), pingers))
 	mux.Handle("/healthz", jobs.LivenessHandler())
 
