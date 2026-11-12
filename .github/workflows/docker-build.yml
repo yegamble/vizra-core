@@ -190,6 +190,60 @@ jobs:
       - name: Assert the toolchain is absent from the runtime image
         run: ./scripts/assert-runtime-image.sh vizra-core:ci
 
+      # VZ-FOUND-003 S1: `vizra migrate` FROM THE RELEASE IMAGE applies cleanly on
+      # an empty PostgreSQL 18 (the digest build-test pins, ADR-001), reaches the
+      # head version the binary embeds, leaves the ledger clean, and is a no-op
+      # the second time. Fails closed: a failing migration, a missing binary or a
+      # dirty/behind ledger turns this lane red.
+      - name: Assert migrate up from the image applies cleanly on an empty database
+        run: |
+          set -euo pipefail
+          docker network create vizra-mig
+          # postgres:18, digest resolved 2026-09-20 (ADR-001); same as build-test.
+          docker run -d --name vizra-mig-pg --network vizra-mig \
+            -e POSTGRES_USER=vizra -e POSTGRES_DB=vizra -e POSTGRES_HOST_AUTH_METHOD=trust \
+            postgres@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+          ready=0
+          for _ in $(seq 1 60); do
+            if docker exec vizra-mig-pg pg_isready -U vizra -d vizra -h 127.0.0.1 >/dev/null 2>&1; then ready=1; break; fi
+            sleep 1
+          done
+          [ $ready -eq 1 ] || { echo "::error::PostgreSQL did not become ready"; docker logs vizra-mig-pg; exit 1; }
+
+          tables=$(docker exec vizra-mig-pg psql -U vizra -d vizra -tAc \
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
+          [ "$tables" = "0" ] || { echo "::error::the database is not empty ($tables tables)"; exit 1; }
+
+          migrate() {
+            docker run --rm --network vizra-mig \
+              -e DATABASE_URL=postgres://vizra@vizra-mig-pg:5432/vizra?sslmode=disable \
+              -e VIZRA_MODE=development \
+              -e VIZRA_CACHE_URL=redis://127.0.0.1:6379/0 \
+              vizra-core:ci /usr/local/bin/vizra migrate
+          }
+          ledger() {
+            docker exec vizra-mig-pg psql -U vizra -d vizra -tAc \
+              "SELECT version || ' ' || dirty FROM schema_migrations"
+          }
+
+          head=$(find migrations -name '*.up.sql' | sed 's#.*/0*\([0-9][0-9]*\)_.*#\1#' | sort -n | tail -1)
+          echo "head version in migrations/: $head"
+
+          echo "--- first run ---"
+          migrate | tee /tmp/mig1.txt
+          grep -q "APPLIED to version $head" /tmp/mig1.txt \
+            || { echo "::error::first run did not report APPLIED to version $head"; exit 1; }
+          l1=$(ledger); echo "ledger: $l1"
+          [ "$l1" = "$head false" ] || { echo "::error::ledger is '$l1', want '$head false'"; exit 1; }
+
+          echo "--- second run (idempotence) ---"
+          migrate | tee /tmp/mig2.txt
+          grep -q "current at version $head" /tmp/mig2.txt \
+            || { echo "::error::second run was not a no-op at version $head"; exit 1; }
+          l2=$(ledger); echo "ledger: $l2"
+          [ "$l2" = "$head false" ] || { echo "::error::ledger changed to '$l2' on the second run"; exit 1; }
+          echo "migrate up from the image: applied to $head, clean, idempotent"
+
       - name: Record the image size
         run: |
           set -euo pipefail
