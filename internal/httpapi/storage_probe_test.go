@@ -167,3 +167,15 @@ func TestReadyzStorageRootUnconfiguredIs503(t *testing.T) {
 		t.Fatalf("/readyz with no storage root = %d %+v, want 503 with storage unavailable", code, body)
 	}
 }
+
+// Regression (F-1, PR #22 valkey leg): busy must be cleared before the result
+// is delivered, or a back-to-back probe sees its predecessor's bookkeeping and
+// reports a false "did not answer in time".
+func TestStorageProbeBackToBackNeverFalseTimeout(t *testing.T) {
+	p := &storageProbe{check: func() error { return nil }}
+	for i := 0; i < 5000; i++ {
+		if err := p.Check(t.Context()); err != nil {
+			t.Fatalf("back-to-back check %d = %v, want nil", i, err)
+		}
+	}
+}

@@ -69,8 +69,11 @@ func (p *storageProbe) Check(ctx context.Context) error {
 	}
 	done := make(chan error, 1)
 	go func() {
-		defer p.busy.Store(false)
-		done <- p.check()
+		err := p.check()
+		// Clear busy before delivering the result: a caller that returns on
+		// this result and probes again must find the probe free (F-1).
+		p.busy.Store(false)
+		done <- err
 	}()
 	select {
 	case err := <-done:
