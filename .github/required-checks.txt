@@ -27,7 +27,6 @@ build-test
 cache-matrix
 fixtures
 govulncheck
-docker-build
 
 # DELIBERATELY ABSENT: image-scan.yml's `image-scan`.
 #
