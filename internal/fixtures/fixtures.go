@@ -89,19 +89,23 @@ const (
 
 // Spec is one fixture: what it is, what it is FOR, and what must be true of it.
 type Spec struct {
-	ID       string   `json:"id"`
-	Path     string   `json:"path"`
-	Format   string   `json:"format"`
-	Tier     Tier     `json:"tier"`
-	ADR009   int      `json:"adr009_item"`
-	Purpose  string   `json:"purpose"`
-	Decode   Decode   `json:"expected_decode"`
-	Width    int      `json:"width"`
-	Height   int      `json:"height"`
-	Asserts  []string `json:"asserts"`
-	License  string   `json:"license"`
-	build    func() ([]byte, error)
-	verifyFn func([]byte) error
+	ID      string   `json:"id"`
+	Path    string   `json:"path"`
+	Format  string   `json:"format"`
+	Tier    Tier     `json:"tier"`
+	ADR009  int      `json:"adr009_item"`
+	Purpose string   `json:"purpose"`
+	Decode  Decode   `json:"expected_decode"`
+	Width   int      `json:"width"`
+	Height  int      `json:"height"`
+	Asserts []string `json:"asserts"`
+	License string   `json:"license"`
+	// Categories are the VZ-FOUND-007 ledger outcome categories this fixture covers.
+	Categories []string `json:"categories"`
+	// Provenance names the generator function (and any committed input) that made the bytes.
+	Provenance string `json:"provenance"`
+	build      func() ([]byte, error)
+	verifyFn   func([]byte) error
 }
 
 const genLicense = "Synthesised by vizra-core internal/fixtures. No third-party material; no licence attaches."
@@ -282,6 +286,21 @@ func Corpus() []Spec {
 	}
 }
 
+// All returns the ADR-009 twelve followed by the VZ-FOUND-007 supplement, with
+// each ADR fixture's ledger categories and provenance filled in.
+func All() []Spec {
+	out := Corpus()
+	for i := range out {
+		out[i].Categories = categoriesOf[out[i].ID]
+		if out[i].Tier == TierCodec {
+			out[i].Provenance = "committed codec input internal/fixtures/codec/" + out[i].Path + " (see codec_inputs), copied by fixturegen"
+		} else {
+			out[i].Provenance = "fixturegen: native Go synthesis in internal/fixtures, spec " + out[i].ID
+		}
+	}
+	return append(out, supplement()...)
+}
+
 // Generate writes the whole corpus into dir and returns each file's sha256,
 // keyed by fixture path. It creates dir if needed and overwrites what is there.
 func Generate(dir string) (map[string]FileInfo, error) {
@@ -289,7 +308,7 @@ func Generate(dir string) (map[string]FileInfo, error) {
 		return nil, err
 	}
 	out := make(map[string]FileInfo)
-	for _, s := range Corpus() {
+	for _, s := range All() {
 		b, err := s.build()
 		if err != nil {
 			return nil, fmt.Errorf("fixture %s: %w", s.ID, err)
@@ -314,7 +333,7 @@ func Generate(dir string) (map[string]FileInfo, error) {
 // than a comment.
 func Verify(dir string) error {
 	var problems []string
-	for _, s := range Corpus() {
+	for _, s := range All() {
 		b, err := os.ReadFile(filepath.Join(dir, s.Path))
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", s.ID, err))
