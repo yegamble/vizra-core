@@ -40,6 +40,12 @@ func repoRoot(t *testing.T) string {
 
 // run executes a script from the repository root and returns combined output
 // and exit code.
+// sameBaseManifest makes the tree's own manifest the tombstone base, for
+// fixture calls whose subject is another check (e.g. check 11): no removal,
+// and no git lookup of the merge base, which a shallow CI checkout without
+// origin/main cannot resolve (the wrapper fails closed there by design).
+const sameBaseManifest = "--base-manifest=.github/required-checks.txt"
+
 func run(t *testing.T, name string, args ...string) (string, int) {
 	t.Helper()
 	root := repoRoot(t)

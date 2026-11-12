@@ -149,7 +149,7 @@ func TestEveryOutOfGrammarLineIsRefusedBeforeMake(t *testing.T) {
 				t.Fatal(err)
 			}
 			out, rec := runRecorded(t, dir, true)
-			gout, gcode := run(t, "ci-required-guard.sh", "--makefile-pins", filepath.Join(dir, ".github", "pinned-makefiles.yml"))
+			gout, gcode := run(t, "ci-required-guard.sh", sameBaseManifest, "--makefile-pins", filepath.Join(dir, ".github", "pinned-makefiles.yml"))
 			if tc.want == "" {
 				assertGreen(t, tc.name, out, rec)
 				if gcode != 0 {
