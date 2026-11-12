@@ -308,8 +308,23 @@ func TestRotate(t *testing.T) {
 	if _, err := Rotate(env, "domain", true, false); err == nil {
 		t.Fatal("rotating a non-secret accepted")
 	}
-	n, err := Rotate(env, "mfa_kek", true, true)
-	if err != nil || n["VIZRA_MFA_KEY_KEK"] == old || len(n["VIZRA_MFA_KEY_KEK"]) < 32 {
-		t.Fatalf("rotate: %v", err)
+	_ = old
+	// Data-loss guard: no re-wrap of TOTP enrolments exists, so the KEK, and
+	// the database passwords (the env value does not change the server's
+	// password), are refused even with --yes --yes-i-know.
+	for _, id := range []string{"mfa_kek", "postgres_password", "clickhouse_password"} {
+		if _, err := Rotate(env, id, true, true); err == nil {
+			t.Fatalf("rotate %s with --yes --yes-i-know accepted", id)
+		}
+	}
+	if _, err := Rotate(env, "mfa_kek", true, true); err == nil || !strings.Contains(err.Error(), "vizra mfa rewrap-kek") {
+		t.Fatalf("KEK refusal must name the future command: %v", err)
+	}
+	for _, id := range []string{"session_secret", "search_hmac"} {
+		key := Lookup(id).Keys[0]
+		n, err := Rotate(env, id, true, false)
+		if err != nil || n[key] == env[key] || len(n[key]) < 32 {
+			t.Fatalf("rotate %s: %v", id, err)
+		}
 	}
 }

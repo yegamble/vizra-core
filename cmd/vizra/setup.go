@@ -34,7 +34,7 @@ func runSetup(args []string) error {
 	check := fs.Bool("check", false, "validate the existing env file; change nothing")
 	rotate := fs.String("rotate", "", "rotate one generated secret by question id (needs --yes)")
 	yes := fs.Bool("yes", false, "allow rewriting an existing env file")
-	yesIKnow := fs.Bool("yes-i-know", false, "also required to rotate mfa_kek")
+	yesIKnow := fs.Bool("yes-i-know", false, "accepted for compatibility; does not override a data-loss refusal (mfa_kek, postgres_password, clickhouse_password are always refused)")
 	web := fs.Bool("web", false, "loopback web wizard (not built yet)")
 	sets := setFlags{}
 	fs.Var(sets, "set", "id=value answer (repeatable)")

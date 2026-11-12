@@ -127,19 +127,34 @@ func Check(env map[string]string) []string {
 	return errs
 }
 
-// Rotate replaces one minted secret. Requires yes; the MFA KEK additionally
-// requires yesIKnow because existing TOTP enrolments wrapped with the old KEK
-// become unreadable (re-wrap is not implemented yet).
+// rotateRefused lists minted secrets whose rotation cannot be made safe by
+// editing the env file alone. They are refused in every mode, --yes-i-know
+// included.
+var rotateRefused = map[string]string{
+	"mfa_kek": "existing TOTP enrolments are wrapped with the current KEK and re-wrapping is not implemented; " +
+		"rotating it would make every enrolment unreadable. Use `vizra mfa rewrap-kek` once it exists (VZ-INSTALL-002 follow-up)",
+	"postgres_password": "the bundled PostgreSQL keeps its own password in its data volume; changing the env value " +
+		"does not change it and locks api/worker/migrate out. Change it in the database first (ALTER ROLE), then edit the env file",
+	"clickhouse_password": "the bundled ClickHouse keeps its own password; changing the env value alone breaks analytics writes. " +
+		"Change it in ClickHouse first, then edit the env file",
+}
+
+// Rotate replaces one minted secret. Requires yes. Secrets in rotateRefused
+// are always refused (yesIKnow does not override a data-loss refusal).
+// session_secret: logs every user out (documented, allowed). search_hmac: the
+// meta compose interpolates the single SEARCH_HMAC_KEY into both api and
+// search, so one env file feeds both; restart them together.
 func Rotate(env map[string]string, id string, yes, yesIKnow bool) (map[string]string, error) {
+	_ = yesIKnow
 	q := Lookup(id)
 	if !q.Mint {
 		return nil, fmt.Errorf("--rotate %s: only generated secrets can be rotated", id)
 	}
+	if why, ok := rotateRefused[id]; ok {
+		return nil, fmt.Errorf("--rotate %s: refused: %s", id, why)
+	}
 	if !yes {
 		return nil, fmt.Errorf("--rotate %s: refusing without --yes", id)
-	}
-	if id == "mfa_kek" && !yesIKnow {
-		return nil, errors.New("--rotate mfa_kek: rotating the KEK makes existing MFA enrolments unreadable; refusing without --yes-i-know")
 	}
 	v, err := mint()
 	if err != nil {
