@@ -1,0 +1,22 @@
+=== RUN   TestQuestionsValidAndInvalid
+--- PASS: TestQuestionsValidAndInvalid (0.00s)
+=== RUN   TestS1EveryAnswerLandsOnATemplateKey
+--- PASS: TestS1EveryAnswerLandsOnATemplateKey (0.00s)
+=== RUN   TestN1ExternalWithoutDSNRefused
+--- PASS: TestN1ExternalWithoutDSNRefused (0.00s)
+=== RUN   TestN2StorageDefaultNeverS3WithoutCredentials
+--- PASS: TestN2StorageDefaultNeverS3WithoutCredentials (0.00s)
+=== RUN   TestSecretsMintedNeverBlank
+--- PASS: TestSecretsMintedNeverBlank (0.00s)
+=== RUN   TestP1IndirectionsModeAndNoLeak
+--- PASS: TestP1IndirectionsModeAndNoLeak (0.01s)
+=== RUN   TestP1InteractiveSecretNotEchoed
+--- PASS: TestP1InteractiveSecretNotEchoed (0.00s)
+=== RUN   TestR1RerunPreservesAndRefusesRewrite
+--- PASS: TestR1RerunPreservesAndRefusesRewrite (0.01s)
+=== RUN   TestCheckNamesBadKeys
+--- PASS: TestCheckNamesBadKeys (0.00s)
+=== RUN   TestRotate
+--- PASS: TestRotate (0.00s)
+PASS
+ok  	github.com/yegamble/vizra-core/internal/setup	0.294s
