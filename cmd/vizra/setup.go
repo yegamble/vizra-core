@@ -41,6 +41,7 @@ func runSetup(args []string) error {
 	web := fs.Bool("web", false, "loopback web wizard (not built yet)")
 	sets := setFlags{}
 	fs.Var(sets, "set", "id=value answer (repeatable)")
+	deployDir := fs.String("deploy-dir", "deploy", "directory for the rendered edge file (Caddyfile.local, or nginx.example.conf for --tls external)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -85,7 +86,19 @@ func runSetup(args []string) error {
 		}
 		opts.Ask = &setup.LineAsker{In: bufio.NewReader(os.Stdin), Out: os.Stdout, ReadSecret: readNoEcho}
 	}
-	return setup.Run(opts)
+	if err := setup.Run(opts); err != nil {
+		return err
+	}
+	env, err := setup.ReadEnvFile(*envPath)
+	if err != nil {
+		return err
+	}
+	p, err := setup.WriteEdge(*deployDir, env, *yes)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s: written\n", p)
+	return nil
 }
 
 func readAnswers(path string) (map[string]string, error) {
