@@ -1,0 +1,22 @@
+$ git status --short (mutations restored)
+?? docs/evidence/found-001-004-pins/
+?? scripts/check-stack-pins.py
+?? scripts/stackpins_test.go
+$ go test -count=1 -run TestStackPins -v ./scripts/
+--- PASS: TestStackPinsRealTreePasses (0.13s)
+--- PASS: TestStackPinsMutationsFail (1.64s)
+    --- PASS: TestStackPinsMutationsFail/baseline_copy_passes (0.13s)
+    --- PASS: TestStackPinsMutationsFail/go.sum_deleted (0.29s)
+    --- PASS: TestStackPinsMutationsFail/go.sum_emptied (0.16s)
+    --- PASS: TestStackPinsMutationsFail/toolchain_changed (0.12s)
+    --- PASS: TestStackPinsMutationsFail/toolchain_removed (0.11s)
+    --- PASS: TestStackPinsMutationsFail/go_line_changed (0.13s)
+    --- PASS: TestStackPinsMutationsFail/setup-go_go-version_1.26 (0.12s)
+    --- PASS: TestStackPinsMutationsFail/setup-go_go-version-file_other (0.11s)
+    --- PASS: TestStackPinsMutationsFail/setup-go_version_source_removed (0.10s)
+    --- PASS: TestStackPinsMutationsFail/echo_below_ADR_floor (0.10s)
+    --- PASS: TestStackPinsMutationsFail/go-redis_off_ADR_minor (0.09s)
+    --- PASS: TestStackPinsMutationsFail/govips_off_ADR_pin (0.09s)
+    --- PASS: TestStackPinsMutationsFail/sqlc_off_ADR_pin (0.10s)
+ok  	github.com/yegamble/vizra-core/scripts	2.183s
+exit=0
