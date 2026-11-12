@@ -1,0 +1,33 @@
+$ # mutation: rm go.sum
+$ go test -count=1 -run TestStackPinsRealTreePasses ./scripts/
+--- FAIL: TestStackPinsRealTreePasses (0.13s)
+    stackpins_test.go:55: real tree must satisfy ADR-001 pins, exit 1:
+          FAIL  go.sum is missing or empty: the lockfile must be committed
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	0.548s
+FAIL
+exit=1
+$ # mutation: toolchain go1.27.4 -> go1.26.0
+$ go test -count=1 -run TestStackPinsRealTreePasses ./scripts/
+go: updates to go.mod needed; to update it:
+	go mod tidy
+exit=1
+$ # mutation: govulncheck.yml setup-go go-version 1.26
+$ go test -count=1 -run TestStackPinsRealTreePasses ./scripts/
+--- FAIL: TestStackPinsRealTreePasses (0.13s)
+    stackpins_test.go:55: real tree must satisfy ADR-001 pins, exit 1:
+          FAIL  govulncheck.yml:27: setup-go reads [('go-version', '1.26')]; want go-version-file: go.mod or go-version: 1.27.4
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	0.549s
+FAIL
+exit=1
+
+$ # mutation: toolchain go1.27.4 -> go1.27.3 (go1.26.0 above was refused by the go command itself before the check ran; this shows the check's own message)
+$ go test -count=1 -run TestStackPinsRealTreePasses ./scripts/
+--- FAIL: TestStackPinsRealTreePasses (0.10s)
+    stackpins_test.go:55: real tree must satisfy ADR-001 pins, exit 1:
+          FAIL  go.mod `toolchain` line is go1.27.3, want go1.27.4 (ADR-001)
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	0.533s
+FAIL
+exit=1
