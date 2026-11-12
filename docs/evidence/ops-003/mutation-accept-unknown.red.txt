@@ -1,0 +1,9 @@
+--- FAIL: TestLogsArgsBoundedAndValidated (0.00s)
+    ops_test.go:76: accepted {svc:nope since: tail:10} -> ["docker" "compose" "--env-file" "env/production.env" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "logs" "--no-color" "--tail" "10" "--" "nope"]
+    ops_test.go:76: accepted {svc:api; rm -rf / since: tail:10} -> ["docker" "compose" "--env-file" "env/production.env" "-f" "docker-compose.yml" "-f" "docker-compose.prod.yml" "-f" "docker-compose.external-postgres.yml" "--profile" "core" "--profile" "frontend" "--profile" "edge" "logs" "--no-color" "--tail" "10" "--" "api; rm -rf /"]
+--- FAIL: TestRestartRefusesUnknownAndOneShot (0.00s)
+    ops_test.go:94: unknown service accepted: refusing to restart one-shot service "postgres" (restart policy ""): it runs to completion; re-running it is a deliberate `vizra migrate`/`vizra update` step
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/ops	0.224s
+FAIL
+exit 1

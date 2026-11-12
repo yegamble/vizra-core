@@ -33,7 +33,24 @@ Usage:
               [--rotate ID --yes [--yes-i-know]] [--yes] [--env F]
                            Interview and write env/production.env (0600).
 
-Commands arriving with later slices: backup, restore, update, jobs.
+  vizra status  [--env F] [--project-dir D]
+                           Per-service health and image (compose ps), CLI release,
+                           and job queue depth from the database. Exit 0 all OK,
+                           1 any FAIL, 3 queue depth not measured (BLOCKED).
+  vizra logs    [--env F] [--tail N<=10000] [--since 30m|RFC3339, <=168h]
+                [--follow] [--dry-run] SERVICE
+  vizra restart [--env F] [--dry-run] SERVICE
+                           SERVICE must exist in the rendered chain; one-shots
+                           (restart: "no", e.g. migrate) are refused.
+  vizra update             Release check (BLOCKED: no release feed yet), the
+                           Compose >= 2.24.4 floor and the upgrade path. Exit 3.
+
+  status/logs/restart run docker compose with exactly the env-derived chain:
+  --env-file F, -f for each COMPOSE_FILE entry, --profile for each
+  COMPOSE_PROFILES entry. Running bare "docker compose" on a production host is
+  WRONG: it drops the prod and external overlays, every profile and the env file.
+
+Commands arriving with later slices: backup, restore, jobs.
 `
 
 func main() {
@@ -56,6 +73,14 @@ func main() {
 		os.Exit(runHealthcheck(os.Args[2:]))
 	case "setup":
 		err = runSetup(os.Args[2:])
+	case "status":
+		os.Exit(runStatus(os.Args[2:], realOpsEnv()))
+	case "logs":
+		os.Exit(runLogs(os.Args[2:], realOpsEnv()))
+	case "restart":
+		os.Exit(runRestart(os.Args[2:], realOpsEnv()))
+	case "update":
+		os.Exit(runUpdate(os.Args[2:], realOpsEnv()))
 	case "claim-token":
 		err = runClaimToken(os.Args[2:])
 	case "help", "-h", "--help":
