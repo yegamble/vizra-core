@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/yegamble/vizra-core/internal/setup"
 )
@@ -28,7 +30,8 @@ func (s setFlags) Set(v string) error {
 }
 
 // runSetup is `vizra setup` (VZ-INSTALL-002). It runs at the install root and
-// writes env/production.env there. --web is not built yet and is refused.
+// writes env/production.env there. --web serves the same interview on a
+// one-time 127.0.0.1 link.
 func runSetup(args []string) error {
 	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
 	envPath := fs.String("env", "env/production.env", "env file to write or check")
@@ -38,7 +41,9 @@ func runSetup(args []string) error {
 	rotate := fs.String("rotate", "", "rotate one generated secret by question id (needs --yes)")
 	yes := fs.Bool("yes", false, "allow rewriting an existing env file")
 	yesIKnow := fs.Bool("yes-i-know", false, "accepted for compatibility; does not override a data-loss refusal (mfa_kek, postgres_password, clickhouse_password are always refused)")
-	web := fs.Bool("web", false, "loopback web wizard (not built yet)")
+	web := fs.Bool("web", false, "serve the interview as a one-time loopback web form")
+	webAddr := fs.String("web-addr", "127.0.0.1:0", "--web listen address; only 127.0.0.1 is accepted")
+	webTTL := fs.Duration("web-ttl", 15*time.Minute, "--web link lifetime")
 	sets := setFlags{}
 	fs.Var(sets, "set", "id=value answer (repeatable)")
 	deployDir := fs.String("deploy-dir", "deploy", "directory for the rendered edge file (Caddyfile.local, or nginx.example.conf for --tls external)")
@@ -48,7 +53,21 @@ func runSetup(args []string) error {
 	opts := setup.Options{Path: *envPath, Out: os.Stdout, Stdin: os.Stdin, Yes: *yes, Answers: map[string]string{}}
 	switch {
 	case *web:
-		return errors.New("vizra setup --web: the web wizard is not built yet (VZ-INSTALL-002 continuation); use the terminal interview")
+		if err := setup.CheckLoopback(*webAddr); err != nil {
+			return err
+		}
+		w, err := setup.NewWeb(opts, *webTTL)
+		if err != nil {
+			return err
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := w.Serve(ctx, *webAddr, *webTTL, func(link string) {
+			fmt.Printf("Open this one-time link in a browser on this machine (expires in %s):\n  %s\n", *webTTL, link)
+		}); err != nil {
+			return err
+		}
+		return writeEdge(*envPath, *deployDir, *yes)
 	case *check:
 		env, err := setup.ReadEnvFile(*envPath)
 		if err != nil {
@@ -89,11 +108,16 @@ func runSetup(args []string) error {
 	if err := setup.Run(opts); err != nil {
 		return err
 	}
-	env, err := setup.ReadEnvFile(*envPath)
+	return writeEdge(*envPath, *deployDir, *yes)
+}
+
+// writeEdge renders the edge file from the env just written.
+func writeEdge(envPath, deployDir string, yes bool) error {
+	env, err := setup.ReadEnvFile(envPath)
 	if err != nil {
 		return err
 	}
-	p, err := setup.WriteEdge(*deployDir, env, *yes)
+	p, err := setup.WriteEdge(deployDir, env, yes)
 	if err != nil {
 		return err
 	}

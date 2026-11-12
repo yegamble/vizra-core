@@ -1,0 +1,6 @@
+vizra setup --web: refusing to listen on "0.0.0.0:0"; only 127.0.0.1 is allowed
+exit=1
+Open this one-time link in a browser on this machine (expires in 2s):
+  http://127.0.0.1:61635/?t=<64hex>
+vizra setup --web: link expired with nothing written
+exit=1
