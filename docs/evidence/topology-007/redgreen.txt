@@ -1,0 +1,32 @@
+## M1 setup: override appended to composeBase
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/setup	0.299s
+FAIL
+ok  	github.com/yegamble/vizra-core/internal/setup	0.260s
+## M2 ops: Argv drops -f
+FAIL
+FAIL	github.com/yegamble/vizra-core/internal/ops	0.248s
+FAIL
+ok  	github.com/yegamble/vizra-core/internal/ops	0.219s
+## M3 config: hatch refusal removed (all seams)
+--- FAIL: TestEveryEscapeHatchIsRefusedInProduction (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_DISABLE_AUTH (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_ALLOW_ANY_ORIGIN (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_SKIP_MIGRATIONS (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_FAKE_SEARCH (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_INSECURE_COOKIES (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedInProduction/VIZRA_DEV_TRUST_ANY_HMAC (0.00s)
+--- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="true" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="1" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="yes" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_DISABLE_AUTH="on" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="true" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="1" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="yes" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_ALLOW_ANY_ORIGIN="on" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="true" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="1" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="yes" (0.00s)
+    --- FAIL: TestEveryEscapeHatchIsRefusedForItsRealisticValues/VIZRA_DEV_SKIP_MIGRATIONS="on" (0.00s)
+ok  	github.com/yegamble/vizra-core/internal/config	0.234s

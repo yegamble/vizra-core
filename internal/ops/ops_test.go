@@ -144,3 +144,27 @@ func TestUpdateReportIsBlockedNotUpToDate(t *testing.T) {
 		t.Error("release check not BLOCKED")
 	}
 }
+
+// VZ-TOPOLOGY-007 negative: every argv carries one -f per chain entry and
+// nothing else, so compose's override auto-load can never engage.
+func TestArgvNeverReliesOnAutoLoad(t *testing.T) {
+	c, err := LoadChain(".env", map[string]string{"COMPOSE_FILE": "docker-compose.yml:docker-compose.prod.yml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sub := range [][]string{{"ps"}, {"logs"}, {"restart", "api"}, {"config", "--format", "json"}, {"pull"}, {"up", "-d"}} {
+		a := c.Argv(sub...)
+		n := 0
+		for i, x := range a {
+			if x == "-f" {
+				n++
+				if a[i+1] == "docker-compose.override.yml" {
+					t.Fatalf("%v: override in argv", a)
+				}
+			}
+		}
+		if n != len(c.Files) || n == 0 {
+			t.Fatalf("%v: want %d explicit -f, got %d", a, len(c.Files), n)
+		}
+	}
+}
