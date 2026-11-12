@@ -1,0 +1,42 @@
+# real binary, built from aae8309, darwin/arm64, Docker local, no stack up, temp dir with no compose files
+$ vizra setup --non-interactive --set domain=photos.example.org --set release=v0.1.0
+env/production.env: unchanged
+deploy/Caddyfile.local: written
+exit code: 0 (re-run)
+$ vizra doctor --env env/production.env
+FAIL   config: DATABASE_URL   must be set
+OK     env file               env/production.env passes `vizra setup --check`
+OK     docker engine          29.9.2
+OK     docker compose         5.6.1
+FAIL   rendered topology      `docker compose config` rejected the chain: compose file "docker-compose.yml" set by COMPOSE_FILE environment variable is invalid: stat /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.3iH3woVcbb/docker-compose.yml: no such file or directory
+BLOCKED dns/tls                no DNS/TLS probe yet: the edge certificate path is not wired into doctor (VZ-OPS-002 follow-up)
+BLOCKED closed ports           no safe external port probe exists yet; doctor will not scan from the host and call it proof
+BLOCKED backup freshness       no backup tool exists yet (backup/restore arrive with a later slice), so there is no backup to date
+
+8 check(s): 2 failed, 3 blocked (not run).
+vizra doctor: 2 check(s) failed
+exit code: 1
+
+$ DATABASE_URL=postgres://vizra:x@127.0.0.1:1/vizra?sslmode=disable REDIS_URL=redis://127.0.0.1:2/0 vizra doctor   (process env, unreachable DB/Redis)
+redis: 2026/11/12 13:29:26 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connect: connection refused
+redis: 2026/11/12 13:29:27 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connect: connection refused
+redis: 2026/11/12 13:29:28 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connect: connection refused
+OK     configuration          34 keys validated, mode=development
+BLOCKED env file               no --env file given; run `vizra doctor --env env/production.env`
+OK     docker engine          29.9.2
+OK     docker compose         5.6.1
+BLOCKED rendered topology      no --env file given, so the COMPOSE_FILE/COMPOSE_PROFILES chain is unknown
+BLOCKED dns/tls                no DNS/TLS probe yet: the edge certificate path is not wired into doctor (VZ-OPS-002 follow-up)
+BLOCKED closed ports           no safe external port probe exists yet; doctor will not scan from the host and call it proof
+BLOCKED backup freshness       no backup tool exists yet (backup/restore arrive with a later slice), so there is no backup to date
+FAIL   database               PostgreSQL is unreachable
+FAIL   cache                  unreachable; rate limiting would run on the per-process fallback and readiness would report degraded
+BLOCKED public origin          no VIZRA_PUBLIC_ORIGIN is configured
+OK     search                 off (the M0 default)
+FAIL   storage root           /var/lib/vizra/media is not writable: stat /var/lib/vizra/media: no such file or directory
+OK     disk free              . has 10.6 GiB free
+FAIL   api readiness          vizra healthcheck api: NOT READY — dial: connect: connection refused (127.0.0.1:8080/readyz, 2ms)
+
+15 check(s): 4 failed, 6 blocked (not run).
+vizra doctor: 4 check(s) failed
+exit code: 1
